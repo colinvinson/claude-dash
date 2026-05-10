@@ -17,6 +17,22 @@ function dateDaysAgo(n: number): string {
   return d.toISOString().split("T")[0];
 }
 
+function avg(arr: number[]): number {
+  return arr.length === 0 ? 0 : arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function trendDirection(values: (number | null)[]): "improving" | "declining" | "stable" {
+  const valid = values.filter((v): v is number => v != null);
+  if (valid.length < 3) return "stable";
+  const half   = Math.floor(valid.length / 2);
+  const first  = valid.slice(0, half);
+  const second = valid.slice(half);
+  const delta  = avg(second) - avg(first);
+  if (delta > 2)  return "improving";
+  if (delta < -2) return "declining";
+  return "stable";
+}
+
 export async function buildContext(userId: string) {
   const supabase = createServiceClient();
   const today     = getLogDate();
@@ -27,6 +43,7 @@ export async function buildContext(userId: string) {
     goalsRes, stackRes, logsRes, medLogsRes, setsRes, streakRes,
     healthRes, yesterdaySetsRes,
     dailyCtxRes, waterRes, faithRes, moodRes, journalRes, ltGoalsRes,
+    health7dRes, suppLogs14dRes, health14dRes, mood7dRes, goals7dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -36,13 +53,18 @@ export async function buildContext(userId: string) {
     supabase.from("goal_streaks").select("current_streak").eq("user_id", userId).single(),
     supabase.from("health_logs").select("*").eq("user_id", userId).eq("date", today).single(),
     supabase.from("workout_sets").select("weight_kg, reps, logged_at, exercises(name, split_day)").eq("user_id", userId).gte("logged_at", `${yesterday}T00:00:00`).lte("logged_at", `${yesterday}T23:59:59`).order("logged_at", { ascending: false }).limit(6),
-    // New lifestyle + journal data
     supabase.from("daily_context").select("raw_text").eq("user_id", userId).eq("log_date", today).single(),
     supabase.from("water_logs").select("glasses").eq("user_id", userId).eq("log_date", today).single(),
     supabase.from("faith_logs").select("prayed, bible_min, church_attended").eq("user_id", userId).eq("log_date", today).single(),
     supabase.from("mood_logs").select("score").eq("user_id", userId).eq("log_date", today).order("logged_at", { ascending: false }).limit(1),
     supabase.from("journal_entries").select("content, ai_summary").eq("user_id", userId).order("created_at", { ascending: false }).limit(3),
     supabase.from("long_term_goals").select("title, category, ai_action_plan").eq("user_id", userId).eq("is_active", true).limit(10),
+    // Trend + correlation data
+    supabase.from("health_logs").select("date, readiness_score, hrv, sleep_hours, deep_min").eq("user_id", userId).gte("date", dateDaysAgo(7)).order("date", { ascending: true }),
+    supabase.from("supplement_logs").select("supplement_id, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("health_logs").select("date, deep_min, hrv, readiness_score, sleep_hours").eq("user_id", userId).gte("date", dateDaysAgo(14)).order("date", { ascending: true }),
+    supabase.from("mood_logs").select("score, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(7)).order("log_date", { ascending: true }),
+    supabase.from("goals").select("title, is_complete, goal_date").eq("user_id", userId).gte("goal_date", dateDaysAgo(7)),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -116,6 +138,118 @@ export async function buildContext(userId: string) {
       : null,
   };
 
+  // ── Trend computation ──────────────────────────────────────────────────
+  type HealthRow = { date: string; readiness_score: number | null; hrv: number | null; sleep_hours: number | null; deep_min: number | null };
+  const h7d = (health7dRes.data ?? []) as HealthRow[];
+  const h14d = (health14dRes.data ?? []) as HealthRow[];
+
+  const hrv7d       = h7d.map((r) => r.hrv);
+  const ready7d     = h7d.map((r) => r.readiness_score);
+  const sleep7d     = h7d.map((r) => r.sleep_hours);
+  const deep7d      = h7d.map((r) => r.deep_min);
+  const moodScores  = ((mood7dRes.data ?? []) as Array<{ score: number; log_date: string }>).map((r) => r.score);
+
+  const validHrv    = hrv7d.filter((v): v is number => v != null);
+  const validReady  = ready7d.filter((v): v is number => v != null);
+  const validSleep  = sleep7d.filter((v): v is number => v != null);
+  const validDeep   = deep7d.filter((v): v is number => v != null);
+
+  // Declining streak: how many consecutive days has metric been falling?
+  function decliningStreak(values: (number | null)[]): number {
+    const valid = [...values].reverse().filter((v): v is number => v != null);
+    let streak = 0;
+    for (let i = 0; i < valid.length - 1; i++) {
+      if (valid[i] < valid[i + 1]) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  const trends = {
+    hrv: {
+      values:    hrv7d,
+      avg7d:     validHrv.length > 0   ? Math.round(avg(validHrv))   : null,
+      direction: trendDirection(hrv7d),
+      decliningDays: decliningStreak(hrv7d),
+    },
+    readiness: {
+      values:    ready7d,
+      avg7d:     validReady.length > 0  ? Math.round(avg(validReady)) : null,
+      direction: trendDirection(ready7d),
+      decliningDays: decliningStreak(ready7d),
+    },
+    sleep: {
+      avg7d_hours: validSleep.length > 0 ? Math.round(avg(validSleep) * 10) / 10 : null,
+      avg7d_deep:  validDeep.length  > 0 ? Math.round(avg(validDeep))            : null,
+      direction:   trendDirection(sleep7d),
+    },
+    mood: {
+      avg7d:     moodScores.length > 0 ? Math.round(avg(moodScores) * 10) / 10 : null,
+      direction: trendDirection(moodScores),
+    },
+  };
+
+  // ── Supplement correlations ─────────────────────────────────────────────
+  type SuppLog14 = { supplement_id: string; log_date: string };
+  const suppLogs14 = (suppLogs14dRes.data ?? []) as SuppLog14[];
+
+  const correlations: string[] = [];
+
+  // HRV declining streak note
+  if (trends.hrv.decliningDays >= 3) {
+    const series = validHrv.slice(-trends.hrv.decliningDays - 1).join("→");
+    correlations.push(`HRV declining ${trends.hrv.decliningDays} days straight: ${series}ms`);
+  }
+  if (trends.readiness.decliningDays >= 3) {
+    correlations.push(`Readiness declining ${trends.readiness.decliningDays} days straight`);
+  }
+
+  // Per-supplement deep sleep correlation
+  for (const supp of stack) {
+    const takenDates  = new Set(suppLogs14.filter((l) => l.supplement_id === supp.id).map((l) => l.log_date));
+    const daysWith    = h14d.filter((r) => takenDates.has(r.date) && r.deep_min != null).map((r) => r.deep_min as number);
+    const daysWithout = h14d.filter((r) => !takenDates.has(r.date) && r.deep_min != null).map((r) => r.deep_min as number);
+    if (daysWith.length >= 2 && daysWithout.length >= 2) {
+      const withAvg    = Math.round(avg(daysWith));
+      const withoutAvg = Math.round(avg(daysWithout));
+      const delta      = withAvg - withoutAvg;
+      if (Math.abs(delta) >= 15) {
+        correlations.push(
+          `${supp.name}: deep sleep avg ${withAvg}min (taken) vs ${withoutAvg}min (skipped) — ${delta > 0 ? "better with" : "worse with"} this supplement (${daysWith.length + daysWithout.length} data points)`
+        );
+      }
+    }
+  }
+
+  // ── Goal patterns ───────────────────────────────────────────────────────
+  type GoalRow = { title: string; is_complete: boolean; goal_date: string };
+  const goals7d = (goals7dRes.data ?? []) as GoalRow[];
+
+  const goalMap = new Map<string, { total: number; complete: number }>();
+  for (const g of goals7d) {
+    const entry = goalMap.get(g.title) ?? { total: 0, complete: 0 };
+    entry.total++;
+    if (g.is_complete) entry.complete++;
+    goalMap.set(g.title, entry);
+  }
+
+  const consistentlyMissed = [...goalMap.entries()]
+    .filter(([, v]) => v.total >= 3 && v.complete / v.total < 0.5)
+    .map(([title, v]) => `"${title}" (${v.complete}/${v.total} days)`);
+
+  const totalDays7d    = new Set(goals7d.map((g) => g.goal_date)).size;
+  const highPerfDays   = totalDays7d > 0
+    ? [...new Set(goals7d.map((g) => g.goal_date))].filter((date) => {
+        const dayGoals = goals7d.filter((g) => g.goal_date === date);
+        return dayGoals.length > 0 && dayGoals.filter((g) => g.is_complete).length / dayGoals.length >= 0.8;
+      }).length
+    : 0;
+
+  const goalPatterns = {
+    winRate7d: totalDays7d > 0 ? `${highPerfDays}/${totalDays7d} days 80%+ complete` : null,
+    consistentlyMissed,
+  };
+
   const goalsComplete = goals.filter((g) => g.is_complete).length;
   const suppsTaken = stack.filter((s) => logs.some((l) => l.supplement_id === s.id)).length;
 
@@ -154,5 +288,8 @@ export async function buildContext(userId: string) {
     journal:       (journalRes.data ?? []) as Array<{ content: string; ai_summary: string | null }>,
     longTermGoals: (ltGoalsRes.data ?? []) as Array<{ title: string; category: string; ai_action_plan: string | null }>,
     dailyScore,
+    trends,
+    correlations,
+    goalPatterns,
   };
 }
