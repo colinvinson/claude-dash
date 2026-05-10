@@ -1,26 +1,86 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: #050506;
+  --color-foreground: #FAFAFA;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --text-primary:    #FAFAFA;
+  --text-secondary:  #B8B6B0;
+  --text-tertiary:   #76746E;
+  --success:         #6BE3A4;
+  --warning:         #F2C063;
+  --danger:          #FF6B6B;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: #050506;
+  color: #FAFAFA;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Radial washes ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(224, 118, 88, 0.16) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 180, 200, 0.06) 0%, transparent 100%);
+  filter: blur(40px);
+  animation: wash-drift 36s ease-in-out infinite alternate;
 }
+
+/* ── Film grain ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
+  opacity: 0.014;
+}
+
+@keyframes wash-drift {
+  0%   { transform: translate(0, 0) scale(1);       }
+  100% { transform: translate(18px, -10px) scale(1.02); }
+}
+
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* ── Dynamic accent system (driven by daily score from Home page) ── */
+body[data-score="red"]::before {
+  background:
+    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(220, 38, 38, 0.18) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 60, 60, 0.08) 0%, transparent 100%);
+}
+
+body[data-score="emerald"]::before {
+  background:
+    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(16, 185, 129, 0.16) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(52, 211, 153, 0.06) 0%, transparent 100%);
+}
+
+/* ── Goal completion flash animation ── */
+@keyframes goal-complete-flash {
+  0%   { background: rgba(107, 227, 164, 0.25); }
+  100% { background: transparent; }
+}
+
+.goal-complete-flash {
+  animation: goal-complete-flash 600ms ease-out forwards;
+}
+
+/* ── Hide scrollbar utility ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
