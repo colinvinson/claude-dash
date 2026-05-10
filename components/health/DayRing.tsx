@@ -86,12 +86,22 @@ function compute(): Ring {
 }
 
 export default function DayRing() {
-  const [ring, setRing] = useState<Ring>(compute);
+  const [ring, setRing] = useState<Ring | null>(null);
 
   useEffect(() => {
+    setRing(compute());
     const id = setInterval(() => setRing(compute()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  if (!ring) {
+    return (
+      <div className="flex items-center gap-5 flex-wrap justify-center">
+        <div style={{ width: 168, height: 168 }} />
+        <div className="flex flex-col gap-1.5" style={{ maxWidth: 240 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-5 flex-wrap justify-center">
