@@ -176,7 +176,8 @@ rowan-dashboard/
         ├── 0002_redesign_tables.sql      # 8 new tables (water, faith, mood, journal, etc.)
         ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
         ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
-        └── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
+        ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
+        └── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
 ```
 
 ---
@@ -285,13 +286,21 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Protein logger (manual + photo + barcode) with AI vision scoring (0-100 for lean aesthetic muscle suitability); only protein persisted, score is metadata; daily target = weight × 2.0g/kg
 - Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h, RPE memory
 - Auto-adjusted lift prescriptions: weight × reps × sets × RPE cap modified based on recovery + muscle status (evidence-based, RP-style)
-- Deployed on Vercel + accessible on iPhone as PWA
+- **Settings page** at /settings (gear icon in TopHeader) — edit profile, supplements, exercises, gyms, recurring goal templates, sign out
+- **Welcome card** auto-appears on Home when supplements + exercises + weight are all empty
+- **Morning briefing** — Haiku-generated 3-sentence brief, fires once per day on app open, stored in `morning_briefings`
+- **Weekly review** — Sonnet 4.6-generated letter, auto-fires Sunday after 8am, stored in `weekly_reviews`, shown as expandable card on Home
+- **Conversational goal completion** — Overseer chat now executes tool calls (log water, complete goal, log supplement, log protein, etc.) via Anthropic tool use. Tool results stream as ✓ chips above the assistant's text response.
+- **Goal templates** — recurring goals auto-populate daily goal list each morning via `goal_templates` table
+- 4-digit passcode auth flow (proxy.ts gates non-public paths)
+- Deployed on Vercel + accessible on iPhone as PWA (manifest, apple touch icon SVG, status bar styling)
 
 ### Pending (needs user action)
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0003_fitness_intelligence.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0004_oura_expansion.sql` in Supabase SQL Editor — adds stress, resilience, vo2_max, workouts columns
 - Run `0005_protein_logger.sql` in Supabase SQL Editor — creates protein_logs table
+- Run `0006_coach_extensions.sql` in Supabase SQL Editor — creates morning_briefings, weekly_reviews, goal_templates tables
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
 ### Known issues

@@ -18,6 +18,9 @@ import ScoreHeadline from "@/components/home/ScoreHeadline";
 import QuickStatsStrip from "@/components/home/QuickStatsStrip";
 import PriorityFocusCard from "@/components/home/PriorityFocusCard";
 import StreakAlert from "@/components/home/StreakAlert";
+import MorningBriefing from "@/components/home/MorningBriefing";
+import WeeklyReviewCard from "@/components/home/WeeklyReviewCard";
+import WelcomeCard from "@/components/home/WelcomeCard";
 
 export default function HomePage() {
   const { goals, streak, toggleGoal } = useGoals();
@@ -86,6 +89,10 @@ export default function HomePage() {
 
   return (
     <>
+      <WelcomeCard />
+      <MorningBriefing />
+      <WeeklyReviewCard />
+
       {!hasCheckedIn && <CheckInCard />}
       {streakAtRisk && <StreakAlert streak={streak} />}
 

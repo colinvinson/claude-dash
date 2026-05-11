@@ -45,13 +45,34 @@ export function useGoals() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [goalsRes, tmrRes, streakRes] = await Promise.all([
+    const [goalsRes, tmrRes, streakRes, templatesRes] = await Promise.all([
       supabase.from("goals").select("*").eq("user_id", user.id).eq("goal_date", today).order("created_at"),
       supabase.from("goals").select("*").eq("user_id", user.id).eq("goal_date", tomorrow).order("created_at"),
       supabase.from("goal_streaks").select("current_streak").eq("user_id", user.id).single(),
+      supabase.from("goal_templates").select("title, priority").eq("user_id", user.id).eq("is_active", true),
     ]);
 
-    setGoals(goalsRes.data ?? []);
+    let todayGoals = goalsRes.data ?? [];
+    const templates = (templatesRes.data ?? []) as Array<{ title: string; priority: number }>;
+
+    // Auto-populate today's goal list from recurring templates if those titles aren't already present
+    const existingTitles = new Set(todayGoals.map((g) => g.title));
+    const missing = templates.filter((t) => !existingTitles.has(t.title));
+    if (missing.length > 0) {
+      await supabase.from("goals").insert(
+        missing.map((t) => ({
+          user_id:   user.id,
+          title:     t.title,
+          priority:  t.priority,
+          goal_date: today,
+        }))
+      );
+      // Re-fetch
+      const { data: refreshed } = await supabase.from("goals").select("*").eq("user_id", user.id).eq("goal_date", today).order("created_at");
+      todayGoals = refreshed ?? todayGoals;
+    }
+
+    setGoals(todayGoals);
     setTomorrowGoals(tmrRes.data ?? []);
     setStreak(streakRes.data?.current_streak ?? 0);
     setLoading(false);

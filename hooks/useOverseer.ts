@@ -3,11 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+export type ToolExecution = { name: string; message: string; ok: boolean };
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  tools?: ToolExecution[];
 };
 
 export function useOverseer() {
@@ -47,6 +50,7 @@ export function useOverseer() {
     const assistantPlaceholder: Message = {
       id: assistantId, role: "assistant", content: "",
       created_at: new Date().toISOString(),
+      tools: [],
     };
 
     setMessages((prev) => [...prev, userMsg, assistantPlaceholder]);
@@ -62,6 +66,7 @@ export function useOverseer() {
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
+      const collectedTools: ToolExecution[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -71,11 +76,17 @@ export function useOverseer() {
           const raw = line.slice(6);
           if (raw === "[DONE]") break;
           try {
-            const { text } = JSON.parse(raw);
-            if (text) {
-              accumulated += text;
+            const parsed = JSON.parse(raw) as { text?: string; tool?: ToolExecution };
+            if (parsed.text) {
+              accumulated += parsed.text;
               setMessages((prev) =>
                 prev.map((m) => m.id === assistantId ? { ...m, content: accumulated } : m)
+              );
+            }
+            if (parsed.tool) {
+              collectedTools.push(parsed.tool);
+              setMessages((prev) =>
+                prev.map((m) => m.id === assistantId ? { ...m, tools: [...collectedTools] } : m)
               );
             }
           } catch {}

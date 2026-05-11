@@ -53,23 +53,40 @@ export default function OverseerChat() {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "rounded-br-sm"
-                  : "rounded-bl-sm"
-              }`}
-              style={{
-                background: m.role === "user"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(255,255,255,0.05)",
-                color: m.role === "user" ? "#f4f4f5" : "#d4d4d8",
-              }}
-            >
-              {m.content}
-              {m.content === "" && streaming && (
-                <span className="inline-block w-1.5 h-4 bg-zinc-400 animate-pulse rounded-sm ml-0.5" />
+            <div className="max-w-[88%] flex flex-col gap-1.5">
+              {m.tools && m.tools.length > 0 && (
+                <div className={`flex flex-wrap gap-1.5 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {m.tools.map((t, i) => (
+                    <span
+                      key={i}
+                      className="text-[11px] font-medium px-2 py-1 rounded-full"
+                      style={{
+                        background: t.ok ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                        color: t.ok ? "#6ee7b7" : "#fca5a5",
+                        border: `1px solid ${t.ok ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                      }}
+                    >
+                      {t.ok ? "✓" : "⚠"} {t.message}
+                    </span>
+                  ))}
+                </div>
               )}
+              <div
+                className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                  m.role === "user" ? "rounded-br-sm" : "rounded-bl-sm"
+                }`}
+                style={{
+                  background: m.role === "user"
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(255,255,255,0.05)",
+                  color: m.role === "user" ? "#f4f4f5" : "#d4d4d8",
+                }}
+              >
+                {m.content}
+                {m.content === "" && streaming && (!m.tools || m.tools.length === 0) && (
+                  <span className="inline-block w-1.5 h-4 bg-zinc-400 animate-pulse rounded-sm ml-0.5" />
+                )}
+              </div>
             </div>
           </div>
         ))}

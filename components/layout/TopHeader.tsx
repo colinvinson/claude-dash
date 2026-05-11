@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Settings as SettingsIcon } from "lucide-react";
 import { useHealth } from "@/hooks/useHealth";
 import { val } from "@/lib/fmt";
 
@@ -28,9 +30,14 @@ export default function TopHeader() {
         <span className="text-[11px] font-semibold tracking-[0.18em] text-zinc-300 uppercase">
           {dayStr}&nbsp;&nbsp;{split.toUpperCase()} DAY
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Live</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Live</span>
+          </div>
+          <Link href="/settings" className="text-zinc-500 hover:text-zinc-200 transition-colors">
+            <SettingsIcon size={14} />
+          </Link>
         </div>
       </div>
 
