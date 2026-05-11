@@ -22,18 +22,6 @@ export default function BottomNav() {
     <>
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
 
-      {/* Safe-area glass cap — fills the home-indicator zone with a soft glass extension
-          so it doesn't look like a hard black rectangle below the floating pill */}
-      <div
-        className="fixed bottom-0 inset-x-0 z-40 pointer-events-none"
-        style={{
-          height: "calc(env(safe-area-inset-bottom) + 28px)",
-          background: "linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.55) 45%, rgba(5,5,6,0.85) 100%)",
-          backdropFilter: "blur(20px) saturate(160%)",
-          WebkitBackdropFilter: "blur(20px) saturate(160%)",
-        }}
-      />
-
       {/* Outer floating container — handles safe-area + horizontal margins */}
       <div
         className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"
