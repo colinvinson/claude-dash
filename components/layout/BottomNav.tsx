@@ -58,8 +58,8 @@ export default function BottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                  active ? "text-white" : "text-zinc-600 hover:text-zinc-400"
+                className={`tap flex flex-col items-center justify-center gap-0.5 ${
+                  active ? "text-white" : "text-zinc-600"
                 }`}
               >
                 <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />

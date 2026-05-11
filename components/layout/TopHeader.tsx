@@ -25,7 +25,16 @@ export default function TopHeader() {
   const split  = splits[date.getDay()];
 
   return (
-    <div className="sticky top-0 z-50 px-4" style={{ background: "rgba(5,5,6,0.85)", backdropFilter: "blur(24px) saturate(1.2)", WebkitBackdropFilter: "blur(24px) saturate(1.2)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+    <div
+      className="sticky top-0 z-50 px-4"
+      style={{
+        background: "rgba(5,5,6,0.85)",
+        backdropFilter: "blur(24px) saturate(1.2)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        paddingTop: "env(safe-area-inset-top)",
+      }}
+    >
       <div className="flex items-center justify-between py-2">
         <span className="text-[11px] font-semibold tracking-[0.18em] text-zinc-300 uppercase">
           {dayStr}&nbsp;&nbsp;{split.toUpperCase()} DAY
