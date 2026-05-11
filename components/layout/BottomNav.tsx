@@ -22,31 +22,44 @@ export default function BottomNav() {
     <>
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
 
-      <nav
-        className="fixed bottom-0 inset-x-0 z-50"
+      {/* Outer floating container — handles safe-area + horizontal margins */}
+      <div
+        className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"
         style={{
-          background: "#050506",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)",
+          paddingLeft: 14,
+          paddingRight: 14,
         }}
       >
-        <div className="grid h-14" style={{ gridTemplateColumns: "1fr 1fr 56px 1fr 1fr" }}>
-          {tabs.map((tab, i) => {
+        {/* The pill itself — liquid glass */}
+        <nav
+          className="flex items-center gap-1 px-1.5 py-1.5 pointer-events-auto"
+          style={{
+            // Tinted base + subtle top-to-bottom sheen for depth
+            background: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%), rgba(20,20,24,0.55)",
+            backdropFilter: "blur(36px) saturate(180%)",
+            WebkitBackdropFilter: "blur(36px) saturate(180%)",
+            // Edge highlight + outer shadow for the floating feel
+            border: "1px solid rgba(255,255,255,0.10)",
+            boxShadow: "0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+            borderRadius: 9999,
+          }}
+        >
+          {tabs.map((tab) => {
             if ("center" in tab && tab.center) {
               return (
-                <div key="log" className="flex items-center justify-center">
-                  <button
-                    onClick={() => setLogOpen(true)}
-                    className="flex items-center justify-center w-11 h-11 rounded-full transition-transform active:scale-95"
-                    style={{
-                      background: "#ffffff",
-                      boxShadow: "0 0 20px rgba(255,255,255,0.15)",
-                    }}
-                    aria-label="Log"
-                  >
-                    <Plus size={20} strokeWidth={2.5} className="text-black" />
-                  </button>
-                </div>
+                <button
+                  key="log"
+                  onClick={() => setLogOpen(true)}
+                  className="flex items-center justify-center w-12 h-12 rounded-full transition-transform active:scale-95"
+                  style={{
+                    background: "#ffffff",
+                    boxShadow: "0 0 18px rgba(255,255,255,0.22), 0 4px 12px rgba(0,0,0,0.25)",
+                  }}
+                  aria-label="Log"
+                >
+                  <Plus size={20} strokeWidth={2.5} className="text-black" />
+                </button>
               );
             }
 
@@ -57,17 +70,23 @@ export default function BottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={`tap flex flex-col items-center justify-center gap-0.5 ${
-                  active ? "text-white" : "text-zinc-600"
-                }`}
+                aria-label={label}
+                className="tap flex flex-col items-center justify-center w-14 h-12 rounded-full"
+                style={{
+                  background: active ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: active ? "#fafafa" : "#a1a1aa",
+                  transition: "background-color 200ms ease, color 200ms ease, transform 120ms cubic-bezier(0.22,1,0.36,1)",
+                }}
               >
                 <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
-                <span className="text-[9px] font-medium uppercase tracking-widest">{label}</span>
+                {active && (
+                  <span className="text-[9px] font-semibold uppercase tracking-widest mt-0.5">{label}</span>
+                )}
               </Link>
             );
           })}
-        </div>
-      </nav>
+        </nav>
+      </div>
     </>
   );
 }
