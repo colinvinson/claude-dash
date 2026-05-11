@@ -308,4 +308,10 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - **AI costs** — Haiku for all async/background tasks; Sonnet only for interactive chat
 - **`computeDailyScore()`** is pure TypeScript, never calls AI
 - **LogSheet** is not a route — lives in BottomNav JSX to survive tab navigation
-- **Vercel deployment** — all 6 env vars must be set in Vercel dashboard (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OURA_PAT`, `WORKOUT_API_KEY`)
+- **Vercel deployment** — all 9 env vars must be set in Vercel dashboard (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OURA_PAT`, `WORKOUT_API_KEY`, `APP_PASSCODE`, `AUTH_EMAIL`, `AUTH_PASSWORD`)
+
+### Auth — 4-digit passcode (replaces magic link)
+- `/login` page renders four single-digit boxes. On full entry, POSTs to `/api/auth/passcode`.
+- Server route checks the code against `APP_PASSCODE` env var. If match, calls `signInWithPassword` using `AUTH_EMAIL` + `AUTH_PASSWORD` env vars — same Supabase account every time.
+- Supabase session cookies handle persistence (~1 week default, auto-refresh). User only re-enters the code if cookies expire or are cleared.
+- The Supabase user must have a password set (one-time manual step in Supabase Dashboard → Authentication → Users → Edit user).
