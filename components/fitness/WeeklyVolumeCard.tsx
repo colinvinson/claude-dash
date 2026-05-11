@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useWorkout, MuscleVolume, VOLUME_TARGETS } from "@/hooks/useWorkout";
 import Card from "@/components/ui/Card";
 
@@ -19,6 +20,11 @@ const STATUS_LABEL: Record<MuscleVolume["status"], string> = {
 
 export default function WeeklyVolumeCard() {
   const { weeklyVolume, loading } = useWorkout();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   if (loading) return null;
 
@@ -76,8 +82,11 @@ export default function WeeklyVolumeCard() {
                   style={{ left: `${mevPct}%` }}
                 />
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${STATUS_COLOR[v.status]}`}
-                  style={{ width: `${pct}%` }}
+                  className={`h-full rounded-full ${STATUS_COLOR[v.status]}`}
+                  style={{
+                    width: `${mounted ? pct : 0}%`,
+                    transition: "width 700ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease",
+                  }}
                 />
               </div>
             </div>

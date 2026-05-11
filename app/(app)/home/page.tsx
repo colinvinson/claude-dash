@@ -21,6 +21,7 @@ import StreakAlert from "@/components/home/StreakAlert";
 import MorningBriefing from "@/components/home/MorningBriefing";
 import WeeklyReviewCard from "@/components/home/WeeklyReviewCard";
 import WelcomeCard from "@/components/home/WelcomeCard";
+import StreakCelebration from "@/components/home/StreakCelebration";
 
 export default function HomePage() {
   const { goals, streak, toggleGoal } = useGoals();
@@ -89,6 +90,7 @@ export default function HomePage() {
 
   return (
     <>
+      <StreakCelebration />
       <div className="anim-fade-up"><WelcomeCard /></div>
       <div className="anim-fade-up stagger-1"><MorningBriefing /></div>
       <div className="anim-fade-up stagger-2"><WeeklyReviewCard /></div>

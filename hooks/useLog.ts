@@ -71,14 +71,18 @@ export function useLog() {
   useEffect(() => { load(); }, [load]);
 
   const addWater = useCallback(async () => {
+    // Optimistic: bump the UI immediately
+    setState((s) => ({ ...s, water: s.water + 1 }));
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const newGlasses = state.water + 1;
-    await supabase.from("water_logs").upsert(
-      { user_id: user.id, log_date: today, glasses: newGlasses, updated_at: new Date().toISOString() },
+    const { error } = await supabase.from("water_logs").upsert(
+      { user_id: user.id, log_date: today, glasses: state.water + 1, updated_at: new Date().toISOString() },
       { onConflict: "user_id,log_date" }
     );
-    setState((s) => ({ ...s, water: newGlasses }));
+    if (error) {
+      // Roll back
+      setState((s) => ({ ...s, water: Math.max(0, s.water - 1) }));
+    }
   }, [supabase, today, state.water]);
 
   const logMeditation = useCallback(async (durationMin: number) => {

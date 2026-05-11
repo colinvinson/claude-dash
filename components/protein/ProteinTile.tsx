@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Camera, Barcode, Type, Loader2 } from "lucide-react";
 import { useProtein, type ProteinSource } from "@/hooks/useProtein";
+import { useToast } from "@/components/ui/Toast";
 import ProteinScanner from "./ProteinScanner";
 import ProteinConfirm from "./ProteinConfirm";
 
@@ -24,6 +25,7 @@ type TileProps = {
 
 export default function ProteinTile({ expanded, onToggle }: TileProps) {
   const { totalToday, target, pctOfTarget, logProtein } = useProtein();
+  const { toast } = useToast();
   const [mode, setMode]               = useState<Mode>("manual");
   const [proteinInput, setProteinInput] = useState("");
   const [foodNameInput, setFoodNameInput] = useState("");
@@ -65,6 +67,7 @@ export default function ProteinTile({ expanded, onToggle }: TileProps) {
       ai_reasoning,
     });
 
+    toast(`Logged ${grams}g protein`);
     setProteinInput("");
     setFoodNameInput("");
     setSubmitting(false);
@@ -117,6 +120,7 @@ export default function ProteinTile({ expanded, onToggle }: TileProps) {
     source: ProteinSource; barcode?: string | null;
   }) {
     await logProtein(final);
+    toast(`Logged ${final.protein_g}g — ${final.food_name}`);
     setAnalysis(null);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);

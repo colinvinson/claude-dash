@@ -64,15 +64,28 @@ export function useStack() {
   const toggle = useCallback(async (supplementId: string, taken: boolean, logId: string | null) => {
     if (!userId) return;
     const today = getLogDate();
-    if (taken && logId) {
-      await supabase.from("supplement_logs").delete().eq("id", logId);
-    } else {
-      await supabase.from("supplement_logs").insert({
-        user_id: userId, supplement_id: supplementId,
-        log_date: today, taken_at: new Date().toISOString(),
-      });
+
+    // Optimistic flip in local state
+    setItems((prev) => prev.map((item) =>
+      item.id === supplementId
+        ? { ...item, taken: !taken, log_id: !taken ? "optimistic" : null }
+        : item
+    ));
+
+    try {
+      if (taken && logId) {
+        await supabase.from("supplement_logs").delete().eq("id", logId);
+      } else {
+        await supabase.from("supplement_logs").insert({
+          user_id: userId, supplement_id: supplementId,
+          log_date: today, taken_at: new Date().toISOString(),
+        });
+      }
+      await load();
+    } catch {
+      // Roll back on error
+      await load();
     }
-    await load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
