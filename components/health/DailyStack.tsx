@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useStack, StackItem } from "@/hooks/useStack";
+import { useStack, StackItem, StackCategory } from "@/hooks/useStack";
 import SectionLabel from "@/components/layout/SectionLabel";
 import Card from "@/components/ui/Card";
-import { Plus } from "lucide-react";
+import { Plus, Pill, Syringe, Sparkles, Beaker } from "lucide-react";
+
+const CATEGORY_META: Record<StackCategory, { label: string; Icon: typeof Pill }> = {
+  supplement: { label: "Supplements", Icon: Pill },
+  medication: { label: "Medications", Icon: Beaker },
+  injection:  { label: "Injections",  Icon: Syringe },
+  skincare:   { label: "Skincare",    Icon: Sparkles },
+};
 
 function StackRow({ item, onToggle }: { item: StackItem; onToggle: () => void }) {
   return (
@@ -34,35 +41,67 @@ function StackRow({ item, onToggle }: { item: StackItem; onToggle: () => void })
   );
 }
 
-function TimingSection({ label, time, items, onToggle }: {
-  label: string; time: string; items: StackItem[];
+function CategorySection({ category, items, onToggle }: {
+  category: StackCategory;
+  items: StackItem[];
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
 }) {
+  if (items.length === 0) return null;
   const taken = items.filter((i) => i.taken).length;
+  const meta = CATEGORY_META[category];
+  const Icon = meta.Icon;
+
+  // Group by timing within the category
+  const morning = items.filter((i) => i.timing === "Morning" || i.timing === "Pre-workout");
+  const lunch   = items.filter((i) => i.timing === "Lunch" || i.timing === "Afternoon");
+  const evening = items.filter((i) => i.timing === "Evening" || i.timing === "Pre-bed");
+  const other   = items.filter((i) => !morning.includes(i) && !lunch.includes(i) && !evening.includes(i));
+
   return (
-    <div className="mb-1">
-      <div className="flex items-center gap-2 mb-1 pb-1 border-b border-[#1f1f1f]">
-        <span className="text-xs font-semibold text-zinc-300">{label}</span>
-        <span className="text-[11px] text-zinc-600">{time}</span>
-        <span className="ml-auto text-[11px] text-zinc-500">{taken}/{items.length}</span>
+    <div className="mb-4 last:mb-0">
+      <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#1f1f1f]">
+        <div className="flex items-center gap-2">
+          <Icon size={13} className="text-zinc-500" />
+          <span className="text-xs font-semibold text-zinc-300 uppercase tracking-widest">{meta.label}</span>
+        </div>
+        <span className="text-[11px] text-zinc-500">{taken}/{items.length}</span>
       </div>
-      {items.map((item) => (
-        <StackRow key={item.id} item={item} onToggle={() => onToggle(item.id, item.taken, item.log_id)} />
-      ))}
+      {morning.length > 0 && (
+        <div className="mb-2">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1 block">Morning</span>
+          {morning.map((item) => <StackRow key={item.id} item={item} onToggle={() => onToggle(item.id, item.taken, item.log_id)} />)}
+        </div>
+      )}
+      {lunch.length > 0 && (
+        <div className="mb-2">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1 block">Midday</span>
+          {lunch.map((item) => <StackRow key={item.id} item={item} onToggle={() => onToggle(item.id, item.taken, item.log_id)} />)}
+        </div>
+      )}
+      {evening.length > 0 && (
+        <div className="mb-2">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1 block">Evening</span>
+          {evening.map((item) => <StackRow key={item.id} item={item} onToggle={() => onToggle(item.id, item.taken, item.log_id)} />)}
+        </div>
+      )}
+      {other.length > 0 && other.map((item) => <StackRow key={item.id} item={item} onToggle={() => onToggle(item.id, item.taken, item.log_id)} />)}
     </div>
   );
 }
 
-export default function DailyStack() {
+export default function DailyStack({ categories }: { categories?: StackCategory[] }) {
   const { items, loading, toggle, addToStack } = useStack();
-  const [newName,   setNewName]   = useState("");
-  const [newDose,   setNewDose]   = useState("");
+  const [newName, setNewName] = useState("");
+  const [newDose, setNewDose] = useState("");
 
-  const morning = items.filter((i) => i.timing === "Morning");
-  const lunch   = items.filter((i) => i.timing === "Lunch");
-  const evening = items.filter((i) => i.timing === "Evening");
-  const total   = items.length;
-  const taken   = items.filter((i) => i.taken).length;
+  const filterCats: StackCategory[] = categories ?? ["supplement"];
+  const visible = items.filter((i) =>
+    filterCats.includes(((i as { category?: string }).category ?? "supplement") as StackCategory)
+  );
+
+  const total = visible.length;
+  const taken = visible.filter((i) => i.taken).length;
+  const showWrapper = filterCats.length === 1 && filterCats[0] === "supplement";
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -71,24 +110,28 @@ export default function DailyStack() {
     setNewDose("");
   }
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <SectionLabel>Daily Stack</SectionLabel>
-        <span className="text-[11px] text-zinc-500">{taken}/{total} taken · resets 6 AM</span>
-      </div>
-      <Card>
-        {loading ? (
-          <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-8 bg-zinc-800 rounded animate-pulse" />)}</div>
-        ) : (
-          <>
-            <p className="text-xs text-zinc-400 mb-3">Tap each as you take it</p>
-            {morning.length > 0 && <TimingSection label="Morning" time="7–10 AM" items={morning} onToggle={toggle} />}
-            {lunch.length   > 0 && <TimingSection label="Lunch"   time="12–2 PM" items={lunch}   onToggle={toggle} />}
-            {evening.length > 0 && <TimingSection label="Evening" time="9–11 PM"  items={evening} onToggle={toggle} />}
-          </>
-        )}
+  const content = (
+    <Card>
+      {loading ? (
+        <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-8 bg-zinc-800 rounded animate-pulse" />)}</div>
+      ) : visible.length === 0 ? (
+        <p className="text-xs text-zinc-500">No routine items in these categories. Add some in Settings.</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-zinc-400">Tap each as you take it</p>
+            <span className="text-[11px] text-zinc-500">{taken}/{total} done · resets 6 AM</span>
+          </div>
+          {filterCats.map((cat) => {
+            const catItems = visible.filter((i) => ((i as { category?: string }).category ?? "supplement") === cat);
+            return (
+              <CategorySection key={cat} category={cat} items={catItems} onToggle={toggle} />
+            );
+          })}
+        </>
+      )}
 
+      {filterCats.includes("supplement") && (
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#1f1f1f]">
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name (e.g. B-complex)"
             className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600" />
@@ -99,7 +142,19 @@ export default function DailyStack() {
             <Plus size={12} /> Add
           </button>
         </div>
-      </Card>
-    </div>
+      )}
+    </Card>
   );
+
+  if (showWrapper) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel>Daily Stack</SectionLabel>
+        </div>
+        {content}
+      </div>
+    );
+  }
+  return content;
 }

@@ -5,12 +5,22 @@ import { createClient } from "@/lib/supabase/client";
 import Card from "@/components/ui/Card";
 import { X, Plus } from "lucide-react";
 
+type Category = "supplement" | "medication" | "injection" | "skincare";
+
 type Stack = {
   id: string;
   name: string;
   dose: string | null;
   timing: string | null;
+  category: Category;
   is_active: boolean;
+};
+
+const CATEGORY_LABEL: Record<Category, string> = {
+  supplement: "Supplement",
+  medication: "Medication",
+  injection:  "Injection",
+  skincare:   "Skincare",
 };
 
 const TIMING_OPTIONS = ["Morning", "Pre-workout", "Lunch", "Afternoon", "Evening", "Pre-bed"];
@@ -23,6 +33,7 @@ export default function SupplementStackEditor() {
   const [name, setName]       = useState("");
   const [dose, setDose]       = useState("");
   const [timing, setTiming]   = useState("Morning");
+  const [category, setCategory] = useState<Category>("supplement");
   const [userId, setUserId]   = useState<string | null>(null);
 
   async function load() {
@@ -31,7 +42,7 @@ export default function SupplementStackEditor() {
     setUserId(user.id);
     const { data } = await supabase
       .from("supplement_stack")
-      .select("id, name, dose, timing, is_active")
+      .select("id, name, dose, timing, category, is_active")
       .eq("user_id", user.id)
       .order("sort_order");
     setItems((data ?? []) as Stack[]);
@@ -48,6 +59,7 @@ export default function SupplementStackEditor() {
       name: name.trim(),
       dose: dose.trim() || null,
       timing,
+      category,
       is_active: true,
       sort_order: items.length,
     });
@@ -65,10 +77,10 @@ export default function SupplementStackEditor() {
 
   return (
     <Card>
-      <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-4">— Supplement Stack</span>
+      <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-4">— Routine items (supplements / meds / injections / skincare)</span>
 
       {items.length === 0 ? (
-        <p className="text-xs text-zinc-500 mb-4">No supplements yet. Add one below.</p>
+        <p className="text-xs text-zinc-500 mb-4">No routine items yet. Add one below.</p>
       ) : (
         <div className="space-y-1.5 mb-4">
           {items.map((s) => (
@@ -79,8 +91,9 @@ export default function SupplementStackEditor() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-100 truncate">{s.name}</p>
                 <p className="text-[10px] text-zinc-500 mt-0.5">
-                  {s.dose && <span>{s.dose} · </span>}
-                  {s.timing}
+                  <span className="text-zinc-400">{CATEGORY_LABEL[s.category ?? "supplement"]}</span>
+                  {s.dose && <span> · {s.dose}</span>}
+                  {s.timing && <span> · {s.timing}</span>}
                   {!s.is_active && <span> · archived</span>}
                 </p>
               </div>
@@ -111,6 +124,22 @@ export default function SupplementStackEditor() {
           placeholder="Dose (e.g. 400mg)"
           className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
         />
+        <div>
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Category</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                  category === c ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                }`}
+              >
+                {CATEGORY_LABEL[c]}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-1.5 flex-wrap">
           {TIMING_OPTIONS.map((t) => (
             <button

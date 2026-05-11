@@ -3,10 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+export type JournalCategory = "personal" | "business";
+
 export type JournalEntry = {
   id: string;
   content: string;
   ai_summary: string | null;
+  category: JournalCategory;
   created_at: string;
 };
 
@@ -20,45 +23,53 @@ export type LongTermGoal = {
   created_at: string;
 };
 
-export function useJournal() {
+export function useJournal(opts?: { entryCategory?: JournalCategory; goalCategories?: string[] }) {
   const supabase = createClient();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [longTermGoals, setLongTermGoals] = useState<LongTermGoal[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const entryCategory  = opts?.entryCategory;
+  const goalCategories = opts?.goalCategories;
+
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [journalRes, goalsRes] = await Promise.all([
-      supabase.from("journal_entries")
-        .select("id, content, ai_summary, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase.from("long_term_goals")
-        .select("id, title, category, target_date, ai_action_plan, is_active, created_at")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false }),
-    ]);
+    let journalQuery = supabase.from("journal_entries")
+      .select("id, content, ai_summary, category, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (entryCategory) journalQuery = journalQuery.eq("category", entryCategory);
+
+    let goalsQuery = supabase.from("long_term_goals")
+      .select("id, title, category, target_date, ai_action_plan, is_active, created_at")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+    if (goalCategories && goalCategories.length > 0) goalsQuery = goalsQuery.in("category", goalCategories);
+
+    const [journalRes, goalsRes] = await Promise.all([journalQuery, goalsQuery]);
 
     setEntries((journalRes.data ?? []) as JournalEntry[]);
     setLongTermGoals((goalsRes.data ?? []) as LongTermGoal[]);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, entryCategory, goalCategories]);
 
-  const addEntry = useCallback(async (content: string) => {
+  const addEntry = useCallback(async (content: string, category: JournalCategory = "personal") => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
       .from("journal_entries")
-      .insert({ user_id: user.id, content })
-      .select("id, content, ai_summary, created_at")
+      .insert({ user_id: user.id, content, category })
+      .select("id, content, ai_summary, category, created_at")
       .single();
     if (data) {
-      setEntries((prev) => [data as JournalEntry, ...prev]);
-      // Fire AI summary async
+      // Only add to local state if it matches our category filter (or no filter)
+      if (!entryCategory || (data as JournalEntry).category === entryCategory) {
+        setEntries((prev) => [data as JournalEntry, ...prev]);
+      }
       fetch("/api/overseer/parse-journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,7 +82,7 @@ export function useJournal() {
         }
       }).catch(() => {});
     }
-  }, [supabase]);
+  }, [supabase, entryCategory]);
 
   const addLongTermGoal = useCallback(async (
     title: string,
@@ -87,7 +98,6 @@ export function useJournal() {
       .single();
     if (data) {
       setLongTermGoals((prev) => [data as LongTermGoal, ...prev]);
-      // Fire action plan async
       fetch("/api/overseer/action-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

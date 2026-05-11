@@ -13,12 +13,15 @@ function getLogDate() {
   return now.toISOString().split("T")[0];
 }
 
+export type StackCategory = "supplement" | "medication" | "injection" | "skincare";
+
 export type StackItem = {
   id: string;
   name: string;
   dose: string;
   notes: string | null;
   timing: string;
+  category: StackCategory;
   sort_order: number;
   taken: boolean;
   log_id: string | null;
@@ -38,7 +41,7 @@ export function useStack() {
     const today = getLogDate();
 
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("*").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 

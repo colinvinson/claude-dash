@@ -2,30 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Leaf, Plus, Bot, BarChart2 } from "lucide-react";
+import { Home, Sparkles, Plus, Dumbbell, Briefcase } from "lucide-react";
 import { useState } from "react";
 import LogSheet from "./LogSheet";
 
 const tabs = [
-  { href: "/home",  label: "Home",  icon: Home },
-  { href: "/life",  label: "Life",  icon: Leaf },
-  { center: true,   label: "Log",   icon: Plus },
-  { href: "/coach", label: "Coach", icon: Bot },
-  { href: "/data",  label: "Data",  icon: BarChart2 },
+  { href: "/home",     label: "Home",    icon: Home },
+  { href: "/lifemax",  label: "LifeMax", icon: Sparkles },
+  { center: true,      label: "Log",     icon: Plus },
+  { href: "/gym",      label: "Gym",     icon: Dumbbell },
+  { href: "/business", label: "Bizz",    icon: Briefcase },
 ] as const;
 
-// Per-tab pill width — must match the rendered width below for the slide to land right.
-const TAB_W = 56;
-const GAP   = 4;     // tailwind gap-1 = 4px
-const CENTER_W = 48; // center + button
-const PILL_PAD = 6;  // px-1.5 = 6px
+const TAB_W   = 56;
+const GAP     = 4;
+const CENTER_W = 48;
+const PILL_PAD = 6;
 
 export default function BottomNav() {
   const pathname = usePathname();
   const [logOpen, setLogOpen] = useState(false);
 
-  // Active index — needed so the highlight slides to the right position.
-  // null when no tab matches (shouldn't happen but safe).
   const activeIndex = (() => {
     for (let i = 0; i < tabs.length; i++) {
       const t = tabs[i];
@@ -36,8 +33,6 @@ export default function BottomNav() {
     return -1;
   })();
 
-  // Compute pixel offset of the highlight given the active index.
-  // Layout: padding | tab(56) | gap | tab(56) | gap | center(48) | gap | tab(56) | gap | tab(56) | padding
   function offsetFor(index: number): number {
     let x = PILL_PAD;
     for (let i = 0; i < index; i++) {
@@ -54,7 +49,6 @@ export default function BottomNav() {
     <>
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
 
-      {/* Outer floating container — handles safe-area + horizontal margins */}
       <div
         className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"
         style={{
@@ -63,7 +57,6 @@ export default function BottomNav() {
           paddingRight: 14,
         }}
       >
-        {/* The pill itself — liquid glass */}
         <nav
           className="relative flex items-center gap-1 px-1.5 py-1.5 pointer-events-auto"
           style={{
@@ -75,7 +68,6 @@ export default function BottomNav() {
             borderRadius: 9999,
           }}
         >
-          {/* Sliding active-tab highlight pill */}
           {activeIndex >= 0 && (
             <div
               className="absolute pointer-events-none"

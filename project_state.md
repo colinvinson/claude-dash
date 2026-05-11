@@ -45,20 +45,25 @@ A personal performance OS — not a collection of trackers. Every data source (O
 ## Navigation (5 Tabs)
 
 ```
-[ Home ]  [ Life ]  [ +LOG ]  [ Coach ]  [ Data ]
+[ Home ]  [ LifeMax ]  [ +LOG ]  [ Gym ]  [ Business ]
 ```
 
 | Tab | Route | Description |
 |-----|-------|-------------|
-| Home | `/home` | Daily score, goals ticker, quick stats, day ring |
-| Life | `/life` | Full goal list, long-term goals, journal |
-| **+LOG** | no route — bottom sheet modal | Unified log overlay (9 categories) |
-| Coach | `/coach` | Full Overseer chat + insights history |
-| Data | `/data?tab=health\|fitness\|finances` | All detailed data views |
+| Home | `/home` | Daily score, goals ticker, briefing, weekly review, day ring + floating Overseer chat bubble |
+| LifeMax | `/lifemax` | All daily routine — Oura/health, water, meditation, faith, mood, supplements + medications + injections + skincare, protein, personal journal, long-term goals |
+| **+LOG** | no route — bottom sheet | NON-DAILY only — alcohol, weight, church |
+| Gym | `/gym` | Hypertrophy coach + recovery + strain + weekly volume |
+| Business | `/business` | Business/career goals + business brain dump |
 
 The `+` center button is NOT a route. `BottomNav.tsx` holds `useState<boolean>` for `LogSheet` open/close. `LogSheet` renders inside BottomNav's JSX tree so it survives tab navigation.
 
-Old routes redirect: `/main` → `/home`, `/health` → `/data?tab=health`, `/fitness` → `/data?tab=fitness`, `/finances` → `/data?tab=finances`.
+Old routes redirect:
+- `/main` → `/home`
+- `/life` → `/lifemax`
+- `/coach` → `/home` (Overseer is now a floating bubble on Home)
+- `/health`, `/fitness`, `/finances` → respective new tabs
+- `/data?tab=health` → `/lifemax`, `/data?tab=fitness` → `/gym`, `/data?tab=finances` → `/business`
 
 ---
 
@@ -177,7 +182,8 @@ rowan-dashboard/
 │       ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
 │       ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
 │       ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
-│       └── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
+│       ├── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
+│       └── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
 │
 └── rowan-watch/                          # Standalone native watchOS companion app
     ├── README.md                         # Build/install guide (Xcode + dev cert)
