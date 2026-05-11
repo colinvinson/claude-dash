@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeDailyScore } from "@/lib/scoring";
 import { computeRecoveryScore, computeSessionStrain } from "@/lib/fitness/recovery";
+import { buildDailySnapshot } from "@/lib/ai/snapshot-builder";
 
 function getLogDate() {
   const now = new Date();
@@ -393,6 +394,11 @@ export async function buildContext(userId: string) {
     sessionsIn21d: sessionsByDate.size,
   };
 
+  // ── Autonomous discovery layer: 21-day daily snapshot as CSV table ────
+  // The Overseer scans this for correlations we didn't hard-code (including
+  // new metrics added later — they're auto-included via snapshot-builder).
+  const snapshot = await buildDailySnapshot(supabase, userId, 21);
+
   // ── Goal patterns ───────────────────────────────────────────────────────
   type GoalRow = { title: string; is_complete: boolean; goal_date: string };
   const goals7d = (goals7dRes.data ?? []) as GoalRow[];
@@ -500,5 +506,10 @@ export async function buildContext(userId: string) {
     goalPatterns,
     recovery,
     performance,
+    dailySnapshot: {
+      windowDays: 21,
+      columns: snapshot.columns,
+      csv: snapshot.csv,
+    },
   };
 }

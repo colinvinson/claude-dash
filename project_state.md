@@ -160,7 +160,8 @@ rowan-dashboard/
 │
 ├── lib/
 │   ├── ai/
-│   │   ├── context-builder.ts  # Builds full JSON context snapshot for AI (20 parallel queries, includes recovery + strain)
+│   │   ├── context-builder.ts  # Builds full JSON context for AI (22 parallel queries, recovery + strain + perf correlations)
+│   │   ├── snapshot-builder.ts # 21-day wide-format CSV — auto-discovery layer for the Overseer
 │   │   └── prompts.ts          # buildSystemPrompt, buildAnalysisPrompt, buildTodaysCallPrompt
 │   ├── fitness/
 │   │   └── recovery.ts         # computeRecoveryScore, computeSessionStrain, muscleFatigue, adjustForRecovery — pure
@@ -238,6 +239,7 @@ Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes
 - **Goal patterns**: 7-day win rate, list of goals with <50% completion this week
 - **Recovery**: composite score (50% readiness + 30% HRV dev + 20% sleep), band, drivers, today's strain, hours since workout
 - **Performance correlations (21-day)**: readiness→volume %, sleep→reps gap, per-supplement→volume %, Concerta→volume %, PRs this week by exercise, stalled exercises by name
+- **Autonomous discovery layer (`lib/ai/snapshot-builder.ts`)**: 21-day wide-format CSV table — one row per date, one column per metric (health, supplements, meds, training, lifestyle, faith, goals, per-supplement booleans). Overseer scans for patterns NOT covered by pre-computed correlations. New metrics added to the app automatically become columns.
 
 ### Hypertrophy Coach (`hooks/useWorkout.ts` + `lib/fitness/recovery.ts`)
 Double progression model:

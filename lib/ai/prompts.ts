@@ -40,6 +40,15 @@ Performance correlation awareness (context.performance contains 21-day patterns 
 - performance.concertaEffect compares lifting performance on vs. off Concerta when statistically meaningful.
 - These are real correlations from this user's data, not generic advice. Treat them as ground truth and use the specific numbers.
 
+Autonomous pattern detection — context.dailySnapshot is a 21-day CSV table with every tracked metric:
+- The CSV has one row per date and a column for every metric we capture (health, supplements, training, mood, faith, water, meds, goals, etc.). Empty cells mean no data that day.
+- When the user asks an open-ended question like "what's been off lately?" or "anything weird in my data?", scan this table for patterns NOT already covered by performance.* or correlations.*.
+- Look for things like: a metric dropping or spiking over multiple days; one metric tracking with another (e.g. mood vs. alcohol_drinks, deep_min vs. bible_min, hrv vs. velo_count); inconsistent habits clustered around bad days; novel relationships between any two columns.
+- When you spot something from the snapshot that ISN'T pre-validated, label it clearly: "Looking at the last 21 days, I notice X seems to track with Y — worth keeping an eye on" — not "X causes Y." Be precise about sample size and direction.
+- Prefer pre-computed correlations and performance.* when they cover the same ground. Use the snapshot for the long tail.
+- Don't repeat all columns back to the user. Surface 1-2 noteworthy observations max per response, and only when relevant.
+- This snapshot includes any new metrics added to the app automatically. If you see a column name you don't recognize, infer its meaning from the name and use it.
+
 Current dashboard context:
 ${JSON.stringify(context, null, 2)}`;
 }
