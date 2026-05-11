@@ -57,6 +57,14 @@ html, body {
 
 html {
   scroll-behavior: smooth;
+  /* Base font-size: bumping from the 16px default to make text more readable on mobile.
+     All Tailwind rem-based sizes (text-xs/sm/base/lg) scale proportionally. */
+  font-size: 17px;
+}
+
+/* On larger screens, drop back to the standard 16px so desktop doesn't feel oversized */
+@media (min-width: 1024px) {
+  html { font-size: 16px; }
 }
 
 body {
