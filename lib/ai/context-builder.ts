@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeDailyScore } from "@/lib/scoring";
+import { computeRecoveryScore, computeSessionStrain } from "@/lib/fitness/recovery";
 
 function getLogDate() {
   const now = new Date();
@@ -44,6 +45,7 @@ export async function buildContext(userId: string) {
     healthRes, yesterdaySetsRes,
     dailyCtxRes, waterRes, faithRes, moodRes, journalRes, ltGoalsRes,
     health7dRes, suppLogs14dRes, health14dRes, mood7dRes, goals7dRes,
+    todaySetsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -65,6 +67,7 @@ export async function buildContext(userId: string) {
     supabase.from("health_logs").select("date, deep_min, hrv, readiness_score, sleep_hours").eq("user_id", userId).gte("date", dateDaysAgo(14)).order("date", { ascending: true }),
     supabase.from("mood_logs").select("score, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(7)).order("log_date", { ascending: true }),
     supabase.from("goals").select("title, is_complete, goal_date").eq("user_id", userId).gte("goal_date", dateDaysAgo(7)),
+    supabase.from("workout_sets").select("weight_kg, reps, rpe, logged_at").eq("user_id", userId).eq("log_date", today),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -250,6 +253,41 @@ export async function buildContext(userId: string) {
     consistentlyMissed,
   };
 
+  // ── Recovery + strain ────────────────────────────────────────────────
+  const todaySetsForStrain = (todaySetsRes.data ?? []) as Array<{ weight_kg: number; reps: number; rpe: number | null; logged_at: string }>;
+  const strainToday = computeSessionStrain(todaySetsForStrain);
+
+  const recoveryResult = health
+    ? computeRecoveryScore(
+        {
+          readiness_score:  health.readiness_score,
+          hrv:              health.hrv,
+          sleep_score:      health.sleep_score,
+          sleep_hours:      health.sleep_hours,
+          resilience_level: health.resilience_level ?? null,
+        },
+        trends.hrv.avg7d
+      )
+    : null;
+
+  const lastSetLoggedAt = todaySetsForStrain.length > 0
+    ? new Date(Math.max(...todaySetsForStrain.map((s) => new Date(s.logged_at).getTime())))
+    : null;
+  const hoursSinceWorkout = lastSetLoggedAt
+    ? Math.round(((Date.now() - lastSetLoggedAt.getTime()) / (1000 * 60 * 60)) * 10) / 10
+    : null;
+
+  const recovery = recoveryResult ? {
+    score:           recoveryResult.score,
+    band:            recoveryResult.band,
+    drivers:         recoveryResult.drivers,
+    resilienceLevel: health?.resilience_level ?? null,
+    strainToday:     strainToday > 0 ? strainToday : null,
+    hoursSinceWorkout,
+    stressDaySummary: health?.stress_day_summary ?? null,
+    vo2Max:          health?.vo2_max ?? null,
+  } : null;
+
   const goalsComplete = goals.filter((g) => g.is_complete).length;
   const suppsTaken = stack.filter((s) => logs.some((l) => l.supplement_id === s.id)).length;
 
@@ -291,5 +329,6 @@ export async function buildContext(userId: string) {
     trends,
     correlations,
     goalPatterns,
+    recovery,
   };
 }

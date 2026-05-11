@@ -117,7 +117,8 @@ rowan-dashboard/
 │   │   └── JournalCard.tsx             # Brain dump textarea + last 5 entries
 │   │
 │   ├── fitness/
-│   │   ├── ProgressiveOverloadCoach.tsx  # Full workout tracking UI with RPE
+│   │   ├── ProgressiveOverloadCoach.tsx  # Full workout tracking UI with RPE + auto-adjustment + Ready screen
+│   │   ├── RecoveryStrainCard.tsx        # Whoop-style recovery dial + strain ring + drivers list
 │   │   └── WeeklyVolumeCard.tsx          # 10 muscle groups vs. MEV–MRV targets + freq/wk
 │   │
 │   ├── data/
@@ -159,8 +160,10 @@ rowan-dashboard/
 │
 ├── lib/
 │   ├── ai/
-│   │   ├── context-builder.ts  # Builds full JSON context snapshot for AI (14 parallel queries)
+│   │   ├── context-builder.ts  # Builds full JSON context snapshot for AI (20 parallel queries, includes recovery + strain)
 │   │   └── prompts.ts          # buildSystemPrompt, buildAnalysisPrompt, buildTodaysCallPrompt
+│   ├── fitness/
+│   │   └── recovery.ts         # computeRecoveryScore, computeSessionStrain, muscleFatigue, adjustForRecovery — pure
 │   ├── scoring.ts              # computeDailyScore() — pure function, zero API cost
 │   └── supabase/
 │       ├── client.ts           # createClient() for client components
@@ -170,7 +173,8 @@ rowan-dashboard/
     └── migrations/
         ├── 0001_initial_schema.sql       # Core tables
         ├── 0002_redesign_tables.sql      # 8 new tables (water, faith, mood, journal, etc.)
-        └── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
+        ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
+        └── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
 ```
 
 ---
@@ -209,6 +213,13 @@ rowan-dashboard/
 - `workout_sets.rpe` — INT 6–10 (Rate of Perceived Exertion)
 - `profiles.goal_weight_kg`, `profiles.training_goal`
 
+### Oura expansion columns (0004)
+- `health_logs.stress_high_sec`, `recovery_high_sec`, `stress_day_summary` — daily_stress endpoint
+- `health_logs.resilience_level` — Oura's own recovery rating (limited/adequate/solid/strong/exceptional)
+- `health_logs.vo2_max` — daily cardiovascular fitness
+- `health_logs.oura_workouts` — JSONB array of Oura-detected workouts (last 7 days)
+- `health_logs.spo2_pct` and `skin_temp_delta` — now populated (existed before but unused)
+
 ---
 
 ## Key Logic & Rules
@@ -226,12 +237,20 @@ Runs before every AI call (chat + analyze). 19 parallel Supabase queries. Passes
 - **14-day correlations**: per-supplement vs. deep sleep delta (if ≥15min delta + ≥2 data points → plain English fact)
 - **Goal patterns**: 7-day win rate, list of goals with <50% completion this week
 
-### Hypertrophy Coach (`hooks/useWorkout.ts`)
+### Hypertrophy Coach (`hooks/useWorkout.ts` + `lib/fitness/recovery.ts`)
 Double progression model:
 - Rep ranges by type: Compound 5–10, Secondary 8–12, Isolation 12–20
 - Hit top of range → add weight (2.5kg compound / 1.25kg isolation)
 - RPE-aware: stalling + RPE ≥9 → deload to 80%; stalling + RPE ≤7 → "push harder"
 - Weekly volume targets (MEV–MRV) for 10 muscle groups, frequency tracking
+
+**Whoop-style recovery + auto-adjustment (RP-framework grounded):**
+- Recovery composite = 50% Oura readiness + 30% HRV deviation from 7d baseline + 20% sleep score (±5 from Oura resilience level)
+- Bands: exceptional (≥85), primed (≥70), adequate (≥55), compromised (≥40), low (<40)
+- Per-muscle fatigue: fresh (>72h), recovering (48–72h), fatigued (24–48h), deeply-fatigued (<24h + RPE 9+ + ≥6 hard sets)
+- Adjustment matrix (cuts VOLUME first, then RPE cap, then weight at extreme low recovery)
+- "Force PR Mode" toggle preserves user autonomy
+- Session strain (0–21, log scale) computed from today's sets × RPE multipliers
 
 ### Oura Auto-Sync (`hooks/useHealth.ts`)
 On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST /api/oura/poll` silently. No manual trigger needed. Uses PAT stored in `OURA_PAT` env var.
@@ -247,14 +266,18 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Coach page: full-height Overseer chat + insights history + context transparency
 - Data page: health/fitness/finances sub-tabs
 - Health tab: Oura stats, meditation tracker, supplement stack, Concerta/Velo trackers
-- Fitness tab: ProgressiveOverloadCoach with RPE, WeeklyVolumeCard with frequency
-- Overseer: trend-aware (7-day HRV/readiness/sleep/mood trends), supplement correlations, goal patterns
-- Oura ring: auto-syncs on page load via PAT
+- Fitness tab: pre-workout Ready screen, RecoveryStrainCard, ProgressiveOverloadCoach with auto-adjusted prescriptions + Force PR Mode, WeeklyVolumeCard with frequency
+- Overseer: trend-aware (7-day HRV/readiness/sleep/mood trends), supplement correlations, goal patterns, recovery + strain composite
+- Oura ring: auto-syncs on page load via PAT — fetches readiness, sleep, activity, **spo2, stress, resilience, vo2_max, workouts**
+- Whoop-style recovery scoring: 50% readiness + 30% HRV deviation + 20% sleep, banded into exceptional/primed/adequate/compromised/low
+- Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h, RPE memory
+- Auto-adjusted lift prescriptions: weight × reps × sets × RPE cap modified based on recovery + muscle status (evidence-based, RP-style)
 - Deployed on Vercel + accessible on iPhone as PWA
 
 ### Pending (needs user action)
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0003_fitness_intelligence.sql` in Supabase SQL Editor (if not yet applied)
+- Run `0004_oura_expansion.sql` in Supabase SQL Editor — adds stress, resilience, vo2_max, workouts columns
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
 ### Known issues

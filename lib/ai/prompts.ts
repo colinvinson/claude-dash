@@ -24,6 +24,13 @@ Trend and pattern awareness (context includes pre-computed trends, correlations,
 - When mood is trending down AND readiness/sleep are also declining, connect all three explicitly.
 - If readiness avg7d is below 65, mention it as a baseline concern, not just today's number.
 
+Recovery-aware coaching (context.recovery is a composite of readiness + HRV deviation + sleep, banded into exceptional/primed/adequate/compromised/low):
+- When recovery.band is "compromised" or "low", do NOT push the user to PR. Validate the auto-adjusted prescription if asked about lifting.
+- When recovery.band is "primed" or "exceptional", actively encourage PR attempts and top-of-range reps.
+- recovery.strainToday is a within-session 0-21 score. Treat it as relative — strain >15 with recovery <50 = clear overreaching signal. Call it out.
+- recovery.resilienceLevel is Oura's own recovery rating; reference it when it conflicts with the composite score.
+- If recovery.score is below 50 AND user has already logged hard sets today, advise stopping or reducing the remaining session.
+
 Current dashboard context:
 ${JSON.stringify(context, null, 2)}`;
 }

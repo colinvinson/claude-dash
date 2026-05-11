@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useWorkout, CoachStatus } from "@/hooks/useWorkout";
-import { useHealth } from "@/hooks/useHealth";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/layout/SectionLabel";
 import Toggle from "@/components/ui/Toggle";
 import WeeklyVolumeCard from "@/components/fitness/WeeklyVolumeCard";
+import RecoveryStrainCard from "@/components/fitness/RecoveryStrainCard";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
-import { X, AlertTriangle } from "lucide-react";
+import { X, Zap, Watch } from "lucide-react";
+
+const READY_KEY = "rowan-workout-ready";  // sessionStorage gate
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -35,28 +37,45 @@ export default function ProgressiveOverloadCoach() {
     activeDay,   setActiveDay,
     activeExId,  setActiveExId,
     activeExercise, verdict, logSet, deleteSet,
+    muscleStatus,
   } = useWorkout();
-  const { health } = useHealth();
 
-  const [weight,  setWeight]  = useState(20);
-  const [reps,    setReps]    = useState(8);
-  const [rpe,     setRpe]     = useState<number | null>(null);
-  const [logging, setLogging] = useState(false);
-  const [flash,   setFlash]   = useState<string | null>(null);
+  const [weight,    setWeight]    = useState(20);
+  const [reps,      setReps]      = useState(8);
+  const [rpe,       setRpe]       = useState<number | null>(null);
+  const [logging,   setLogging]   = useState(false);
+  const [flash,     setFlash]     = useState<string | null>(null);
+  const [forcePR,   setForcePR]   = useState(false);
+  const [ready,     setReady]     = useState(false);
 
-  // Pre-fill from verdict when exercise changes
+  // Ready-screen gate: once tapped today, stays dismissed for the session
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem(READY_KEY) === "1") setReady(true);
+  }, []);
+
+  function confirmReady() {
+    if (typeof window !== "undefined") sessionStorage.setItem(READY_KEY, "1");
+    setReady(true);
+  }
+
+  // Pre-fill from verdict when exercise or override changes
   useEffect(() => {
     if (!activeExId) return;
     if (verdict) {
-      setWeight(verdict.targetWeight);
-      setReps(verdict.repRange.min);
+      const useOriginal = forcePR && verdict.recoveryAdjustment?.applied;
+      const src = useOriginal && verdict.recoveryAdjustment
+        ? verdict.recoveryAdjustment.original
+        : { targetWeight: verdict.targetWeight, targetReps: verdict.targetReps };
+      setWeight(src.targetWeight);
+      setReps(src.targetReps);
     } else {
       setWeight(20);
       setReps(8);
     }
     setRpe(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeExId]);
+  }, [activeExId, forcePR, verdict?.recoveryAdjustment?.applied]);
 
   async function handleLog() {
     setLogging(true);
@@ -75,29 +94,43 @@ export default function ProgressiveOverloadCoach() {
     );
   }
 
-  const style        = verdict ? STATUS_STYLES[verdict.status] : null;
-  const inRange      = verdict ? (reps >= verdict.repRange.min && reps <= verdict.repRange.max) : false;
-  const lowReadiness = health.readiness_score != null && health.readiness_score < 50;
-  const typeBadge    = activeExercise?.exercise_type ? TYPE_BADGE[activeExercise.exercise_type] : null;
+  const style       = verdict ? STATUS_STYLES[verdict.status] : null;
+  const inRange     = verdict ? (reps >= verdict.repRange.min && reps <= verdict.repRange.max) : false;
+  const typeBadge   = activeExercise?.exercise_type ? TYPE_BADGE[activeExercise.exercise_type] : null;
+  const adjustment  = verdict?.recoveryAdjustment;
+  const isAdjusted  = !!adjustment?.applied;
+
+  // Ready-screen gate
+  if (!ready) {
+    return (
+      <div className="space-y-4">
+        <SectionLabel>Hypertrophy Coach</SectionLabel>
+        <Card>
+          <div className="flex flex-col items-center text-center py-6">
+            <Watch size={36} className="text-zinc-500 mb-4" />
+            <p className="text-base font-bold text-zinc-100 mb-1.5">Ready to lift?</p>
+            <p className="text-xs text-zinc-500 leading-relaxed max-w-xs mb-5">
+              Start a Strength Training workout on your Apple Watch so it captures heart rate and calories.
+              When it&apos;s recording, tap Ready and we&apos;ll show today&apos;s prescription.
+            </p>
+            <button
+              onClick={confirmReady}
+              className="w-full max-w-xs py-3.5 bg-white hover:bg-zinc-100 rounded-xl text-sm font-bold text-zinc-900 transition-colors"
+            >
+              Ready
+            </button>
+          </div>
+        </Card>
+        <RecoveryStrainCard />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <SectionLabel>Hypertrophy Coach</SectionLabel>
 
-      {/* Low readiness recovery banner */}
-      {lowReadiness && (
-        <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
-          <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-xs font-semibold text-amber-400 mb-0.5">
-              Readiness {health.readiness_score}% — Recovery Day
-            </p>
-            <p className="text-xs text-zinc-500 leading-relaxed">
-              Whoop is flagging low recovery. Train at 70–80% effort today — focus on technique, avoid PRs. Full intensity tomorrow.
-            </p>
-          </div>
-        </div>
-      )}
+      <RecoveryStrainCard />
 
       {/* Selectors */}
       <Card>
@@ -134,6 +167,16 @@ export default function ProgressiveOverloadCoach() {
                     {typeBadge.label}
                   </span>
                 )}
+                {isAdjusted && !forcePR && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/40">
+                    Auto-adjusted
+                  </span>
+                )}
+                {forcePR && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/40">
+                    PR Mode
+                  </span>
+                )}
               </div>
               <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${style.pill}`}>
                 {style.label}
@@ -142,17 +185,51 @@ export default function ProgressiveOverloadCoach() {
             <p className="text-xl font-bold text-white leading-snug mb-2">{verdict.headline}</p>
             <p className="text-xs text-zinc-500 leading-relaxed mb-2">{verdict.tip}</p>
             {verdict.rpeContext && (
-              <p className="text-[10px] text-zinc-600 italic mb-3">{verdict.rpeContext}</p>
+              <p className="text-[10px] text-zinc-600 italic mb-2">{verdict.rpeContext}</p>
             )}
-            <div className="flex items-center gap-4 pt-3 border-t border-[#1f1f1f]">
+            {muscleStatus && muscleStatus.hoursSince != null && muscleStatus.hoursSince < 72 && (
+              <p className="text-[10px] text-zinc-600 mb-2">
+                {activeExercise.muscle_group} hit {muscleStatus.hoursSince}h ago · {muscleStatus.hardSetsLast48h} hard sets in 48h · {muscleStatus.status.replace("-", " ")}
+              </p>
+            )}
+            {isAdjusted && adjustment && (
+              <div className="mt-3 p-3 bg-orange-500/5 border border-orange-500/20 rounded-xl">
+                <p className="text-[10px] uppercase tracking-widest text-orange-400 font-bold mb-1">Recovery adjustment</p>
+                <p className="text-xs text-zinc-300 leading-relaxed mb-2">{adjustment.reason}</p>
+                {!forcePR && (
+                  <p className="text-[10px] text-zinc-500">
+                    Original: {adjustment.original.targetWeight}kg × {adjustment.original.targetReps} · {adjustment.original.targetSets} sets
+                    {" → "}
+                    Now: {adjustment.adjusted.targetWeight}kg × {adjustment.adjusted.targetReps} · {adjustment.adjusted.targetSets} sets
+                    {adjustment.adjusted.rpeCap && ` · RPE ${adjustment.adjusted.rpeCap} cap`}
+                  </p>
+                )}
+                <button
+                  onClick={() => setForcePR(!forcePR)}
+                  className={`mt-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                    forcePR
+                      ? "bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30"
+                      : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-200"
+                  }`}
+                >
+                  {forcePR ? "Disable PR Mode" : "Force PR Mode"}
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-4 pt-3 mt-3 border-t border-[#1f1f1f]">
               <div className="text-center">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Target</p>
-                <p className="text-lg font-bold text-white">{verdict.targetWeight}<span className="text-xs text-zinc-500 font-normal ml-0.5">kg</span></p>
+                <p className="text-lg font-bold text-white">{weight}<span className="text-xs text-zinc-500 font-normal ml-0.5">kg</span></p>
               </div>
               <div className="w-px h-8 bg-[#1f1f1f]" />
               <div className="text-center">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Rep Range</p>
-                <p className="text-lg font-bold text-white">{verdict.repRange.min}–{verdict.repRange.max}</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Reps</p>
+                <p className="text-lg font-bold text-white">{verdict.targetReps}</p>
+              </div>
+              <div className="w-px h-8 bg-[#1f1f1f]" />
+              <div className="text-center">
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Sets</p>
+                <p className="text-lg font-bold text-white">{verdict.targetSets}</p>
               </div>
               {pastSessions.length > 0 && (
                 <>

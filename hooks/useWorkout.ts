@@ -2,6 +2,17 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  computeRecoveryScore,
+  computeSessionStrain,
+  muscleFatigue,
+  adjustForRecovery,
+  type RecoveryResult,
+  type MuscleFatigueResult,
+  type Adjustment,
+  type Prescription,
+  type MuscleSetRow,
+} from "@/lib/fitness/recovery";
 
 export type WorkoutSet = {
   id: string;
@@ -26,10 +37,14 @@ export type CoachStatus = "NEW" | "PROGRESS" | "GRIND" | "STALLING" | "REGRESSIO
 export type CoachVerdict = {
   status: CoachStatus;
   targetWeight: number;
+  targetReps: number;
+  targetSets: number;
+  rpeCap: number | null;
   repRange: { min: number; max: number };
   headline: string;
   tip: string;
   rpeContext: string | null;
+  recoveryAdjustment: Adjustment | null;
 };
 
 export type Exercise = {
@@ -104,10 +119,11 @@ function analyze(
   if (pastSessions.length === 0) {
     const startWeight = isCompound ? 40 : isIsolation ? 10 : 20;
     return {
-      status: "NEW", targetWeight: startWeight, repRange,
+      status: "NEW", targetWeight: startWeight, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
       headline: `First session — start at ${startWeight}kg`,
       tip: `${isCompound ? "Compounds build the foundation. " : isIsolation ? "Focus on the squeeze, not the weight. " : ""}Nail form before adding load. Hit ${repRange.min}–${repRange.max} reps clean.`,
       rpeContext: null,
+      recoveryAdjustment: null,
     };
   }
 
@@ -126,10 +142,11 @@ function analyze(
   // Regression: est_1RM down >5% vs previous session
   if (prev && last.est_1rm < prev.est_1rm * 0.95) {
     return {
-      status: "REGRESSION", targetWeight: prev.weight_kg, repRange,
+      status: "REGRESSION", targetWeight: prev.weight_kg, targetReps: repRange.min, targetSets: 3, rpeCap: 8, repRange,
       headline: `Step back to ${prev.weight_kg}kg — strength dropped`,
       tip: "Est. 1RM fell >5%. Return to last good weight and rebuild. Check sleep quality, caloric intake, and weekly volume — you may be overreaching.",
       rpeContext,
+      recoveryAdjustment: null,
     };
   }
 
@@ -141,10 +158,11 @@ function analyze(
       ? " — even though it felt maximal, the reps prove you're ready."
       : ".";
     return {
-      status: "PROGRESS", targetWeight: next, repRange,
+      status: "PROGRESS", targetWeight: next, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
       headline: `Load up — ${next}kg, aim for ${repRange.min} reps`,
       tip: `You hit ${last.reps} reps at ${last.weight_kg}kg${rpeNote} Add ${increment}kg and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
       rpeContext,
+      recoveryAdjustment: null,
     };
   }
 
@@ -164,10 +182,11 @@ function analyze(
         ? `You're not pushing hard enough. Same weight 3 sessions but RPE is low. On your last set, leave nothing in the tank — rep it to near-failure.`
         : `3 sessions at ${last.weight_kg}kg. Try drop-sets: after your top set, strip ${Math.round(last.weight_kg * 0.15)}kg and hit a full AMRAP with no rest. Metabolic overload breaks plateaus.`;
       return {
-        status: "STALLING", targetWeight: last.weight_kg, repRange,
+        status: "STALLING", targetWeight: last.weight_kg, targetReps: last.reps, targetSets: 3, rpeCap: null, repRange,
         headline: `Plateau at ${last.weight_kg}kg — ${highRPE ? "deload needed" : "push harder"}`,
         tip,
         rpeContext,
+        recoveryAdjustment: null,
       };
     }
   }
@@ -177,20 +196,39 @@ function analyze(
     ? ` Your RPE was only ${lastRPE} — you have more capacity. Push harder on working sets.`
     : "";
   return {
-    status: "GRIND", targetWeight: last.weight_kg, repRange,
+    status: "GRIND", targetWeight: last.weight_kg, targetReps: Math.min(last.reps + 1, repRange.max), targetSets: 3, rpeCap: null, repRange,
     headline: `${last.weight_kg}kg — push for ${Math.min(last.reps + 1, repRange.max)}+ reps`,
     tip: `Last best: ${last.reps} reps. You need ${repRange.max} to unlock the next weight.${rpeNote} ${isIsolation ? "Slow 3-second eccentric — time under tension drives growth." : isCompound ? "Control the descent, explode up." : ""}`,
     rpeContext,
+    recoveryAdjustment: null,
   };
 }
 
-type WeeklySet = { muscle_group: string; log_date: string };
+type WeeklySet = {
+  muscle_group: string;
+  muscle_targets: string[];
+  log_date: string;
+  logged_at: string;
+  weight_kg: number;
+  reps: number;
+  rpe: number | null;
+};
+
+type HealthDay = {
+  date: string;
+  readiness_score: number | null;
+  hrv: number | null;
+  sleep_score: number | null;
+  sleep_hours: number | null;
+  resilience_level: string | null;
+};
 
 export function useWorkout() {
   const [gyms,       setGyms]       = useState<Gym[]>([]);
   const [exercises,  setExercises]  = useState<Exercise[]>([]);
   const [history,    setHistory]    = useState<WorkoutSet[]>([]);
   const [weeklyRaw,  setWeeklyRaw]  = useState<WeeklySet[]>([]);
+  const [health7d,   setHealth7d]   = useState<HealthDay[]>([]);
   const [activeGymId,   setActiveGymId]   = useState<string | null>(null);
   const [activeDay,     setActiveDay]     = useState("Push");
   const [activeExId,    setActiveExId]    = useState<string | null>(null);
@@ -205,20 +243,48 @@ export function useWorkout() {
     const cutoffStr = cutoff.toISOString().split("T")[0];
     const { data } = await supabase
       .from("workout_sets")
-      .select("log_date, exercises(muscle_group)")
+      .select("log_date, logged_at, weight_kg, reps, rpe, exercises(muscle_group, muscle_targets)")
       .eq("user_id", uid)
       .gte("log_date", cutoffStr);
     if (data) {
       setWeeklyRaw(
-        (data as unknown as Array<{ log_date: string; exercises: { muscle_group: string } | { muscle_group: string }[] | null }>)
+        (data as unknown as Array<{
+          log_date: string;
+          logged_at: string;
+          weight_kg: number;
+          reps: number;
+          rpe: number | null;
+          exercises: { muscle_group: string; muscle_targets: string[] } | { muscle_group: string; muscle_targets: string[] }[] | null;
+        }>)
           .map((r) => {
             const ex = r.exercises;
-            const mg = Array.isArray(ex) ? ex[0]?.muscle_group : ex?.muscle_group;
-            return { muscle_group: mg ?? "", log_date: r.log_date };
+            const exObj = Array.isArray(ex) ? ex[0] : ex;
+            return {
+              muscle_group:   exObj?.muscle_group   ?? "",
+              muscle_targets: exObj?.muscle_targets ?? [],
+              log_date:       r.log_date,
+              logged_at:      r.logged_at,
+              weight_kg:      r.weight_kg,
+              reps:           r.reps,
+              rpe:            r.rpe,
+            };
           })
           .filter((r) => r.muscle_group)
       );
     }
+  }, [supabase]);
+
+  const fetchHealth7d = useCallback(async (uid: string) => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    const { data } = await supabase
+      .from("health_logs")
+      .select("date, readiness_score, hrv, sleep_score, sleep_hours, resilience_level")
+      .eq("user_id", uid)
+      .gte("date", cutoffStr)
+      .order("date", { ascending: true });
+    setHealth7d((data ?? []) as HealthDay[]);
   }, [supabase]);
 
   useEffect(() => {
@@ -234,7 +300,7 @@ export function useWorkout() {
       setGyms(gymList);
       setExercises((exRes.data ?? []) as Exercise[]);
       if (gymList.length > 0) setActiveGymId(gymList[0].id);
-      await fetchWeeklyVolume(user.id);
+      await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id)]);
       setLoading(false);
     }
     load();
@@ -293,9 +359,57 @@ export function useWorkout() {
   const pastSessions = sessions.filter((s) => s.date !== today);
   const filteredExercises = exercises.filter((e) => e.split_day === activeDay);
   const activeExercise    = exercises.find((e) => e.id === activeExId) ?? null;
-  const verdict = activeExercise
+
+  // ── Recovery + strain computation ─────────────────────────────────────
+  const todayHealth = health7d.find((h) => h.date === today) ?? health7d[health7d.length - 1] ?? null;
+  const hrv7d = health7d.map((h) => h.hrv).filter((v): v is number => v != null);
+  const hrv7dAvg = hrv7d.length > 0 ? hrv7d.reduce((a, b) => a + b, 0) / hrv7d.length : null;
+
+  const recovery: RecoveryResult | null = todayHealth
+    ? computeRecoveryScore(todayHealth, hrv7dAvg)
+    : null;
+
+  const sessionStrain = computeSessionStrain(todaySets.map((s) => ({
+    weight_kg: s.weight_kg, reps: s.reps, rpe: s.rpe,
+  })));
+
+  // Build muscle-set rows from weekly data for fatigue lookup
+  const recentMuscleSets: MuscleSetRow[] = weeklyRaw.map((r) => ({
+    logged_at: r.logged_at,
+    weight_kg: r.weight_kg,
+    reps:      r.reps,
+    rpe:       r.rpe,
+    muscles:   r.muscle_targets.length > 0 ? r.muscle_targets : [r.muscle_group],
+  }));
+
+  const primaryMuscle = activeExercise?.muscle_group ?? null;
+  const muscleStatus: MuscleFatigueResult | null = primaryMuscle
+    ? muscleFatigue(primaryMuscle, recentMuscleSets)
+    : null;
+
+  // Base verdict from history, then layer on recovery adjustment
+  const baseVerdict = activeExercise
     ? analyze(pastSessions, activeExercise.exercise_type ?? "Secondary", activeExercise.name)
     : null;
+
+  let verdict = baseVerdict;
+  if (baseVerdict && recovery && muscleStatus) {
+    const base: Prescription = {
+      targetWeight: baseVerdict.targetWeight,
+      targetReps:   baseVerdict.targetReps,
+      targetSets:   baseVerdict.targetSets,
+      rpeCap:       baseVerdict.rpeCap,
+    };
+    const adjustment = adjustForRecovery(base, recovery, muscleStatus);
+    verdict = {
+      ...baseVerdict,
+      targetWeight: adjustment.adjusted.targetWeight,
+      targetReps:   adjustment.adjusted.targetReps,
+      targetSets:   adjustment.adjusted.targetSets,
+      rpeCap:       adjustment.adjusted.rpeCap,
+      recoveryAdjustment: adjustment,
+    };
+  }
 
   const trendData = [...pastSessions].reverse().slice(-10).map((s, i) => ({
     session: i + 1, est1rm: s.topEst1rm, weight: s.bestSet.weight_kg,
@@ -318,5 +432,6 @@ export function useWorkout() {
     activeDay,   setActiveDay,
     activeExId,  setActiveExId,
     activeExercise, verdict, logSet, deleteSet,
+    recovery, sessionStrain, muscleStatus,
   };
 }

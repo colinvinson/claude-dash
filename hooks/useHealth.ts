@@ -31,6 +31,11 @@ export type HealthLog = {
   todays_call_body:     string | null;
   todays_call_severity: "green" | "yellow" | "red" | null;
   is_final:             boolean;
+  stress_high_sec:      number | null;
+  recovery_high_sec:    number | null;
+  stress_day_summary:   string | null;
+  resilience_level:     string | null;
+  vo2_max:              number | null;
 };
 
 const EMPTY: HealthLog = {
@@ -40,6 +45,8 @@ const EMPTY: HealthLog = {
   spo2_pct: null, resp_rate: null, skin_temp_delta: null,
   rem_min: null, deep_min: null, light_min: null, awake_min: null,
   todays_call_body: null, todays_call_severity: null, is_final: false,
+  stress_high_sec: null, recovery_high_sec: null, stress_day_summary: null,
+  resilience_level: null, vo2_max: null,
 };
 
 export function useHealth() {
