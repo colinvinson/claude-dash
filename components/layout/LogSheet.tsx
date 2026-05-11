@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useLog } from "@/hooks/useLog";
+import ProteinTile from "@/components/protein/ProteinTile";
 
 const DRINK_TYPES = ["Beer", "Wine", "Spirits", "Cocktail"];
 const MOOD_EMOJIS = ["😞", "😐", "🙂", "😊", "🤩"];
@@ -88,6 +89,12 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
               </button>
             </div>
           </LogTile>
+
+          {/* Protein */}
+          <ProteinTile
+            expanded={expanded === "protein"}
+            onToggle={() => toggle("protein")}
+          />
 
           {/* Meditation */}
           <LogTile

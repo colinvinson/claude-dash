@@ -175,7 +175,8 @@ rowan-dashboard/
         ├── 0001_initial_schema.sql       # Core tables
         ├── 0002_redesign_tables.sql      # 8 new tables (water, faith, mood, journal, etc.)
         ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
-        └── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
+        ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
+        └── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
 ```
 
 ---
@@ -281,6 +282,7 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Overseer: trend-aware (7-day HRV/readiness/sleep/mood trends), supplement correlations, goal patterns, recovery + strain composite
 - Oura ring: auto-syncs on page load via PAT — fetches readiness, sleep, activity, **spo2, stress, resilience, vo2_max, workouts**
 - Whoop-style recovery scoring: 50% readiness + 30% HRV deviation + 20% sleep, banded into exceptional/primed/adequate/compromised/low
+- Protein logger (manual + photo + barcode) with AI vision scoring (0-100 for lean aesthetic muscle suitability); only protein persisted, score is metadata; daily target = weight × 2.0g/kg
 - Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h, RPE memory
 - Auto-adjusted lift prescriptions: weight × reps × sets × RPE cap modified based on recovery + muscle status (evidence-based, RP-style)
 - Deployed on Vercel + accessible on iPhone as PWA
@@ -289,6 +291,7 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0003_fitness_intelligence.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0004_oura_expansion.sql` in Supabase SQL Editor — adds stress, resilience, vo2_max, workouts columns
+- Run `0005_protein_logger.sql` in Supabase SQL Editor — creates protein_logs table
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
 ### Known issues

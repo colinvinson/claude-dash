@@ -48,6 +48,7 @@ export async function buildContext(userId: string) {
     health7dRes, suppLogs14dRes, health14dRes, mood7dRes, goals7dRes,
     todaySetsRes,
     sets21dRes, medLogs21dRes, recentInsightsRes,
+    proteinTodayRes, latestWeightRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -74,6 +75,8 @@ export async function buildContext(userId: string) {
     supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
     supabase.from("medication_logs").select("medication_type, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
     supabase.from("overseer_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
+    supabase.from("protein_logs").select("protein_g, ai_score").eq("user_id", userId).eq("log_date", today),
+    supabase.from("weight_logs").select("weight_kg").eq("user_id", userId).order("logged_at", { ascending: false }).limit(1),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -493,12 +496,21 @@ export async function buildContext(userId: string) {
       const ex = s.exercises as unknown as { name: string; split_day: string } | null;
       return { exercise: ex?.name ?? "unknown", split: ex?.split_day, weight: s.weight_kg, reps: s.reps };
     }),
-    lifestyle: {
-      dailyPlan:    dailyCtxRes.data?.raw_text ?? null,
-      waterGlasses: waterRes.data?.glasses ?? 0,
-      faith:        faithRes.data ?? null,
-      latestMood:   (moodRes.data as Array<{ score: number }> | null)?.[0]?.score ?? null,
-    },
+    lifestyle: (() => {
+      const proteinToday = ((proteinTodayRes.data ?? []) as Array<{ protein_g: number; ai_score: number | null }>)
+        .reduce((sum, r) => sum + Number(r.protein_g), 0);
+      const latestWeight = (latestWeightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null;
+      const proteinTarget = latestWeight ? Math.round(latestWeight * 2.0) : 150;
+      return {
+        dailyPlan:     dailyCtxRes.data?.raw_text ?? null,
+        waterGlasses:  waterRes.data?.glasses ?? 0,
+        faith:         faithRes.data ?? null,
+        latestMood:    (moodRes.data as Array<{ score: number }> | null)?.[0]?.score ?? null,
+        proteinToday:  Math.round(proteinToday),
+        proteinTarget,
+        proteinPct:    proteinTarget > 0 ? Math.round((proteinToday / proteinTarget) * 100) : 0,
+      };
+    })(),
     journal:       (journalRes.data ?? []) as Array<{ content: string; ai_summary: string | null }>,
     longTermGoals: (ltGoalsRes.data ?? []) as Array<{ title: string; category: string; ai_action_plan: string | null }>,
     dailyScore,

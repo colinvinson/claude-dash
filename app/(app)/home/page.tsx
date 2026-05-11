@@ -7,6 +7,7 @@ import { useStack } from "@/hooks/useStack";
 import { useWorkout } from "@/hooks/useWorkout";
 import { useDailyContext } from "@/hooks/useDailyContext";
 import { useLog } from "@/hooks/useLog";
+import { useProtein } from "@/hooks/useProtein";
 import { computeDailyScore } from "@/lib/scoring";
 import Card from "@/components/ui/Card";
 import GoalTicker from "@/components/productivity/GoalTicker";
@@ -25,6 +26,7 @@ export default function HomePage() {
   const { todaySets } = useWorkout();
   const { hasCheckedIn } = useDailyContext();
   const { state: logState } = useLog();
+  const { totalToday: proteinToday, target: proteinTarget, pctOfTarget: proteinPct } = useProtein();
 
   const supplementsTaken = stackItems.filter((s) => s.taken).length;
   const supplementsTotal = stackItems.length;
@@ -74,6 +76,11 @@ export default function HomePage() {
       label: "Gym",
       value: workoutDoneToday ? "Trained ✓" : "Rest",
       color: workoutDoneToday ? "#34d399" : undefined,
+    },
+    {
+      label: "Protein",
+      value: `${Math.round(proteinToday)}/${proteinTarget}g`,
+      color: proteinPct >= 80 ? "#34d399" : proteinPct >= 50 ? "#fbbf24" : undefined,
     },
   ];
 

@@ -51,6 +51,10 @@ export type DaySnapshot = {
   goals_total:       number | null;
   goals_complete:    number | null;
   goals_complete_pct: number | null;
+  // nutrition
+  protein_g:         number | null;
+  meal_score_avg:    number | null;
+  meals_logged:      number | null;
   // per-supplement booleans (dynamically added in buildDailySnapshot)
   [supKey: `supp_${string}`]: 0 | 1 | null | undefined;
 };
@@ -81,7 +85,7 @@ export async function buildDailySnapshot(
   const [
     healthRes, suppStackRes, suppLogsRes, medLogsRes,
     waterRes, meditRes, moodRes, alcRes, weightRes, faithRes,
-    setsRes, goalsRes,
+    setsRes, goalsRes, proteinRes,
   ] = await Promise.all([
     supabase.from("health_logs").select("*").eq("user_id", userId).gte("date", cutoff).order("date", { ascending: true }),
     supabase.from("supplement_stack").select("id, name").eq("user_id", userId).eq("is_active", true),
@@ -95,6 +99,7 @@ export async function buildDailySnapshot(
     supabase.from("faith_logs").select("prayed, bible_min, church_attended, log_date").eq("user_id", userId).gte("log_date", cutoff),
     supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, split_day").eq("user_id", userId).gte("log_date", cutoff),
     supabase.from("goals").select("is_complete, goal_date").eq("user_id", userId).gte("goal_date", cutoff),
+    supabase.from("protein_logs").select("protein_g, ai_score, log_date").eq("user_id", userId).gte("log_date", cutoff),
   ]);
 
   type HealthRow = Record<string, unknown> & { date: string };
@@ -165,6 +170,16 @@ export async function buildDailySnapshot(
     goalsByDate.set(g.goal_date, e);
   }
 
+  // Protein per day
+  const proteinByDate = new Map<string, { total: number; scores: number[]; count: number }>();
+  for (const p of ((proteinRes.data ?? []) as Array<{ protein_g: number; ai_score: number | null; log_date: string }>)) {
+    const e = proteinByDate.get(p.log_date) ?? { total: 0, scores: [], count: 0 };
+    e.total += Number(p.protein_g);
+    e.count++;
+    if (p.ai_score != null) e.scores.push(p.ai_score);
+    proteinByDate.set(p.log_date, e);
+  }
+
   // Build rows
   const rows: DaySnapshot[] = listDates(daysBack).map((date) => {
     const h = healthByDate.get(date);
@@ -175,6 +190,7 @@ export async function buildDailySnapshot(
     const split = setsForDay[0]?.split_day ?? null;
     const goals = goalsByDate.get(date);
     const faith = faithByDate.get(date);
+    const protein = proteinByDate.get(date);
 
     const row: DaySnapshot = {
       date,
@@ -212,6 +228,11 @@ export async function buildDailySnapshot(
       goals_total:       goals?.total          ?? null,
       goals_complete:    goals?.complete       ?? null,
       goals_complete_pct:goals && goals.total > 0 ? Math.round((goals.complete / goals.total) * 100) : null,
+      protein_g:         protein ? Math.round(protein.total) : null,
+      meal_score_avg:    protein && protein.scores.length > 0
+        ? Math.round(protein.scores.reduce((a, b) => a + b, 0) / protein.scores.length)
+        : null,
+      meals_logged:      protein ? protein.count : null,
     };
 
     // Per-supplement boolean
