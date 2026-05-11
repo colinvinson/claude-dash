@@ -239,7 +239,14 @@ Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes
 - **Goal patterns**: 7-day win rate, list of goals with <50% completion this week
 - **Recovery**: composite score (50% readiness + 30% HRV dev + 20% sleep), band, drivers, today's strain, hours since workout
 - **Performance correlations (21-day)**: readiness→volume %, sleep→reps gap, per-supplement→volume %, Concerta→volume %, PRs this week by exercise, stalled exercises by name
-- **Autonomous discovery layer (`lib/ai/snapshot-builder.ts`)**: 21-day wide-format CSV table — one row per date, one column per metric (health, supplements, meds, training, lifestyle, faith, goals, per-supplement booleans). Overseer scans for patterns NOT covered by pre-computed correlations. New metrics added to the app automatically become columns.
+- **Autonomous discovery layer (`lib/ai/snapshot-builder.ts`)**: 21-day wide-format CSV table — one row per date, one column per metric (health, supplements, meds, training, lifestyle, faith, goals, per-supplement booleans). Overseer scans for patterns NOT covered by pre-computed correlations. New metrics added to the app automatically become columns. **Used by both chat AND proactive analyze flow.**
+- **Anti-repeat memory**: context.recentInsights[] contains last 5 surfaced insights with hoursAgo. Analyze prompt explicitly avoids repeating the same insight within 24h — finds new angles or returns null.
+
+### Proactive Surfacing
+- `components/layout/ProactiveCheck.tsx` lives in the (app) shell layout. On page mount, if last insight is > 90 min old, hits `/api/overseer/analyze`.
+- Analyze runs Haiku with `buildAnalysisPrompt` — instructed to surface ONE insight that's either actionable OR a noteworthy pattern from the daily snapshot.
+- Inserts into `overseer_insights` table → surfaces as dismissible banner at top of every app page AND in Coach insights strip.
+- Anti-repeat: AI sees its recent 5 insights and won't repeat them.
 
 ### Hypertrophy Coach (`hooks/useWorkout.ts` + `lib/fitness/recovery.ts`)
 Double progression model:

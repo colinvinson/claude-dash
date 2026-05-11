@@ -47,7 +47,7 @@ export async function buildContext(userId: string) {
     dailyCtxRes, waterRes, faithRes, moodRes, journalRes, ltGoalsRes,
     health7dRes, suppLogs14dRes, health14dRes, mood7dRes, goals7dRes,
     todaySetsRes,
-    sets21dRes, medLogs21dRes,
+    sets21dRes, medLogs21dRes, recentInsightsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -73,6 +73,7 @@ export async function buildContext(userId: string) {
     // Performance correlation data
     supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
     supabase.from("medication_logs").select("medication_type, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
+    supabase.from("overseer_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -511,5 +512,10 @@ export async function buildContext(userId: string) {
       columns: snapshot.columns,
       csv: snapshot.csv,
     },
+    recentInsights: ((recentInsightsRes.data ?? []) as Array<{ body: string; severity: string; triggered_at: string }>).map((r) => ({
+      body: r.body,
+      severity: r.severity,
+      hoursAgo: Math.round((Date.now() - new Date(r.triggered_at).getTime()) / (1000 * 60 * 60) * 10) / 10,
+    })),
   };
 }
