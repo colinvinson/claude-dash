@@ -23,12 +23,11 @@ export default function BottomNav() {
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
 
       <nav
-        className="fixed bottom-0 inset-x-0 z-50 pb-safe"
+        className="fixed bottom-0 inset-x-0 z-50"
         style={{
-          background: "rgba(5,5,6,0.90)",
-          backdropFilter: "blur(24px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          background: "#050506",
           borderTop: "1px solid rgba(255,255,255,0.06)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
         <div className="grid h-14" style={{ gridTemplateColumns: "1fr 1fr 56px 1fr 1fr" }}>
