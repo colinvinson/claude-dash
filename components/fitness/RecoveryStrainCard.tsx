@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useWorkout } from "@/hooks/useWorkout";
 import Card from "@/components/ui/Card";
+import { useAnimatedNumber } from "@/lib/useAnimatedNumber";
 
 const BAND_COLOR: Record<string, string> = {
   exceptional: "#10b981",  // emerald-500
@@ -22,8 +24,17 @@ const BAND_LABEL: Record<string, string> = {
 function Ring({ value, max, color, suffix }: { value: number; max: number; color: string; suffix?: string }) {
   const r = 38;
   const C = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, value / max));
-  const offset = C * (1 - pct);
+  // Start with the ring empty, then fill to the target value after mount so the
+  // CSS transition catches the change and animates it.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const targetPct = Math.max(0, Math.min(1, value / max));
+  const offset    = C * (1 - (mounted ? targetPct : 0));
+  const displayValue = useAnimatedNumber(mounted ? value : 0, 900);
 
   return (
     <div className="relative" style={{ width: 96, height: 96 }}>
@@ -38,11 +49,11 @@ function Ring({ value, max, color, suffix }: { value: number; max: number; color
           strokeDasharray={C}
           strokeDashoffset={offset}
           transform="rotate(-90 50 50)"
-          style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.22,1,0.36,1)" }}
+          style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1), stroke 400ms ease" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-2xl font-bold text-white tabular-nums leading-none">{value}</span>
+        <span className="text-2xl font-bold text-white tabular-nums leading-none">{displayValue}</span>
         {suffix && <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-1">{suffix}</span>}
       </div>
     </div>

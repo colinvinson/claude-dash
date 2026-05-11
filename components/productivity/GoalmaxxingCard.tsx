@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useGoals } from "@/hooks/useGoals";
+import { useAnimatedNumber } from "@/lib/useAnimatedNumber";
 import Card from "@/components/ui/Card";
 import { Zap, X, ArrowRight } from "lucide-react";
 
@@ -31,6 +32,7 @@ function getTomorrowIso() {
 export default function GoalmaxxingCard() {
   const { goals, tomorrowGoals, streak, loading,
           addGoal, addTomorrowGoal, toggleGoal, deleteGoal, pushToTomorrow } = useGoals();
+  const animatedStreak = useAnimatedNumber(streak, 700);
 
   const [todayInput,    setTodayInput]    = useState("");
   const [tmrInput,      setTmrInput]      = useState("");
@@ -119,7 +121,7 @@ export default function GoalmaxxingCard() {
                 : "bg-zinc-800/60 text-zinc-500 border border-zinc-700/40"
             }`}>
               <Zap size={13} className={streak > 0 ? "drop-shadow-[0_0_6px_rgba(242,192,99,0.6)]" : ""} />
-              <span className="tabular-nums">{streak}</span>
+              <span className="tabular-nums">{animatedStreak}</span>
               <span>day streak</span>
             </div>
           </div>
