@@ -56,18 +56,30 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
+
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch { /* ignore */ }
+
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Invalid code");
+        let msg = "Invalid code";
+        try {
+          const data = JSON.parse(bodyText);
+          msg = data.error ?? `HTTP ${res.status}`;
+        } catch {
+          msg = `HTTP ${res.status}: ${bodyText.slice(0, 80) || "no response body"}`;
+        }
+        setError(msg);
         setDigits(Array(CODE_LENGTH).fill(""));
         refs.current[0]?.focus();
         setLoading(false);
         return;
       }
+
       router.push("/home");
       router.refresh();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error";
+      setError(msg);
       setLoading(false);
     }
   }
