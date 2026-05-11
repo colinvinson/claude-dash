@@ -106,16 +106,21 @@ Dashboard updates in real-time (Supabase Realtime)
 
 ---
 
-## Tuning rep sensitivity (RepDetector.swift)
+## Rep sensitivity — auto-tuned per exercise
 
-Default thresholds work well for compound lifts (bench, squat, curl).
-If you're getting false counts or missing reps, adjust:
+`RepDetector.swift` automatically picks one of four threshold profiles based
+on the exercise's `muscle_group` + `exercise_type` returned from the server:
 
-```swift
-private let HIGH: Double = 0.35  // raise for slower/lighter movements
-private let LOW:  Double = 0.15  // lower = more sensitive to eccentric
-private let MIN_INTERVAL: TimeInterval = 0.5  // min seconds between reps
-```
+| Profile | When it applies | HIGH | LOW | Min gap | Why |
+|---|---|---|---|---|---|
+| `lower-body` | muscle_group is Quads / Hamstrings / Glutes / Calves | 0.18g | 0.08g | 0.7s | Wrist barely moves bracing under load — crank sensitivity way up |
+| `isolation` | exercise_type = Isolation (upper body) | 0.25g | 0.12g | 0.7s | Slower controlled tempo, smaller ROM |
+| `compound` | exercise_type = Compound (upper body) | 0.35g | 0.15g | 0.5s | Strong predictable motion, default sane values |
+| `default` | Everything else (Secondary upper) | 0.30g | 0.13g | 0.55s | Middle ground |
+
+The active profile is shown under the counting screen ("counting reps · compound").
+No manual tuning needed — change `exercise_type` in the dashboard Settings page
+and the watch picks up the new profile on the next exercise fetch.
 
 ---
 

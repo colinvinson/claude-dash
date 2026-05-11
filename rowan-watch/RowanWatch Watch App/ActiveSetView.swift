@@ -31,7 +31,9 @@ struct ActiveSetView: View {
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.15), value: detector.count)
 
-                    Text(detector.isAvailable ? "counting reps…" : "no accelerometer")
+                    Text(detector.isAvailable
+                         ? "counting reps · \(detector.activeProfile)"
+                         : "no accelerometer")
                         .font(.caption2).foregroundStyle(.secondary)
 
                     Button("Done") {
@@ -43,7 +45,7 @@ struct ActiveSetView: View {
                     .tint(.red)
                     .buttonBorderShape(.capsule)
                 }
-                .onAppear { detector.start() }
+                .onAppear { detector.start(for: exercise) }
 
             case .confirming:
                 VStack(spacing: 8) {

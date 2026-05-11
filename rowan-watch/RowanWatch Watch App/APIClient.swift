@@ -5,6 +5,7 @@ struct Exercise: Identifiable, Codable {
     let name: String
     let split_day: String?
     let muscle_group: String?
+    let exercise_type: String?   // "Compound" | "Secondary" | "Isolation" — used for rep threshold tuning
 }
 
 enum APIClient {

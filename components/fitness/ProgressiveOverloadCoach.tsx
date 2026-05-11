@@ -8,9 +8,7 @@ import Toggle from "@/components/ui/Toggle";
 import WeeklyVolumeCard from "@/components/fitness/WeeklyVolumeCard";
 import RecoveryStrainCard from "@/components/fitness/RecoveryStrainCard";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
-import { X, Zap, Watch } from "lucide-react";
-
-const READY_KEY = "rowan-workout-ready";  // sessionStorage gate
+import { X, Zap } from "lucide-react";
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -46,18 +44,6 @@ export default function ProgressiveOverloadCoach() {
   const [logging,   setLogging]   = useState(false);
   const [flash,     setFlash]     = useState<string | null>(null);
   const [forcePR,   setForcePR]   = useState(false);
-  const [ready,     setReady]     = useState(false);
-
-  // Ready-screen gate: once tapped today, stays dismissed for the session
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (sessionStorage.getItem(READY_KEY) === "1") setReady(true);
-  }, []);
-
-  function confirmReady() {
-    if (typeof window !== "undefined") sessionStorage.setItem(READY_KEY, "1");
-    setReady(true);
-  }
 
   // Pre-fill from verdict when exercise or override changes
   useEffect(() => {
@@ -99,32 +85,6 @@ export default function ProgressiveOverloadCoach() {
   const typeBadge   = activeExercise?.exercise_type ? TYPE_BADGE[activeExercise.exercise_type] : null;
   const adjustment  = verdict?.recoveryAdjustment;
   const isAdjusted  = !!adjustment?.applied;
-
-  // Ready-screen gate
-  if (!ready) {
-    return (
-      <div className="space-y-4">
-        <SectionLabel>Hypertrophy Coach</SectionLabel>
-        <Card>
-          <div className="flex flex-col items-center text-center py-6">
-            <Watch size={36} className="text-zinc-500 mb-4" />
-            <p className="text-base font-bold text-zinc-100 mb-1.5">Ready to lift?</p>
-            <p className="text-xs text-zinc-500 leading-relaxed max-w-xs mb-5">
-              Start a Strength Training workout on your Apple Watch so it captures heart rate and calories.
-              When it&apos;s recording, tap Ready and we&apos;ll show today&apos;s prescription.
-            </p>
-            <button
-              onClick={confirmReady}
-              className="w-full max-w-xs py-3.5 bg-white hover:bg-zinc-100 rounded-xl text-sm font-bold text-zinc-900 transition-colors"
-            >
-              Ready
-            </button>
-          </div>
-        </Card>
-        <RecoveryStrainCard />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

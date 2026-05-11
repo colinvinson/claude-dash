@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const service = createServiceClient();
   const { data, error } = await service
     .from("exercises")
-    .select("id, name, split_day, muscle_group")
+    .select("id, name, split_day, muscle_group, exercise_type")
     .eq("user_id", userId)
     .order("name");
 

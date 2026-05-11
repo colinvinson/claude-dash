@@ -170,14 +170,26 @@ rowan-dashboard/
 │       ├── client.ts           # createClient() for client components
 │       └── server.ts           # createClient() + createServiceClient() for server/API
 │
-└── supabase/
-    └── migrations/
-        ├── 0001_initial_schema.sql       # Core tables
-        ├── 0002_redesign_tables.sql      # 8 new tables (water, faith, mood, journal, etc.)
-        ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
-        ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
-        ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
-        └── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
+├── supabase/
+│   └── migrations/
+│       ├── 0001_initial_schema.sql       # Core tables
+│       ├── 0002_redesign_tables.sql      # 8 new tables (water, faith, mood, journal, etc.)
+│       ├── 0003_fitness_intelligence.sql # exercise_type, muscle_targets, rpe columns
+│       ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
+│       ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
+│       └── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
+│
+└── rowan-watch/                          # Standalone native watchOS companion app
+    ├── README.md                         # Build/install guide (Xcode + dev cert)
+    └── RowanWatch Watch App/
+        ├── Constants.swift               # apiBase + apiKey + userId (paste-in setup)
+        ├── APIClient.swift               # fetchExercises + logSet → calls Rowan API
+        ├── RowanWatchApp.swift           # App entry
+        ├── ContentView.swift             # Split picker (Push/Pull/Legs) + exercise list
+        ├── SetupView.swift               # Weight picker (Digital Crown, 2.5kg steps)
+        ├── ActiveSetView.swift           # Live rep counter + post-set confirm + log
+        └── RepDetector.swift             # Schmitt-trigger over Core Motion (50Hz),
+                                          # auto-tunes thresholds per exercise type
 ```
 
 ---
@@ -294,6 +306,28 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - **Goal templates** — recurring goals auto-populate daily goal list each morning via `goal_templates` table
 - 4-digit passcode auth flow (proxy.ts gates non-public paths)
 - Deployed on Vercel + accessible on iPhone as PWA (manifest, apple touch icon SVG, status bar styling)
+
+### Native Apple Watch companion app (`rowan-watch/`)
+Standalone watchOS SwiftUI app. NOT bundled with the PWA — built separately in Xcode and installed via free or paid Apple Developer account.
+
+**Workflow on the watch:**
+1. Pick split day (Push/Pull/Legs) → exercise list loads from `/api/workouts/exercises`
+2. Pick exercise → SetupView
+3. Set weight via Digital Crown (2.5kg steps)
+4. Tap "Start Set" → `RepDetector` starts accelerometer at 50Hz, counts reps live with haptic per rep
+5. Tap "Done" → confirm screen, scroll crown to adjust if miscounted
+6. Tap "Log Set ✓" → POSTs to `/api/workouts/log-set` with `WORKOUT_API_KEY` auth
+7. PWA dashboard updates via Supabase Realtime (no refresh needed)
+
+**Rep detection algorithm:** Schmitt-trigger on EMA-smoothed accel magnitude. Per-rep haptic. Thresholds **auto-tune per exercise** based on `muscle_group` + `exercise_type`:
+- `lower-body` (Quads/Hams/Glutes/Calves): HIGH 0.18g, LOW 0.08g, gap 0.7s — wrist barely moves under heavy bracing
+- `isolation` (upper-body Isolation): HIGH 0.25g, LOW 0.12g, gap 0.7s — slower controlled tempo
+- `compound` (upper-body Compound): HIGH 0.35g, LOW 0.15g, gap 0.5s — strong predictable motion
+- `default` (everything else): HIGH 0.30g, LOW 0.13g, gap 0.55s
+
+Active profile is shown under the live counter. Editing `exercise_type` in the dashboard Settings page automatically updates the profile on the watch's next fetch.
+
+**Accuracy realism:** ~90% on upper-body compound/isolation; ~40-60% on squat/deadlift/leg press (the wrist barely moves). The Done screen's manual count adjustment is the safety net for poorly-tracked lifts.
 
 ### Pending (needs user action)
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
