@@ -21,17 +21,17 @@ function DataInner() {
 
       {tab === "health" && (
         <>
-          <HealthCard />
-          <MeditationCard />
-          <DailyStack />
-          <MedicationTracker />
-          <VeloTracker />
+          <div className="anim-fade-up"><HealthCard /></div>
+          <div className="anim-fade-up stagger-2"><MeditationCard /></div>
+          <div className="anim-fade-up stagger-3"><DailyStack /></div>
+          <div className="anim-fade-up stagger-4"><MedicationTracker /></div>
+          <div className="anim-fade-up stagger-5"><VeloTracker /></div>
         </>
       )}
 
-      {tab === "fitness" && <ProgressiveOverloadCoach />}
+      {tab === "fitness" && <div className="anim-fade-up"><ProgressiveOverloadCoach /></div>}
 
-      {tab === "finances" && <FinancesContent />}
+      {tab === "finances" && <div className="anim-fade-up"><FinancesContent /></div>}
     </>
   );
 }

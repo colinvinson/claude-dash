@@ -141,6 +141,53 @@ button:not(.no-tap):not(:disabled):active {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* ── Entry animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.anim-fade-up { animation: fadeInUp 400ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade    { animation: fadeIn 300ms ease-out both; }
+.anim-scale   { animation: scaleIn 350ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-pop     { animation: pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.anim-sheet   { animation: slideUpSheet 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Stagger delays — apply alongside .anim-fade-up on sequential items */
+.stagger-1 { animation-delay: 40ms;  }
+.stagger-2 { animation-delay: 80ms;  }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 160ms; }
+.stagger-5 { animation-delay: 200ms; }
+.stagger-6 { animation-delay: 240ms; }
+.stagger-7 { animation-delay: 280ms; }
+
+/* Respect user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade, .anim-scale, .anim-pop, .anim-sheet,
+  .stagger-1, .stagger-2, .stagger-3, .stagger-4, .stagger-5, .stagger-6, .stagger-7 {
+    animation: none !important;
+  }
+  * { transition-duration: 0.01ms !important; }
+}
+
 /* ── Radial washes ── */
 body::before {
   content: '';

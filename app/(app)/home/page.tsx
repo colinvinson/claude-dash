@@ -89,35 +89,45 @@ export default function HomePage() {
 
   return (
     <>
-      <WelcomeCard />
-      <MorningBriefing />
-      <WeeklyReviewCard />
+      <div className="anim-fade-up"><WelcomeCard /></div>
+      <div className="anim-fade-up stagger-1"><MorningBriefing /></div>
+      <div className="anim-fade-up stagger-2"><WeeklyReviewCard /></div>
 
-      {!hasCheckedIn && <CheckInCard />}
-      {streakAtRisk && <StreakAlert streak={streak} />}
+      {!hasCheckedIn && <div className="anim-fade-up stagger-2"><CheckInCard /></div>}
+      {streakAtRisk && <div className="anim-fade-up stagger-2"><StreakAlert streak={streak} /></div>}
 
-      <ScoreHeadline score={score} accent={accent} headline={headline} />
+      <div className="anim-fade-up stagger-3">
+        <ScoreHeadline score={score} accent={accent} headline={headline} />
+      </div>
 
-      <GoalTicker />
+      <div className="anim-fade-up stagger-3">
+        <GoalTicker />
+      </div>
 
-      <QuickStatsStrip pills={pills} />
+      <div className="anim-fade-up stagger-4">
+        <QuickStatsStrip pills={pills} />
+      </div>
 
-      <PriorityFocusCard
-        goals={goals}
-        totalGoals={goals.length}
-        onToggle={toggleGoal}
-      />
+      <div className="anim-fade-up stagger-5">
+        <PriorityFocusCard
+          goals={goals}
+          totalGoals={goals.length}
+          onToggle={toggleGoal}
+        />
+      </div>
 
-      <Card>
-        <DayRing />
-      </Card>
+      <div className="anim-fade-up stagger-6">
+        <Card><DayRing /></Card>
+      </div>
 
       {health.todays_call_severity === "red" && health.todays_call_body && (
-        <TodaysCall
-          severity={health.todays_call_severity}
-          headline={health.todays_call_body}
-          bullets={[]}
-        />
+        <div className="anim-fade-up stagger-7">
+          <TodaysCall
+            severity={health.todays_call_severity}
+            headline={health.todays_call_body}
+            bullets={[]}
+          />
+        </div>
       )}
     </>
   );

@@ -5,9 +5,9 @@ import JournalCard from "@/components/life/JournalCard";
 export default function LifePage() {
   return (
     <>
-      <GoalmaxxingCard />
-      <LongTermGoalsCard />
-      <JournalCard />
+      <div className="anim-fade-up"><GoalmaxxingCard /></div>
+      <div className="anim-fade-up stagger-2"><LongTermGoalsCard /></div>
+      <div className="anim-fade-up stagger-4"><JournalCard /></div>
     </>
   );
 }

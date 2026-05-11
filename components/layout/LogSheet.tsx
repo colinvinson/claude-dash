@@ -40,13 +40,13 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/60"
+        className="fixed inset-0 z-40 bg-black/60 anim-fade"
         onClick={onClose}
       />
 
       {/* Sheet */}
       <div
-        className="fixed bottom-0 inset-x-0 z-50 rounded-t-3xl overflow-y-auto"
+        className="fixed bottom-0 inset-x-0 z-50 rounded-t-3xl overflow-y-auto anim-sheet"
         style={{
           maxHeight: "85vh",
           background: "rgba(10,10,12,0.97)",

@@ -14,8 +14,8 @@ export default function QuickStatsStrip({ pills }: { pills: Pill[] }) {
         >
           <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{p.label}</span>
           <span
-            className="text-[11px] font-semibold"
-            style={{ color: p.color ?? "#e4e4e7" }}
+            className="text-[11px] font-semibold tabular-nums"
+            style={{ color: p.color ?? "#e4e4e7", transition: "color 400ms ease" }}
           >
             {p.value}
           </span>
