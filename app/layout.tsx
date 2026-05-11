@@ -20,8 +20,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full`}>
-      <body className="h-full text-[#FAFAFA] antialiased" style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}>
+    <html lang="en" className={geist.variable}>
+      <body className="text-[#FAFAFA] antialiased" style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}>
         {children}
       </body>
     </html>

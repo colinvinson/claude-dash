@@ -37,7 +37,14 @@ button, a, label, nav, [role="button"], [data-no-select] {
 }
 
 html, body {
-  height: 100%;
+  /* iOS PWA full-screen: 100dvh extends through the home-indicator area.
+     100vh fallback for browsers without dvh support (covers a slightly smaller area
+     but still works). min-height ensures we never shrink below the screen. */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
   background: #050506;
   color: #FAFAFA;
   -webkit-font-smoothing: antialiased;
