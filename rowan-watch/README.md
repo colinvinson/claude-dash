@@ -39,7 +39,7 @@ Edit `Constants.swift`:
 
 ```swift
 static let apiBase = "https://YOUR_APP.vercel.app"  // or http://192.168.x.x:3000 for local
-static let apiKey  = "0372f4dc2e4a8a7f50409821deca16ff"   // your WORKOUT_API_KEY
+static let apiKey  = "YOUR_WORKOUT_API_KEY"   // from .env.local — never commit the real value
 static let userId  = "PASTE_YOUR_SUPABASE_USER_UUID"
 ```
 
@@ -79,7 +79,7 @@ In Xcode:
 
 Add to `.env.local`:
 ```
-WORKOUT_API_KEY=0372f4dc2e4a8a7f50409821deca16ff
+WORKOUT_API_KEY=generate_with_openssl_rand_hex_16
 ```
 
 For production, add this same key in Vercel Dashboard → Settings → Environment Variables.
