@@ -46,6 +46,7 @@ export async function buildContext(userId: string) {
     dailyCtxRes, waterRes, faithRes, moodRes, journalRes, ltGoalsRes,
     health7dRes, suppLogs14dRes, health14dRes, mood7dRes, goals7dRes,
     todaySetsRes,
+    sets21dRes, medLogs21dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -68,6 +69,9 @@ export async function buildContext(userId: string) {
     supabase.from("mood_logs").select("score, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(7)).order("log_date", { ascending: true }),
     supabase.from("goals").select("title, is_complete, goal_date").eq("user_id", userId).gte("goal_date", dateDaysAgo(7)),
     supabase.from("workout_sets").select("weight_kg, reps, rpe, logged_at").eq("user_id", userId).eq("log_date", today),
+    // Performance correlation data
+    supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
+    supabase.from("medication_logs").select("medication_type, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -224,6 +228,171 @@ export async function buildContext(userId: string) {
     }
   }
 
+  // ── Performance correlations (lifting × everything else) ─────────────────
+  type SetRow21 = {
+    weight_kg: number;
+    reps: number;
+    rpe: number | null;
+    est_1rm: number;
+    log_date: string;
+    exercises: { name: string; muscle_group: string } | { name: string; muscle_group: string }[] | null;
+  };
+  const sets21 = (sets21dRes.data ?? []) as unknown as SetRow21[];
+
+  // Daily session map: log_date → { volume, avgRpe, sets[], bestEst1RM }
+  type DaySession = { volume: number; sets: SetRow21[]; bestEst1rm: number; avgReps: number; avgRpe: number | null };
+  const sessionsByDate = new Map<string, DaySession>();
+  for (const s of sets21) {
+    const entry = sessionsByDate.get(s.log_date) ?? { volume: 0, sets: [], bestEst1rm: 0, avgReps: 0, avgRpe: null };
+    entry.volume   += s.weight_kg * s.reps;
+    entry.sets.push(s);
+    entry.bestEst1rm = Math.max(entry.bestEst1rm, s.est_1rm);
+    sessionsByDate.set(s.log_date, entry);
+  }
+  for (const [date, ds] of sessionsByDate) {
+    ds.avgReps = ds.sets.reduce((sum, s) => sum + s.reps, 0) / ds.sets.length;
+    const rpeVals = ds.sets.map((s) => s.rpe).filter((v): v is number => v != null);
+    ds.avgRpe = rpeVals.length > 0 ? rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length : null;
+    sessionsByDate.set(date, ds);
+  }
+
+  // Build date → health lookup (we have h14d already)
+  const healthByDate = new Map(h14d.map((h) => [h.date, h]));
+
+  // ── Readiness → volume correlation ────────────────────────────────────
+  const highRecDays: { date: string; volume: number }[] = [];
+  const lowRecDays:  { date: string; volume: number }[] = [];
+  for (const [date, ds] of sessionsByDate) {
+    const h = healthByDate.get(date);
+    if (!h?.readiness_score) continue;
+    if (h.readiness_score >= 70) highRecDays.push({ date, volume: ds.volume });
+    else if (h.readiness_score < 55) lowRecDays.push({ date, volume: ds.volume });
+  }
+
+  let recoveryEffect: string | null = null;
+  if (highRecDays.length >= 2 && lowRecDays.length >= 2) {
+    const highAvg = Math.round(avg(highRecDays.map((d) => d.volume)));
+    const lowAvg  = Math.round(avg(lowRecDays.map((d) => d.volume)));
+    const pctDiff = lowAvg > 0 ? Math.round(((highAvg - lowAvg) / lowAvg) * 100) : 0;
+    if (Math.abs(pctDiff) >= 10) {
+      recoveryEffect = `Readiness≥70 days avg ${highAvg.toLocaleString()}kg volume vs ${lowAvg.toLocaleString()}kg on readiness<55 days (${pctDiff > 0 ? "+" : ""}${pctDiff}%, ${highRecDays.length + lowRecDays.length} sessions)`;
+    }
+  }
+
+  // ── Sleep → next-session reps correlation ─────────────────────────────
+  const goodSleepReps: number[] = [];
+  const poorSleepReps: number[] = [];
+  for (const [date, ds] of sessionsByDate) {
+    const h = healthByDate.get(date);
+    if (!h?.sleep_hours) continue;
+    if (h.sleep_hours >= 7) goodSleepReps.push(ds.avgReps);
+    else if (h.sleep_hours < 6.5) poorSleepReps.push(ds.avgReps);
+  }
+
+  let sleepEffect: string | null = null;
+  if (goodSleepReps.length >= 2 && poorSleepReps.length >= 2) {
+    const goodAvg = Math.round(avg(goodSleepReps) * 10) / 10;
+    const poorAvg = Math.round(avg(poorSleepReps) * 10) / 10;
+    const delta   = Math.round((goodAvg - poorAvg) * 10) / 10;
+    if (Math.abs(delta) >= 0.8) {
+      sleepEffect = `After <6.5h sleep, avg ${poorAvg} reps/set vs ${goodAvg} after ≥7h sleep (${delta > 0 ? "+" : ""}${delta} rep gap, ${goodSleepReps.length + poorSleepReps.length} sessions)`;
+    }
+  }
+
+  // ── Supplement → next-day workout volume correlation ──────────────────
+  const supplementEffects: string[] = [];
+  for (const supp of stack) {
+    const takenDates = new Set(
+      suppLogs14.filter((l) => l.supplement_id === supp.id).map((l) => l.log_date)
+    );
+    const sessionsWith:    number[] = [];
+    const sessionsWithout: number[] = [];
+    for (const [date, ds] of sessionsByDate) {
+      // Same-day supp adherence vs same-day workout volume
+      if (takenDates.has(date)) sessionsWith.push(ds.volume);
+      else sessionsWithout.push(ds.volume);
+    }
+    if (sessionsWith.length >= 3 && sessionsWithout.length >= 3) {
+      const withAvg    = Math.round(avg(sessionsWith));
+      const withoutAvg = Math.round(avg(sessionsWithout));
+      const pct        = withoutAvg > 0 ? Math.round(((withAvg - withoutAvg) / withoutAvg) * 100) : 0;
+      if (Math.abs(pct) >= 15) {
+        supplementEffects.push(
+          `${supp.name}: avg ${withAvg.toLocaleString()}kg volume on days taken vs ${withoutAvg.toLocaleString()}kg skipped (${pct > 0 ? "+" : ""}${pct}%, ${sessionsWith.length + sessionsWithout.length} sessions)`
+        );
+      }
+    }
+  }
+
+  // ── Concerta → workout performance ────────────────────────────────────
+  const medLogs21 = (medLogs21dRes.data ?? []) as Array<{ medication_type: string; log_date: string }>;
+  const concertaDates = new Set(medLogs21.filter((m) => m.medication_type === "concerta").map((m) => m.log_date));
+  const concertaWorkouts:    number[] = [];
+  const noConcertaWorkouts:  number[] = [];
+  for (const [date, ds] of sessionsByDate) {
+    if (concertaDates.has(date)) concertaWorkouts.push(ds.volume);
+    else noConcertaWorkouts.push(ds.volume);
+  }
+  let concertaEffect: string | null = null;
+  if (concertaWorkouts.length >= 3 && noConcertaWorkouts.length >= 3) {
+    const onAvg  = Math.round(avg(concertaWorkouts));
+    const offAvg = Math.round(avg(noConcertaWorkouts));
+    const pct    = offAvg > 0 ? Math.round(((onAvg - offAvg) / offAvg) * 100) : 0;
+    if (Math.abs(pct) >= 15) {
+      concertaEffect = `Concerta days: ${onAvg.toLocaleString()}kg avg session volume vs ${offAvg.toLocaleString()}kg off-Concerta (${pct > 0 ? "+" : ""}${pct}%)`;
+    }
+  }
+
+  // ── Per-exercise progression (PRs + stalls) ───────────────────────────
+  const byExercise = new Map<string, { dates: string[]; est1rms: number[]; weights: number[] }>();
+  for (const s of sets21) {
+    const ex = Array.isArray(s.exercises) ? s.exercises[0] : s.exercises;
+    if (!ex) continue;
+    const entry = byExercise.get(ex.name) ?? { dates: [], est1rms: [], weights: [] };
+    // Track best est_1rm per session
+    const existingIdx = entry.dates.indexOf(s.log_date);
+    if (existingIdx === -1) {
+      entry.dates.push(s.log_date);
+      entry.est1rms.push(s.est_1rm);
+      entry.weights.push(s.weight_kg);
+    } else if (s.est_1rm > entry.est1rms[existingIdx]) {
+      entry.est1rms[existingIdx] = s.est_1rm;
+      entry.weights[existingIdx] = s.weight_kg;
+    }
+    byExercise.set(ex.name, entry);
+  }
+
+  const prsThisWeek:  string[] = [];
+  const stalled:      string[] = [];
+  const sevenAgo      = dateDaysAgo(7);
+  for (const [name, data] of byExercise) {
+    if (data.est1rms.length < 3) continue;
+    const recent = data.est1rms[data.est1rms.length - 1];
+    const first  = data.est1rms[0];
+    const prevBest = Math.max(...data.est1rms.slice(0, -1));
+    const recentDate = data.dates[data.dates.length - 1];
+
+    // PR: last session beat all prior sessions in window AND happened this week
+    if (recent > prevBest && recentDate >= sevenAgo) {
+      prsThisWeek.push(`${name} (${data.weights[data.weights.length - 1]}kg → est. 1RM ${Math.round(recent)}kg)`);
+    }
+
+    // Stalled: 3+ sessions, recent within 2% of first
+    if (data.est1rms.length >= 3 && Math.abs(recent - first) / first < 0.02) {
+      stalled.push(`${name} (${data.est1rms.length} sessions, est. 1RM ~${Math.round(recent)}kg)`);
+    }
+  }
+
+  const performance = {
+    recoveryEffect,
+    sleepEffect,
+    supplementEffects,
+    concertaEffect,
+    prsThisWeek,
+    stalled,
+    sessionsIn21d: sessionsByDate.size,
+  };
+
   // ── Goal patterns ───────────────────────────────────────────────────────
   type GoalRow = { title: string; is_complete: boolean; goal_date: string };
   const goals7d = (goals7dRes.data ?? []) as GoalRow[];
@@ -330,5 +499,6 @@ export async function buildContext(userId: string) {
     correlations,
     goalPatterns,
     recovery,
+    performance,
   };
 }

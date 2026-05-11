@@ -231,11 +231,13 @@ Pure function, zero API cost. Runs client-side on Home page.
 - Score sets `document.body.dataset.score` → triggers CSS radial gradient accent
 
 ### Overseer Context (`lib/ai/context-builder.ts`)
-Runs before every AI call (chat + analyze). 19 parallel Supabase queries. Passes:
+Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes:
 - Today's snapshot: goals, supplements, medications, workouts, health, mood, faith, water, daily plan
 - **7-day trends**: HRV direction + declining streak, readiness direction, sleep avg, mood avg
 - **14-day correlations**: per-supplement vs. deep sleep delta (if ≥15min delta + ≥2 data points → plain English fact)
 - **Goal patterns**: 7-day win rate, list of goals with <50% completion this week
+- **Recovery**: composite score (50% readiness + 30% HRV dev + 20% sleep), band, drivers, today's strain, hours since workout
+- **Performance correlations (21-day)**: readiness→volume %, sleep→reps gap, per-supplement→volume %, Concerta→volume %, PRs this week by exercise, stalled exercises by name
 
 ### Hypertrophy Coach (`hooks/useWorkout.ts` + `lib/fitness/recovery.ts`)
 Double progression model:
