@@ -57,6 +57,17 @@ body {
   overscroll-behavior: none;
 }
 
+/* iOS Safari adds a 300ms tap delay on most elements; touch-action: manipulation removes it. */
+button, a, label, [role="button"], input, textarea, select {
+  touch-action: manipulation;
+}
+
+/* iOS auto-zooms when focusing an input with font-size < 16px. Bump inputs/textareas/selects
+   to at least 16px to prevent the unwanted zoom-in, while leaving smaller text elsewhere unchanged. */
+input, textarea, select {
+  font-size: max(16px, 1rem);
+}
+
 /* Tap feedback utility — spring-back transform on press */
 .tap {
   transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease;
@@ -73,12 +84,47 @@ body {
   transform: scale(0.985);
 }
 
+/* Default tap feedback for ALL <button> elements unless they opt out with .no-tap.
+   Disabled buttons stay still. */
+button:not(.no-tap) {
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease, opacity 120ms ease;
+}
+button:not(.no-tap):not(:disabled):active {
+  transform: scale(0.96);
+}
+
 /* Safe-area utilities — Tailwind v4 doesn't ship these by default */
 .pt-safe { padding-top:    env(safe-area-inset-top); }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pl-safe { padding-left:   env(safe-area-inset-left); }
 .pr-safe { padding-right:  env(safe-area-inset-right); }
 .h-safe-bottom { height: env(safe-area-inset-bottom); }
+
+/* ── View transitions ── */
+/* Browser cross-fades between routes automatically. Chrome 111+, Safari 18+. */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
 
 /* ── Radial washes ── */
 body::before {
