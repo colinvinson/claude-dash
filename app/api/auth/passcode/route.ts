@@ -4,6 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// GET is a health check — confirms the route is deployed and env vars are wired.
+// Returns whether each env var exists, never the values themselves.
+export async function GET() {
+  return NextResponse.json({
+    deployed: true,
+    envs: {
+      APP_PASSCODE:  !!process.env.APP_PASSCODE,
+      AUTH_EMAIL:    !!process.env.AUTH_EMAIL,
+      AUTH_PASSWORD: !!process.env.AUTH_PASSWORD,
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   const { code } = await req.json() as { code: string };
 
