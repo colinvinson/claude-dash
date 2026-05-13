@@ -373,10 +373,19 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
   - `read_artifact(id_or_name)` — retrieve full content
 - **Client interaction**: open_url (returns __OPEN_URL__ marker → SSE openUrl → window.open in browser)
 
-**Workers additionally have** (`WORKER_TOOLS` constant, not in chat):
+**Workers have a SMALLER tool set** (`WORKER_TOOLS` constant) — focused on business/project work. Personal logging tools (log_water, log_protein, log_mood, log_alcohol, log_weight, log_concerta, log_supplement, complete_goal, mark_prayed, mark_bible, mark_church) are deliberately excluded — those are direct Jarvis chat actions, not worker tasks.
+
+Workers can call:
 - **`code_execution`** — Anthropic-hosted Python sandbox (server tool, beta header `code-execution-2025-08-25`). Worker writes + runs Python at runtime: pip-install packages, scrape pages, parse JSON/CSV, do math, generate plots. This is the "figure it out without me hand-coding" capability — workers can do almost anything code can do.
+- fetch_url, web_search
+- write_artifact, list_artifacts, read_artifact
+- remember_fact, recall_facts
+- dispatch_worker, list_workers (coordinate with other workers)
+- open_url
 
 Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropic.messages.create`. Server tool blocks (`server_tool_use`, `code_execution_tool_result`) are preserved in the assistant message verbatim so Claude can iterate on results.
+
+**When does Jarvis create a worker vs do it directly?** Per the sharpened `create_worker` description: only when the task is (a) more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/web search. "Log a glass of water" → direct tool call. "Scrape Hacker News daily and digest the AI infra launches" → worker.
 
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
 

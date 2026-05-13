@@ -157,15 +157,15 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "create_worker",
-    description: "Define a new specialized worker. The worker will run on its schedule (or on-demand if no schedule given).",
+    description: "Define a new autonomous worker for BUSINESS or PROJECT work — research, scraping, content generation, market monitoring, analysis, automated digests. NEVER use this for personal logging (water, mood, supplements, etc.) — those go through direct tools instantly. A worker is appropriate when the task (a) takes more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/searching to complete.",
     input_schema: {
       type: "object" as const,
       properties: {
         name: { type: "string" },
         description: { type: "string", description: "What this worker does, one sentence." },
-        system_prompt: { type: "string", description: "Full system prompt that defines the worker's job, style, and constraints." },
-        schedule: { type: "string", description: "Optional cron string (e.g. '0 7 * * *' for daily 7am). Omit for on-demand only." },
-        allowed_tools: { type: "array", items: { type: "string" }, description: "Tool names this worker is allowed to use." },
+        system_prompt: { type: "string", description: "Full system prompt defining the worker's job. Be specific about inputs, outputs, format. Tell it to write_artifact for substantial outputs." },
+        schedule: { type: "string", description: "Optional cron string (e.g. '0 7 * * *' for daily 7am, '0 17 * * 5' for Fridays at 5pm). Omit for on-demand only." },
+        allowed_tools: { type: "array", items: { type: "string" }, description: "Optional. If omitted, worker gets all business tools (code_execution, fetch_url, web_search, artifacts, memory)." },
       },
       required: ["name", "system_prompt"],
     },
@@ -262,10 +262,27 @@ export const CODE_EXECUTION_TOOL = {
 
 export const CODE_EXECUTION_BETA = "code-execution-2025-08-25";
 
-// Tools workers get (everything Jarvis has + code execution).
-// Code execution doesn't go into Jarvis chat because runs can take 30+s
-// and that would block voice/chat UX. Workers are async — they can wait.
-export const WORKER_TOOLS: Anthropic.Tool[] = [...ALL_JARVIS_TOOLS, CODE_EXECUTION_TOOL];
+// Workers are for business/project work — research, scraping, content gen, analysis.
+// They explicitly do NOT get personal logging tools (log_water, log_protein, etc).
+// Personal logging is a direct Jarvis chat action — instant, deterministic, no worker needed.
+// Workers get capability primitives + memory + the ability to coordinate other workers.
+const WORKER_TOOL_NAMES = new Set([
+  "fetch_url",
+  "web_search",
+  "write_artifact",
+  "list_artifacts",
+  "read_artifact",
+  "remember_fact",
+  "recall_facts",
+  "dispatch_worker",
+  "list_workers",
+  "open_url",
+]);
+
+export const WORKER_TOOLS: Anthropic.Tool[] = [
+  ...JARVIS_EXTRA_TOOLS.filter((t) => WORKER_TOOL_NAMES.has(t.name)),
+  CODE_EXECUTION_TOOL,
+];
 
 type ToolInput = Record<string, unknown>;
 
