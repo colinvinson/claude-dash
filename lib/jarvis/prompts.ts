@@ -60,20 +60,27 @@ export function buildWorkerSystemPrompt(
   workerName: string,
   workerSystemPrompt: string,
   workerLearnedFacts: Record<string, unknown>,
+  universalLessons: string[],
   context: object,
 ): string {
-  // Surface lessons from past runs prominently; they're the compound-improvement signal.
+  // Two tiers of learned wisdom:
+  //  - UNIVERSAL lessons: craft principles every worker should follow (cross-worker fleet wisdom).
+  //  - INDIVIDUAL lessons: domain-specific knowledge this worker has accumulated from its own runs.
   const lessons = (workerLearnedFacts as { lessons?: string[] }).lessons ?? [];
   const otherLearned = Object.fromEntries(
     Object.entries(workerLearnedFacts).filter(([k]) => k !== "lessons")
   );
+
+  const universalBlock = universalLessons.length > 0
+    ? `\n\nUNIVERSAL WORKER PRINCIPLES (apply to every task — accumulated craft wisdom across the fleet):\n${universalLessons.map((l) => `  • ${l}`).join("\n")}`
+    : "";
   const lessonsBlock = lessons.length > 0
-    ? `\n\nLESSONS FROM PAST RUNS (apply these — they're why you're getting better):\n${lessons.map((l) => `  • ${l}`).join("\n")}`
+    ? `\n\nLESSONS FROM YOUR PAST RUNS (specific to your job — apply these):\n${lessons.map((l) => `  • ${l}`).join("\n")}`
     : "";
   const otherBlock = Object.keys(otherLearned).length > 0
     ? `\n\nOther accumulated knowledge:\n${JSON.stringify(otherLearned, null, 2)}`
     : "";
-  const learnedSection = lessonsBlock + otherBlock;
+  const learnedSection = universalBlock + lessonsBlock + otherBlock;
 
   return `You are "${workerName}" — a specialized autonomous agent deployed by Jarvis on behalf of Sir.
 

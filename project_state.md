@@ -190,7 +190,8 @@ rowan-dashboard/
 │       ├── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
 │       ├── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
 │       ├── 0008_jarvis.sql                # jarvis_facts + jarvis_workers + jarvis_worker_runs + jarvis_conversations
-│       └── 0009_jarvis_artifacts.sql      # jarvis_artifacts — worker outputs (blog posts, plans, reports)
+│       ├── 0009_jarvis_artifacts.sql      # jarvis_artifacts — worker outputs (blog posts, plans, reports)
+│       └── 0010_jarvis_universal_lessons.sql  # craft principles shared across all workers (current + future)
 │
 └── rowan-watch/                          # Standalone native watchOS companion app
     ├── README.md                         # Build/install guide (Xcode + dev cert)
@@ -385,7 +386,11 @@ Workers can call:
 
 Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropic.messages.create`. Server tool blocks (`server_tool_use`, `code_execution_tool_result`) are preserved in the assistant message verbatim so Claude can iterate on results.
 
-**Compound improvement (the "gets smarter" mechanism):** after every worker run, the runner fires a parallel Haiku call that asks "what's ONE durable lesson this worker should remember for next time?" If Haiku returns a real lesson (vs "NONE"), it's appended to the worker's `learned_facts.lessons` array (FIFO, cap 50). The next run's system prompt prominently surfaces those lessons under "LESSONS FROM PAST RUNS — apply these." Zero behavioral change needed from the worker; the system extracts and reinjects automatically.
+**Compound improvement (two tiers — universal + individual):** after every worker run, the runner fires a parallel Haiku call that extracts BOTH:
+- **UNIVERSAL** lessons — craft principles every worker (current + future) should follow. Written to `jarvis_universal_lessons` table (deduped case-insensitively). Examples: "wrap fetch_url in try/except and continue on failure rather than crash", "cite sources in artifacts", "save partial progress as an artifact even on partial failure".
+- **INDIVIDUAL** lessons — specific to this worker's domain. Appended to `jarvis_workers.learned_facts.lessons` (FIFO, cap 50). Examples: "HN /best.json is faster than scraping homepage", "Roblox trends API rate-limits at 30/min".
+
+Haiku returns JSON `{individual: <str|null>, universal: <str|null>}` — most runs produce 0 lessons. Each worker's next run sees BOTH the universal fleet wisdom AND its own accumulated knowledge in its system prompt, surfaced as separate "UNIVERSAL WORKER PRINCIPLES" and "LESSONS FROM YOUR PAST RUNS" sections. Zero behavioral change needed from workers.
 
 **When does Jarvis create a worker vs do it directly?** Per the sharpened `create_worker` description: only when the task is (a) more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/web search. "Log a glass of water" → direct tool call. "Scrape Hacker News daily and digest the AI infra launches" → worker.
 
@@ -409,6 +414,7 @@ Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropi
 - Run `0007_lifemax_business.sql` in Supabase SQL Editor — category columns on supplement_stack + journal_entries
 - Run `0008_jarvis.sql` in Supabase SQL Editor — Jarvis tables (facts, workers, runs, conversations)
 - Run `0009_jarvis_artifacts.sql` in Supabase SQL Editor — artifact storage for worker outputs
+- Run `0010_jarvis_universal_lessons.sql` in Supabase SQL Editor — universal lesson table
 - Add `CRON_SECRET` env var in Vercel (any random string) so the worker dispatcher can authenticate
 - Optional: add `TAVILY_API_KEY` env var (free tier at tavily.com — 1000 searches/mo) to enable `web_search` tool. Without it, workers that try to search get an error message but everything else works.
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
