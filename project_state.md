@@ -347,7 +347,8 @@ Active profile is shown under the live counter. Editing `exercise_type` in the d
 Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives at the center of the bottom nav — tap the glowing orb to open the HUD.
 
 **Architecture:**
-- `app/(app)/jarvis/JarvisHUD.tsx` — full-screen overlay: pulsing animated orb (`Orb.tsx`) + corner telemetry (time, recovery, goals, protein, streak) + hold-to-talk mic + text fallback
+- `app/(app)/jarvis/JarvisHUD.tsx` — Iron Man tactical HUD aesthetic. Cyan monospace overlay with: top status bar (J.A.R.V.I.S. title, ONLINE/SECURE/ENCRYPTED/AUTO-LVL9 pills, ms-precision timestamp, session id), 12-col grid body — SYSTEM VITALS + TELEMETRY panels (left), Orb + live caption + tool chips (center), PROXIMITY radar + AUDIO I/O bar meter + DIAGNOSTICS (right), bottom command-line input with ▸ prompt. Background grid pattern. Tap-to-toggle mic (single click starts/stops continuous listening).
+- `app/(app)/jarvis/Orb.tsx` — SVG-based multi-ring orb with 180-particle nebula core. State-driven cyan hues (idle 200, listening 185, thinking 220, speaking 195). Layered rings: outermost with 36 cardinal tick marks, dashed counter-rotating mid-ring with 3 accent arcs, inner solid ring, innermost dashed decorative — each spinning at different speeds per state. Real audio levels driven by Web Audio API `AnalyserNode` via `getUserMedia` while listening.
 - `lib/jarvis/voice.ts` — `webkitSpeechRecognition` STT + `speechSynthesis` TTS, picks "Daniel" UK voice when available, sentence-buffered streaming speaker
 - `lib/jarvis/prompts.ts` — Jarvis persona prompt (formal, dry, addresses user as "Sir")
 - `lib/jarvis/memory.ts` — read/write `jarvis_facts` with confidence reinforcement
