@@ -349,7 +349,8 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 **Architecture:**
 - `app/(app)/jarvis/JarvisHUD.tsx` — Iron Man tactical HUD aesthetic. Cyan monospace overlay with: top status bar (J.A.R.V.I.S. title, ONLINE/SECURE/ENCRYPTED/AUTO-LVL9 pills, ms-precision timestamp, session id), 12-col grid body — SYSTEM VITALS + TELEMETRY panels (left), Orb + live caption + tool chips (center), PROXIMITY radar + AUDIO I/O bar meter + DIAGNOSTICS (right), bottom command-line input with ▸ prompt. Background grid pattern. Tap-to-toggle mic (single click starts/stops continuous listening).
 - `app/(app)/jarvis/Orb.tsx` — SVG-based multi-ring orb with 180-particle nebula core. State-driven cyan hues (idle 200, listening 185, thinking 220, speaking 195). Layered rings: outermost with 36 cardinal tick marks, dashed counter-rotating mid-ring with 3 accent arcs, inner solid ring, innermost dashed decorative — each spinning at different speeds per state. Real audio levels driven by Web Audio API `AnalyserNode` via `getUserMedia` while listening.
-- `lib/jarvis/voice.ts` — `webkitSpeechRecognition` STT + `speechSynthesis` TTS, picks "Daniel" UK voice when available, sentence-buffered streaming speaker
+- `lib/jarvis/voice.ts` — `webkitSpeechRecognition` STT + **ElevenLabs TTS** (cinematic British "Daniel" voice via `/api/jarvis/tts` proxy, `eleven_turbo_v2_5` model, sentence-buffered streaming speaker, sequential audio queue, browser `speechSynthesis` fallback if API down). Requires `ELEVENLABS_API_KEY` env var.
+- `app/api/jarvis/tts/route.ts` — server proxy to ElevenLabs (keeps API key off the client). Voice ID `onwK4e9ZLuTAKqWW03F9` (Daniel).
 - `lib/jarvis/prompts.ts` — Jarvis persona prompt (formal, dry, addresses user as "Sir")
 - `lib/jarvis/memory.ts` — read/write `jarvis_facts` with confidence reinforcement
 - `lib/jarvis/runner.ts` — `runWorker(id)` orchestration loop with tool use
@@ -397,7 +398,7 @@ Haiku returns JSON `{individual: <str|null>, universal: <str|null>}` — most ru
 
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
 
-**Voice quality:** free system voice for V1. Easy upgrade to ElevenLabs/Cartesia via API swap later.
+**Voice quality:** ElevenLabs "Daniel" (British, authoritative news-anchor delivery — closest pre-made voice to Paul Bettany's Jarvis). Model `eleven_turbo_v2_5` for low latency. Browser `speechSynthesis` is the fallback if the API errors so the assistant still talks.
 
 ### Future (V2+)
 - Native desktop wrapper (Tauri) for true computer control — open IDEs, run shell commands, manipulate windows

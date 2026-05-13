@@ -1,69 +1,92 @@
-// Voice plumbing for Jarvis — STT (SpeechRecognition) + TTS (speechSynthesis).
-// Pure browser APIs. Falls back gracefully where not supported.
+// Voice plumbing for Jarvis.
+//   TTS: ElevenLabs (cinematic British "Daniel") via /api/jarvis/tts. Browser speechSynthesis is the fallback.
+//   STT: webkitSpeechRecognition.
 
 // ============================================================
-// TTS — pick the best-available "Jarvis-ish" voice
+// TTS — ElevenLabs proxy with sequential queue + cancellation
 // ============================================================
 
-// Preference order: cinematic UK male voices first
-const VOICE_PREFERENCES = ["Daniel", "Oliver", "Arthur", "Alex", "Samantha"];
+type SpeakItem = {
+  audio: HTMLAudioElement;
+  onEnd?: () => void;
+  revoke: () => void;
+};
 
-let cachedVoice: SpeechSynthesisVoice | null = null;
+let currentAudio: HTMLAudioElement | null = null;
+const playQueue: SpeakItem[] = [];
+const activeAborts = new Set<AbortController>();
 
-function pickVoice(): SpeechSynthesisVoice | null {
-  if (cachedVoice) return cachedVoice;
-  if (typeof window === "undefined" || !window.speechSynthesis) return null;
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length === 0) return null;
+function playNext() {
+  const next = playQueue.shift();
+  if (!next) { currentAudio = null; return; }
+  currentAudio = next.audio;
+  const finish = () => {
+    try { next.revoke(); } catch {}
+    next.onEnd?.();
+    playNext();
+  };
+  next.audio.addEventListener("ended", finish, { once: true });
+  next.audio.addEventListener("error", finish, { once: true });
+  next.audio.play().catch(() => finish());
+}
 
-  for (const name of VOICE_PREFERENCES) {
-    const match = voices.find((v) => v.name === name);
-    if (match) { cachedVoice = match; return match; }
+export async function speak(text: string, opts?: { onEnd?: () => void }): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) { opts?.onEnd?.(); return; }
+
+  const ctrl = new AbortController();
+  activeAborts.add(ctrl);
+  try {
+    const res = await fetch("/api/jarvis/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: trimmed }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`tts ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    playQueue.push({ audio, onEnd: opts?.onEnd, revoke: () => URL.revokeObjectURL(url) });
+    if (!currentAudio) playNext();
+  } catch (err) {
+    if ((err as { name?: string })?.name === "AbortError") return;
+    // Fallback to browser speechSynthesis so the assistant still talks if ElevenLabs is down.
+    fallbackSpeak(trimmed, opts);
+  } finally {
+    activeAborts.delete(ctrl);
   }
-  const enMale = voices.find((v) => v.lang?.startsWith("en") && /male/i.test(v.name));
-  if (enMale) { cachedVoice = enMale; return enMale; }
-  const en = voices.find((v) => v.lang?.startsWith("en"));
-  cachedVoice = en ?? voices[0];
-  return cachedVoice;
 }
 
-// Wait for voices to populate (some browsers fire `voiceschanged` after load).
-export function primeVoices(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-    if (window.speechSynthesis.getVoices().length > 0) { resolve(); return; }
-    const handler = () => {
-      window.speechSynthesis.removeEventListener("voiceschanged", handler);
-      resolve();
-    };
-    window.speechSynthesis.addEventListener("voiceschanged", handler);
-    // Fallback timeout
-    setTimeout(resolve, 1000);
-  });
-}
-
-export function speak(text: string, opts?: { rate?: number; pitch?: number; onEnd?: () => void }): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
+function fallbackSpeak(text: string, opts?: { onEnd?: () => void }) {
+  if (typeof window === "undefined" || !window.speechSynthesis) { opts?.onEnd?.(); return; }
   const utter = new SpeechSynthesisUtterance(text);
-  const voice = pickVoice();
-  if (voice) utter.voice = voice;
-  utter.rate  = opts?.rate  ?? 0.95;
-  utter.pitch = opts?.pitch ?? 0.95;
+  utter.rate = 0.95;
+  utter.pitch = 0.95;
   if (opts?.onEnd) utter.addEventListener("end", opts.onEnd);
   window.speechSynthesis.speak(utter);
 }
 
 export function cancelSpeech(): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
+  activeAborts.forEach((a) => a.abort());
+  activeAborts.clear();
+  if (currentAudio) {
+    try { currentAudio.pause(); currentAudio.currentTime = 0; } catch {}
+  }
+  currentAudio = null;
+  playQueue.length = 0;
+  if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+// Retained as a no-op for compatibility with callers that primed browser voices.
+export function primeVoices(): Promise<void> {
+  return Promise.resolve();
 }
 
 // Streams text chunks → speaks complete sentences as they arrive.
-// Prevents awkward mid-word pauses while still feeling reactive.
 export class StreamingSpeaker {
   private buffer = "";
   private spoken = "";
-  private endCallback?: () => void;
 
   feed(chunk: string) {
     this.buffer += chunk;
@@ -71,18 +94,18 @@ export class StreamingSpeaker {
   }
 
   private flushCompleteSentences() {
-    // Match through end-of-sentence punctuation OR a comma if the chunk is getting long
     const match = this.buffer.match(/^([\s\S]*?[.!?…])(\s|$)/);
     if (match) {
       const sentence = match[1].trim();
-      if (sentence) speak(sentence, { onEnd: this.endCallback });
+      if (sentence) speak(sentence);
       this.buffer = this.buffer.slice(match[0].length);
       this.spoken += sentence + " ";
+      // Recurse to flush additional sentences in one feed.
+      if (this.buffer.match(/[.!?…]/)) this.flushCompleteSentences();
     }
   }
 
   finish(onComplete?: () => void) {
-    // Speak any remainder
     if (this.buffer.trim()) {
       speak(this.buffer.trim(), { onEnd: onComplete });
       this.spoken += this.buffer;
@@ -132,7 +155,7 @@ export function createRecognition(): ISpeechRecognition | null {
     (window as unknown as { webkitSpeechRecognition?: new () => ISpeechRecognition }).webkitSpeechRecognition;
   if (!Ctor) return null;
   const rec = new Ctor();
-  rec.continuous = false;       // we want single-utterance mode for hold-to-talk
+  rec.continuous = false;
   rec.interimResults = true;
   rec.lang = "en-US";
   return rec;
