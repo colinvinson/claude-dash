@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { buildContext } from "@/lib/ai/context-builder";
-import { buildJarvisSystemPrompt } from "@/lib/jarvis/prompts";
+import { buildJarvisStaticPrompt, buildJarvisDynamicContext } from "@/lib/jarvis/prompts";
 import { getRelevantFacts } from "@/lib/jarvis/memory";
 import { ALL_JARVIS_TOOLS, OS_NATIVE_TOOLS, CC_NATIVE_TOOLS, NATIVE_TOOL_NAMES, executeTool, type ToolResult } from "@/lib/ai/tools";
 
@@ -55,7 +55,15 @@ export async function POST(req: NextRequest) {
     getRelevantFacts(service, user.id, undefined, 40),
   ]);
 
-  const systemPrompt = buildJarvisSystemPrompt(context, facts);
+  // Anthropic prompt caching: the persona/capabilities text is large and
+  // never changes within a 5-minute window — wrap it in an ephemeral cache
+  // block so we pay full rate once and ~10% on every subsequent turn.
+  // The dynamic context (facts + dashboard state) goes in a second block
+  // that isn't cached.
+  const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
+    { type: "text", text: buildJarvisStaticPrompt(), cache_control: { type: "ephemeral" } },
+    { type: "text", text: buildJarvisDynamicContext(context, facts) },
+  ];
   // CC agent tools work in both environments (Tauri direct shell, or Supabase bridge from web).
   // OS native tools (screenshot, mouse, keyboard, shell, fs) require Tauri — strip in browser mode.
   const toolset: Anthropic.Tool[] = [
@@ -104,8 +112,8 @@ export async function POST(req: NextRequest) {
         for (let turn = 0; turn < 6; turn++) {
           const anthropicStream = anthropic.messages.stream({
             model: "claude-sonnet-4-6",
-            max_tokens: 1200,
-            system: systemPrompt,
+            max_tokens: 600, // 1-3 sentence responses are the norm; Claude will fill any larger budget
+            system: systemBlocks as unknown as Anthropic.TextBlockParam[],
             tools: toolset,
             messages,
           });

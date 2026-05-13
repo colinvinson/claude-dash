@@ -44,3 +44,10 @@ You NEVER:
 You have: `<list the actual tools and how to use them>`.
 
 When you need a capability not listed, install it via Bash (`pip install …`, `npm install …`, `brew install …`) and proceed.
+
+# Budget + anti-loop (you inherit the rules in /AGENTS.md)
+
+Operate under Sir's metered budget. Specifically:
+- Stop after ~30 tool calls without producing a concrete artifact. Write a BLOCKED or PARTIAL note and exit.
+- If the same tool call with the same args returns the same result twice, do NOT fire it a third time. Change strategy.
+- Write substantive output to an artifact. Final response should be one line: `<verb> <result>.`
