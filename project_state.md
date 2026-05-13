@@ -51,10 +51,15 @@ A personal performance OS — not a collection of trackers. Every data source (O
 | Tab | Route | Description |
 |-----|-------|-------------|
 | Home | `/home` | Daily score, goals ticker, briefing, weekly review, day ring + floating Overseer chat bubble |
-| LifeMax | `/lifemax` | All daily routine — Oura/health, water, meditation, faith, mood, supplements + medications + injections + skincare, protein, personal journal, long-term goals |
-| **+LOG** | no route — bottom sheet | NON-DAILY only — alcohol, weight, church |
+| LifeMax | `/lifemax` | VIEW: Oura biometrics, protein progress, routine items (supps/meds/injections/skincare — tappable inline), long-term goals, recent personal journal entries |
+| **+LOG** | no route — bottom sheet | UNIVERSAL logging surface (single-event + counter logs): water, protein, meditation, mood, weight, alcohol, faith (prayer/bible/church), brain dump (with Personal/Business/Other tag) |
 | Gym | `/gym` | Hypertrophy coach + recovery + strain + weekly volume |
-| Business | `/business` | Business/career goals + business brain dump |
+| Business | `/business` | Business + career goals, recent business journal entries (view-only) |
+
+**Logging architecture principle:** the interaction *shape* drives where it lives, not whether it's daily.
+- **Checklist** (recurring fixed list — supplements, meds, injections, skincare) → tapped inline on LifeMax (you need to see what's left)
+- **Counter / single-event log** (water, mood, weight, alcohol, brain dump, protein, etc) → +LOG popup (one surface for "I want to record something")
+- **Brain dump is ONE entry** in +LOG with a Personal/Business/Other tag. LifeMax shows personal-tagged entries; Business shows business-tagged. No duplicate brain dump UI.
 
 The `+` center button is NOT a route. `BottomNav.tsx` holds `useState<boolean>` for `LogSheet` open/close. `LogSheet` renders inside BottomNav's JSX tree so it survives tab navigation.
 

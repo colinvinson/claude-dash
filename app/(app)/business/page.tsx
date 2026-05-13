@@ -4,33 +4,20 @@ import { useState } from "react";
 import { useJournal } from "@/hooks/useJournal";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/layout/SectionLabel";
-import { useToast } from "@/components/ui/Toast";
 import { Briefcase, X, Plus } from "lucide-react";
 
 const BUSINESS_CATEGORIES = ["Business", "Career"];
 
 export default function BusinessPage() {
-  const { entries, longTermGoals, addEntry, addLongTermGoal, archiveGoal } = useJournal({
+  const { entries, longTermGoals, addLongTermGoal, archiveGoal } = useJournal({
     entryCategory: "business",
     goalCategories: BUSINESS_CATEGORIES,
   });
-  const { toast } = useToast();
 
-  const [dumpText, setDumpText] = useState("");
-  const [savingDump, setSavingDump] = useState(false);
   const [goalTitle, setGoalTitle] = useState("");
   const [goalCategory, setGoalCategory] = useState("Business");
   const [adding, setAdding] = useState(false);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
-
-  async function saveBrainDump() {
-    if (!dumpText.trim()) return;
-    setSavingDump(true);
-    await addEntry(dumpText.trim(), "business");
-    setDumpText("");
-    setSavingDump(false);
-    toast("Saved to business journal");
-  }
 
   async function handleAddGoal() {
     if (!goalTitle.trim()) return;
@@ -125,33 +112,16 @@ export default function BusinessPage() {
         </Card>
       </div>
 
-      {/* Brain dump */}
+      {/* Recent business entries (view-only — log via +LOG → Brain dump → Business tag) */}
       <div className="anim-fade-up stagger-2">
         <Card>
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-3">— Business brain dump</span>
-          <textarea
-            value={dumpText}
-            onChange={(e) => setDumpText(e.target.value)}
-            placeholder="Ideas, notes, decisions, deals, anything..."
-            rows={4}
-            className="w-full px-3 py-2 rounded-lg bg-zinc-900 text-zinc-100 border border-zinc-800 outline-none focus:border-zinc-700 resize-none"
-          />
-          <button
-            onClick={saveBrainDump}
-            disabled={!dumpText.trim() || savingDump}
-            className="mt-2 w-full py-2 rounded-lg text-sm font-semibold text-zinc-200 disabled:opacity-40"
-            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }}
-          >
-            {savingDump ? "Saving..." : "Save"}
-          </button>
-        </Card>
-      </div>
-
-      {/* Recent business entries */}
-      {entries.length > 0 && (
-        <div className="anim-fade-up stagger-3">
-          <Card>
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-3">— Recent entries</span>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">— Recent entries</span>
+            <span className="text-[10px] text-zinc-600">Tap + → 🧠 → Business</span>
+          </div>
+          {entries.length === 0 ? (
+            <p className="text-xs text-zinc-500">No business notes yet. Use the + button → Brain dump → tag &quot;Business&quot;.</p>
+          ) : (
             <div className="space-y-3">
               {entries.slice(0, 10).map((e) => (
                 <div key={e.id} className="pb-3 last:pb-0 border-b border-zinc-800 last:border-b-0">
@@ -165,9 +135,9 @@ export default function BusinessPage() {
                 </div>
               ))}
             </div>
-          </Card>
-        </div>
-      )}
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
