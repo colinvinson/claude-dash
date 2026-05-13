@@ -1,0 +1,3 @@
+# Tauri requires PNG/ICNS/ICO icons in this directory.
+# Run `npx @tauri-apps/cli icon path/to/source.png` from the repo root to generate them.
+# Tauri will create: 32x32.png, 128x128.png, 128x128@2x.png, icon.icns, icon.ico, icon.png.

@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tauri (rust build outputs + generated schemas)
+/src-tauri/target
+/src-tauri/gen
