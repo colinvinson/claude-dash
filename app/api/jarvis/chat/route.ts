@@ -4,7 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { buildContext } from "@/lib/ai/context-builder";
 import { buildJarvisSystemPrompt } from "@/lib/jarvis/prompts";
 import { getRelevantFacts } from "@/lib/jarvis/memory";
-import { ALL_JARVIS_TOOLS, NATIVE_TOOLS, NATIVE_TOOL_NAMES, executeTool, type ToolResult } from "@/lib/ai/tools";
+import { ALL_JARVIS_TOOLS, OS_NATIVE_TOOLS, CC_NATIVE_TOOLS, NATIVE_TOOL_NAMES, executeTool, type ToolResult } from "@/lib/ai/tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -56,7 +56,13 @@ export async function POST(req: NextRequest) {
   ]);
 
   const systemPrompt = buildJarvisSystemPrompt(context, facts);
-  const toolset: Anthropic.Tool[] = tauriMode ? [...ALL_JARVIS_TOOLS, ...NATIVE_TOOLS] : ALL_JARVIS_TOOLS;
+  // CC agent tools work in both environments (Tauri direct shell, or Supabase bridge from web).
+  // OS native tools (screenshot, mouse, keyboard, shell, fs) require Tauri — strip in browser mode.
+  const toolset: Anthropic.Tool[] = [
+    ...ALL_JARVIS_TOOLS,
+    ...CC_NATIVE_TOOLS,
+    ...(tauriMode ? OS_NATIVE_TOOLS : []),
+  ];
 
   // Initial message stack — either a fresh user message OR a resume from native tool execution.
   let messages: Anthropic.MessageParam[];

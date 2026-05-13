@@ -215,13 +215,26 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
 export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
 
 // ============================================================
-// NATIVE tools — only available when Jarvis runs inside the Tauri
-// desktop shell. The server NEVER executes these; the client does,
-// via the Tauri bridge, then sends results back to resume the
-// conversation. Schemas live here so prompts + server know they exist.
+// CLIENT-EXECUTED tools — the server never runs these. When Claude
+// calls one, the chat route emits a pendingNative SSE event and the
+// client picks up the execution.
+//
+// Two subgroups (the server doesn't care about the split — it's the
+// CLIENT that picks how to execute each):
+//
+//   OS_NATIVE_TOOLS   → screenshots, mouse, keyboard, shell, filesystem
+//                       Require the Tauri desktop app — no browser fallback.
+//                       Stripped from the toolset when the client is a regular browser.
+//
+//   CC_NATIVE_TOOLS   → Claude Code agent runtime (dispatch / list / logs / stop / define)
+//                       Work in BOTH environments: Tauri shells directly,
+//                       browser writes to `jarvis_cc_dispatches` for the local
+//                       bridge daemon (scripts/jarvis-bridge.ts) to execute.
+//                       Always included in the toolset; if the bridge isn't running
+//                       the call surfaces a clean timeout error.
 // ============================================================
 
-export const NATIVE_TOOLS: Anthropic.Tool[] = [
+export const OS_NATIVE_TOOLS: Anthropic.Tool[] = [
   {
     name: "take_screenshot",
     description: "Capture the user's primary display and look at it. Use this whenever the user asks about something on their screen, references 'this' or 'that', or you need visual context to help with a UI task. The screenshot is returned to you as an image you can actually see.",
@@ -300,12 +313,9 @@ export const NATIVE_TOOLS: Anthropic.Tool[] = [
       required: ["path"],
     },
   },
+];
 
-  // ============================================================
-  // Claude Code agent runtime — dispatch + monitor business workers.
-  // These are the entry point to the autonomous agent fleet defined under
-  // `<repo>/.claude/agents/*.md`. Each shells out to the `claude` CLI.
-  // ============================================================
+export const CC_NATIVE_TOOLS: Anthropic.Tool[] = [
   {
     name: "cc_run_agent",
     description: "Deploy a background Claude Code agent to take on a real task — research, scraping, content creation, building things, posting, etc. Use this whenever Sir asks for autonomous work, NOT for one-shot questions. If `agent_name` matches a subagent defined in .claude/agents/, that subagent's system prompt + tool allowlist load automatically; otherwise a generic CC session runs with the given prompt. Returns the session id so Sir can monitor or stop it later.",
@@ -375,6 +385,9 @@ export const NATIVE_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+// All client-executed tools, regardless of which subgroup. Used by the chat
+// route to decide whether to execute server-side or yield to the client.
+export const NATIVE_TOOLS: Anthropic.Tool[] = [...OS_NATIVE_TOOLS, ...CC_NATIVE_TOOLS];
 export const NATIVE_TOOL_NAMES = new Set(NATIVE_TOOLS.map((t) => t.name));
 
 // ============================================================

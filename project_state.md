@@ -376,13 +376,19 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 
 The server never executes native tools — when Claude calls one, the chat route emits a `pendingNative` SSE event with the full assistant turn + tool_use blocks, then closes the stream. The client (`JarvisHUD`) executes each native tool through the Tauri bridge, builds tool_result content (screenshots come back as `image` blocks so Claude actually sees the screen), and POSTs back with `resumeFrom: { messages, toolResults }`. The server's `resumeFrom` path skips the initial Claude call and continues the conversation with the appended tool_results. The round-trip loops up to 6 times per user message. In a regular browser, native tools are stripped from the toolset entirely.
 
-The CC agent native tools shell out to the `claude` CLI from within the Tauri shell:
+The CC agent native tools work in TWO modes:
+- **Inside the Tauri desktop app** — shell out to the `claude` CLI directly via the Tauri shell plugin (fast, no DB round-trip).
+- **Inside the regular browser PWA** — write a row to the `jarvis_cc_dispatches` Supabase table; the local **bridge daemon** (`scripts/jarvis-bridge.ts`, started with `npm run bridge`) subscribes via Realtime, executes the matching `claude` command on the user's Mac, and writes the result back. Web client awaits the UPDATE via filtered Realtime subscription on its own row id. 30-second timeout if the bridge isn't running.
+
+Mapping (same for both modes):
 - `cc_run_agent` → `claude --bg [--agent <name>] "<prompt>"`
 - `cc_list_agents` → `claude agents --json` (best-effort parse)
 - `cc_agent_logs` → `claude logs <id>`
 - `cc_stop_agent` → `claude stop <id>`
 - `cc_define_agent` → writes a markdown file directly to `.claude/agents/<name>.md`
 - `cc_list_defined_agents` / `cc_read_agent` → enumerate or read those markdown files
+
+The OS native tools (screenshot, mouse, keyboard, shell, fs) still **require Tauri** — no browser fallback. The chat route splits these into `OS_NATIVE_TOOLS` (Tauri-only) and `CC_NATIVE_TOOLS` (always available) so the toolset Claude sees matches what actually works in the current environment.
 
 CC sessions inherit the FULL Claude Code tool surface — Bash, Read, Edit, WebFetch, WebSearch, MCP servers — so an agent can `pip install playwright`, run a real browser, hit APIs, edit files, open PRs, etc. The tool allowlist per agent is controlled by the `tools:` frontmatter in its markdown file.
 

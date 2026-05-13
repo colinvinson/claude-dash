@@ -34,13 +34,23 @@ Tell it:
 
 Three paths, all backed by Claude Code's `claude agents`:
 
-### 1. From Jarvis chat (desktop only)
+### 1. From Jarvis chat (desktop OR web — via bridge daemon)
 
-Talk to Jarvis in the desktop app:
+Talk to Jarvis in either the Tauri desktop app OR the regular web PWA:
 
 > "Jarvis, deploy the upwork-proposer agent on the last 10 Python gigs."
 
-Jarvis fires the `cc_run_agent` native tool, which shells out to `claude --bg --agent upwork-proposer "..."` and returns the session id.
+Jarvis fires the `cc_run_agent` native tool.
+- **In Tauri**: shells out directly via the desktop bridge.
+- **In the browser PWA**: writes a row to `jarvis_cc_dispatches` (Supabase). The local **bridge daemon** picks it up and runs the actual `claude` command on your Mac, then writes results back. Web client gets the response via Supabase Realtime.
+
+**Start the bridge once** (in a terminal that stays open, or via launchd / a tmux session):
+```bash
+cd ~/rowan-dashboard
+npm run bridge
+```
+
+Without the bridge running, web dispatch will time out after 30s with a clear error. Tauri dispatch works without it.
 
 ### 2. From the terminal
 
