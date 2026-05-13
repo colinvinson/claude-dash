@@ -144,38 +144,6 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "dispatch_worker",
-    description: "Manually fire a specific worker now. Returns immediately; result will appear in worker history shortly.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        worker_id: { type: "string", description: "UUID or name substring of the worker to dispatch" },
-        instructions: { type: "string", description: "Optional one-shot override instructions for this run" },
-      },
-      required: ["worker_id"],
-    },
-  },
-  {
-    name: "create_worker",
-    description: "Define a new autonomous worker for BUSINESS or PROJECT work — research, scraping, content generation, market monitoring, analysis, automated digests. NEVER use this for personal logging (water, mood, supplements, etc.) — those go through direct tools instantly. A worker is appropriate when the task (a) takes more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/searching to complete.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string" },
-        description: { type: "string", description: "What this worker does, one sentence." },
-        system_prompt: { type: "string", description: "Full system prompt defining the worker's job. Be specific about inputs, outputs, format. Tell it to write_artifact for substantial outputs." },
-        schedule: { type: "string", description: "Optional cron string (e.g. '0 7 * * *' for daily 7am, '0 17 * * 5' for Fridays at 5pm). Omit for on-demand only." },
-        allowed_tools: { type: "array", items: { type: "string" }, description: "Optional. If omitted, worker gets all business tools (code_execution, fetch_url, web_search, artifacts, memory)." },
-      },
-      required: ["name", "system_prompt"],
-    },
-  },
-  {
-    name: "list_workers",
-    description: "List all active workers and their recent run summaries.",
-    input_schema: { type: "object", properties: {} },
-  },
-  {
     name: "open_url",
     description: "Open a URL in a new browser tab on Sir's device. Use this to show him a webpage, dashboard, or document.",
     input_schema: {
@@ -332,6 +300,79 @@ export const NATIVE_TOOLS: Anthropic.Tool[] = [
       required: ["path"],
     },
   },
+
+  // ============================================================
+  // Claude Code agent runtime — dispatch + monitor business workers.
+  // These are the entry point to the autonomous agent fleet defined under
+  // `<repo>/.claude/agents/*.md`. Each shells out to the `claude` CLI.
+  // ============================================================
+  {
+    name: "cc_run_agent",
+    description: "Deploy a background Claude Code agent to take on a real task — research, scraping, content creation, building things, posting, etc. Use this whenever Sir asks for autonomous work, NOT for one-shot questions. If `agent_name` matches a subagent defined in .claude/agents/, that subagent's system prompt + tool allowlist load automatically; otherwise a generic CC session runs with the given prompt. Returns the session id so Sir can monitor or stop it later.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        agent_name: { type: "string", description: "Optional. Name of a subagent defined under .claude/agents/. Omit for a generic session." },
+        prompt: { type: "string", description: "The task or instructions for the agent. Be specific about the deliverable and where to save it." },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "cc_list_agents",
+    description: "List currently running Claude Code background agents (sessions). Returns their id, name, state, and last activity. Use this when Sir asks what's running.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "cc_agent_logs",
+    description: "Fetch the recent output of a running or completed CC agent session. Use when Sir asks 'what did it do?' or wants to inspect progress.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        session_id: { type: "string", description: "The short id printed when the agent was dispatched (also visible in `claude agents`)." },
+        tail_lines: { type: "number", description: "Optional. Return only the last N lines. Default returns the full recent buffer." },
+      },
+      required: ["session_id"],
+    },
+  },
+  {
+    name: "cc_stop_agent",
+    description: "Stop a running CC agent session by id. Use when Sir says to kill or halt an agent.",
+    input_schema: {
+      type: "object" as const,
+      properties: { session_id: { type: "string" } },
+      required: ["session_id"],
+    },
+  },
+  {
+    name: "cc_define_agent",
+    description: "Define a new agent — writes a markdown file to .claude/agents/<name>.md that becomes immediately dispatchable. Use this when Sir wants to set up a new kind of worker (a recurring research role, a content factory, a monitor, etc.). Do NOT use this for one-shot work — that's what cc_run_agent without an agent_name is for.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Filesystem-safe agent name (kebab-case)." },
+        description: { type: "string", description: "One sentence — what this agent owns." },
+        system_prompt: { type: "string", description: "Full system prompt. Be specific about job, outputs, boundaries." },
+        tools: { type: "array", items: { type: "string" }, description: "Optional tool allowlist (CC tool names, e.g. ['Bash','Read','Edit','WebFetch']). Omit for full access." },
+        model: { type: "string", description: "Optional. 'sonnet' | 'opus' | 'haiku' or a specific model id. Default: sonnet." },
+      },
+      required: ["name", "description", "system_prompt"],
+    },
+  },
+  {
+    name: "cc_list_defined_agents",
+    description: "List every agent definition currently sitting in .claude/agents/ — i.e. what's available to dispatch. Independent of whether they're running.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "cc_read_agent",
+    description: "Read the full markdown definition for an agent — system prompt, tools, model, everything. Use when Sir wants to inspect or edit one.",
+    input_schema: {
+      type: "object" as const,
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    },
+  },
 ];
 
 export const NATIVE_TOOL_NAMES = new Set(NATIVE_TOOLS.map((t) => t.name));
@@ -355,24 +396,10 @@ export const CODE_EXECUTION_BETA = "code-execution-2025-08-25";
 // Workers are for business/project work — research, scraping, content gen, analysis.
 // They explicitly do NOT get personal logging tools (log_water, log_protein, etc).
 // Personal logging is a direct Jarvis chat action — instant, deterministic, no worker needed.
-// Workers get capability primitives + memory + the ability to coordinate other workers.
-const WORKER_TOOL_NAMES = new Set([
-  "fetch_url",
-  "web_search",
-  "write_artifact",
-  "list_artifacts",
-  "read_artifact",
-  "remember_fact",
-  "recall_facts",
-  "dispatch_worker",
-  "list_workers",
-  "open_url",
-]);
-
-export const WORKER_TOOLS: Anthropic.Tool[] = [
-  ...JARVIS_EXTRA_TOOLS.filter((t) => WORKER_TOOL_NAMES.has(t.name)),
-  CODE_EXECUTION_TOOL,
-];
+// Workers (now CC agents) get the full Claude Code tool surface natively — Bash, Read, Edit,
+// WebFetch, WebSearch, MCP, plus anything else you grant in their `.claude/agents/<name>.md`
+// frontmatter. The constants below are retained for any legacy server-tool wiring; the
+// CC agent runtime ignores them.
 
 type ToolInput = Record<string, unknown>;
 
@@ -541,52 +568,6 @@ export async function executeTool(
           .limit(10);
         if (!facts || facts.length === 0) return { ok: true, message: `No facts matching "${query}"` };
         return { ok: true, message: facts.map((f) => `• ${f.fact}`).join("\n") };
-      }
-
-      // ── Jarvis worker tools ────────────────────────────
-      case "dispatch_worker": {
-        const idOrName = String(input.worker_id ?? "");
-        const { data: workers } = await supabase
-          .from("jarvis_workers").select("id, name").eq("user_id", userId).eq("is_active", true);
-        const worker =
-          (workers ?? []).find((w) => w.id === idOrName) ??
-          (workers ?? []).find((w) => w.name.toLowerCase().includes(idOrName.toLowerCase()));
-        if (!worker) return { ok: false, error: `No worker matching "${idOrName}"` };
-        // Schedule it for immediate next run by setting next_run_at to now()
-        await supabase.from("jarvis_workers").update({ next_run_at: new Date().toISOString() }).eq("id", worker.id);
-        return { ok: true, message: `Dispatched "${worker.name}". Result will appear shortly.` };
-      }
-
-      case "create_worker": {
-        const name          = String(input.name ?? "").trim();
-        const description   = (input.description as string | undefined) ?? null;
-        const system_prompt = String(input.system_prompt ?? "").trim();
-        const schedule      = (input.schedule as string | undefined) ?? null;
-        const allowed_tools = Array.isArray(input.allowed_tools) ? input.allowed_tools as string[] : [];
-        if (!name || !system_prompt) return { ok: false, error: "Name and system_prompt required" };
-        const { data, error } = await supabase.from("jarvis_workers").insert({
-          user_id: userId,
-          name, description, system_prompt, schedule, allowed_tools,
-          next_run_at: schedule ? new Date(Date.now() + 60_000).toISOString() : null,
-        }).select("id, name").single();
-        if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
-        return { ok: true, message: `Created worker "${data.name}"${schedule ? ` (cron: ${schedule})` : " (on-demand)"}` };
-      }
-
-      case "list_workers": {
-        const { data: workers } = await supabase
-          .from("jarvis_workers")
-          .select("name, description, schedule, last_run_at, is_active")
-          .eq("user_id", userId)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false });
-        if (!workers || workers.length === 0) return { ok: true, message: "No workers deployed." };
-        return {
-          ok: true,
-          message: workers.map((w) =>
-            `• ${w.name}${w.schedule ? ` (${w.schedule})` : " (on-demand)"}${w.last_run_at ? ` — last ran ${new Date(w.last_run_at).toLocaleString()}` : ""}`
-          ).join("\n"),
-        };
       }
 
       case "open_url": {

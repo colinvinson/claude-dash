@@ -19,6 +19,15 @@ import {
   writeFile,
   listDir,
 } from "@/lib/tauri/bridge";
+import {
+  dispatchAgent,
+  listAgents,
+  agentLogs,
+  stopAgent,
+  defineAgent,
+  listDefinedAgents,
+  readAgentDefinition,
+} from "@/lib/jarvis/cc-bridge";
 import Orb, { OrbState } from "./Orb";
 
 type ChatTurn = {
@@ -237,6 +246,68 @@ export default function JarvisHUD({ onClose }: { onClose: () => void }) {
             ? { content: `Failed to list ${input.path}`, is_error: true }
             : { content: r.length === 0 ? "(empty directory)" : r.join("\n"), is_error: false };
         }
+
+        // ── Claude Code agent runtime ─────────────────────────────────
+        case "cc_run_agent": {
+          const r = await dispatchAgent({
+            agentName: input.agent_name as string | undefined,
+            prompt: input.prompt as string,
+          });
+          return {
+            content: r.ok
+              ? `Dispatched${r.sessionId ? ` (session ${r.sessionId})` : ""}.\n${r.output}`
+              : `Dispatch failed: ${r.output}`,
+            is_error: !r.ok,
+          };
+        }
+        case "cc_list_agents": {
+          const sessions = await listAgents();
+          if (sessions.length === 0) return { content: "No CC agents currently running.", is_error: false };
+          return {
+            content: sessions.map((s) =>
+              `• ${s.id} [${s.state}] ${s.name}${s.activity ? ` — ${s.activity}` : ""}${s.lastChanged ? ` (${s.lastChanged})` : ""}`
+            ).join("\n"),
+            is_error: false,
+          };
+        }
+        case "cc_agent_logs": {
+          const text = await agentLogs(input.session_id as string, {
+            tailLines: input.tail_lines as number | undefined,
+          });
+          return { content: text || "(no output)", is_error: false };
+        }
+        case "cc_stop_agent": {
+          const r = await stopAgent(input.session_id as string);
+          return { content: r.ok ? `Stopped ${input.session_id}` : `Failed: ${r.output}`, is_error: !r.ok };
+        }
+        case "cc_define_agent": {
+          const r = await defineAgent({
+            name: input.name as string,
+            description: input.description as string,
+            systemPrompt: input.system_prompt as string,
+            tools: input.tools as string[] | undefined,
+            model: input.model as string | undefined,
+          });
+          return {
+            content: r.ok ? `Defined agent at ${r.path}` : `Failed: ${r.error}`,
+            is_error: !r.ok,
+          };
+        }
+        case "cc_list_defined_agents": {
+          const defs = await listDefinedAgents();
+          if (defs.length === 0) return { content: "No agents defined in .claude/agents/ yet.", is_error: false };
+          return {
+            content: defs.map((d) => `• ${d.name} — ${d.description}`).join("\n"),
+            is_error: false,
+          };
+        }
+        case "cc_read_agent": {
+          const text = await readAgentDefinition(input.name as string);
+          return text === null
+            ? { content: `No agent named "${input.name}" found.`, is_error: true }
+            : { content: text, is_error: false };
+        }
+
         default:
           return { content: `Unknown native tool: ${name}`, is_error: true };
       }

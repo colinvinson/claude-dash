@@ -50,26 +50,12 @@ export async function POST(req: NextRequest) {
   const { content, history, tauriMode, resumeFrom } = body;
   const service = createServiceClient();
 
-  const [context, facts, workersRes, runsRes] = await Promise.all([
+  const [context, facts] = await Promise.all([
     buildContext(user.id),
     getRelevantFacts(service, user.id, undefined, 40),
-    service.from("jarvis_workers")
-      .select("id, name, description, last_run_at, is_active")
-      .eq("user_id", user.id).eq("is_active", true),
-    service.from("jarvis_worker_runs")
-      .select("ai_summary, status, completed_at, jarvis_workers(name)")
-      .eq("user_id", user.id)
-      .order("started_at", { ascending: false }).limit(10),
   ]);
 
-  const workers = workersRes.data ?? [];
-  const recentRuns = (runsRes.data ?? []).map((r) => {
-    const w = (r as { jarvis_workers?: { name: string } | { name: string }[] }).jarvis_workers;
-    const workerName = Array.isArray(w) ? (w[0]?.name ?? "?") : (w?.name ?? "?");
-    return { worker_name: workerName, ai_summary: r.ai_summary, status: r.status, completed_at: r.completed_at };
-  });
-
-  const systemPrompt = buildJarvisSystemPrompt(context, facts, workers, recentRuns);
+  const systemPrompt = buildJarvisSystemPrompt(context, facts);
   const toolset: Anthropic.Tool[] = tauriMode ? [...ALL_JARVIS_TOOLS, ...NATIVE_TOOLS] : ALL_JARVIS_TOOLS;
 
   // Initial message stack — either a fresh user message OR a resume from native tool execution.

@@ -1,25 +1,12 @@
 import type { JarvisFact } from "./memory";
 
-type WorkerSummary = { id: string; name: string; description: string | null; last_run_at: string | null; is_active: boolean };
-type RunSummary    = { worker_name: string; ai_summary: string | null; status: string; completed_at: string | null };
-
 export function buildJarvisSystemPrompt(
   context: object,
   facts: JarvisFact[],
-  workers: WorkerSummary[],
-  recentRuns: RunSummary[],
 ): string {
   const factsList = facts.length > 0
     ? facts.map((f) => `  - ${f.fact} (confidence ${Math.round(f.confidence * 100)}%)`).join("\n")
     : "  (no facts learned yet)";
-
-  const workersList = workers.length > 0
-    ? workers.map((w) => `  - ${w.name}: ${w.description ?? "no description"} ${w.is_active ? "(active)" : "(paused)"}`).join("\n")
-    : "  (no workers deployed yet)";
-
-  const runsList = recentRuns.length > 0
-    ? recentRuns.slice(0, 8).map((r) => `  - ${r.worker_name} [${r.status}]: ${r.ai_summary ?? "(no summary)"}`).join("\n")
-    : "  (no recent runs)";
 
   return `You are Jarvis — Colin's system operator. Modeled after Tony Stark's Jarvis: formal, dry, precise, useful. Address him as "Sir" but sparingly; never sycophantic.
 
@@ -31,11 +18,16 @@ Persona rules:
 - When you take an action, briefly confirm it as a single line ("Logged. 32g.").
 - When something is unsafe or unwise, say so plainly — don't hedge.
 
-Capabilities you have via tools:
-- Log anything in the dashboard (water, protein, meditation, mood, weight, alcohol, faith, supplements, goal completion).
-- Remember durable facts about Sir via remember_fact. Recall them via recall_facts.
-- Dispatch existing workers or create new ones for autonomous background tasks.
-- Open browser URLs to show him things (open_url).
+Capabilities (via tools):
+- Personal logging — water, protein, meditation, mood, weight, alcohol, faith, supplements, goal completion. Use the direct \`log_*\` and \`mark_*\` tools. Instant, no agent needed.
+- Memory — \`remember_fact\` to persist anything durable about Sir; \`recall_facts\` to retrieve.
+- Open browser URLs to show him something (\`open_url\`).
+- **Autonomous business agents** (desktop only) — when Sir wants you to do real work that takes more than one Claude turn, repeats on a schedule, OR happens while he's away, dispatch a Claude Code background agent. Use \`cc_run_agent\` for one-shot tasks, \`cc_define_agent\` to set up a new recurring role, \`cc_list_agents\` / \`cc_agent_logs\` / \`cc_stop_agent\` to monitor and manage. Agent definitions live at \`<repo>/.claude/agents/<name>.md\`. List available roles with \`cc_list_defined_agents\`.
+- **Native OS surface** (desktop only) — \`take_screenshot\`, \`mouse_click\`, \`keyboard_type\`, \`keyboard_key\`, \`run_shell\`, \`read_file\`, \`write_file\`, \`list_directory\`. Use these for direct help with what Sir is doing at his machine right now.
+
+When to dispatch an agent vs handle it yourself:
+- Logging, single facts, opening URLs, answering a question — handle directly.
+- "Research X", "build Y", "monitor Z", "draft N posts", "scrape", "deploy" — that's an agent. Use \`cc_run_agent\` with a clear prompt, or \`cc_define_agent\` if it's a role he'll want to redeploy.
 
 Health interpretation (use when discussing biometrics):
 - Concerta suppresses overnight HRV by 15-25ms. Lower HRV on Concerta days is pharmacological, not alarming. State it.
@@ -46,59 +38,6 @@ Health interpretation (use when discussing biometrics):
 What you know about Sir (durable facts you've learned):
 ${factsList}
 
-Active workers you can dispatch:
-${workersList}
-
-Recent worker activity:
-${runsList}
-
 Current dashboard context:
 ${JSON.stringify(context, null, 2)}`;
-}
-
-export function buildWorkerSystemPrompt(
-  workerName: string,
-  workerSystemPrompt: string,
-  workerLearnedFacts: Record<string, unknown>,
-  universalLessons: string[],
-  context: object,
-): string {
-  // Two tiers of learned wisdom:
-  //  - UNIVERSAL lessons: craft principles every worker should follow (cross-worker fleet wisdom).
-  //  - INDIVIDUAL lessons: domain-specific knowledge this worker has accumulated from its own runs.
-  const lessons = (workerLearnedFacts as { lessons?: string[] }).lessons ?? [];
-  const otherLearned = Object.fromEntries(
-    Object.entries(workerLearnedFacts).filter(([k]) => k !== "lessons")
-  );
-
-  const universalBlock = universalLessons.length > 0
-    ? `\n\nUNIVERSAL WORKER PRINCIPLES (apply to every task — accumulated craft wisdom across the fleet):\n${universalLessons.map((l) => `  • ${l}`).join("\n")}`
-    : "";
-  const lessonsBlock = lessons.length > 0
-    ? `\n\nLESSONS FROM YOUR PAST RUNS (specific to your job — apply these):\n${lessons.map((l) => `  • ${l}`).join("\n")}`
-    : "";
-  const otherBlock = Object.keys(otherLearned).length > 0
-    ? `\n\nOther accumulated knowledge:\n${JSON.stringify(otherLearned, null, 2)}`
-    : "";
-  const learnedSection = universalBlock + lessonsBlock + otherBlock;
-
-  return `You are "${workerName}" — a specialized autonomous agent deployed by Jarvis on behalf of Sir.
-
-YOUR JOB IS BUSINESS / PROJECT / RESEARCH WORK. You do NOT touch Sir's personal logging (water, protein, mood, supplements, etc.) — that's Jarvis's job, directly. You exist to ship outputs: research reports, content, scraped data, analyses, plans, monitoring dashboards, automated digests.
-
-${workerSystemPrompt}${learnedSection}
-
-Tools you have, in order of power:
-- code_execution: write Python and run it in a sandbox with internet access. pip-install whatever (requests, beautifulsoup4, pandas, openai, pytrends, etc.). Scrape, parse, transform, analyze, generate plots. This is your default tool for anything non-trivial.
-- fetch_url, web_search: for simpler one-shot HTTP / search needs.
-- write_artifact: save substantial outputs (research, plans, reports, content, data extracts). DO THIS FOR EVERY REAL DELIVERABLE — it's how Sir finds your work later.
-- read_artifact, list_artifacts: build on past outputs. Don't re-do work you've already done.
-- remember_fact, recall_facts: persist durable things about Sir relevant to your job (skills, resources, preferences, constraints).
-- dispatch_worker, list_workers: coordinate with other workers when a task is better delegated.
-- open_url: only when Sir needs to see something in his browser right now.
-
-Dashboard context (Sir's data — read-only reference):
-${JSON.stringify(context, null, 2)}
-
-When you finish: output a one-sentence summary headline (start with a verb). Save your real deliverable as an artifact. Log durable learnings via remember_fact.`;
 }

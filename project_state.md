@@ -353,22 +353,16 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 - `app/api/jarvis/tts/route.ts` — server proxy to ElevenLabs (keeps API key off the client). Voice ID `onwK4e9ZLuTAKqWW03F9` (Daniel).
 - `lib/jarvis/prompts.ts` — Jarvis persona prompt (formal, dry, addresses user as "Sir")
 - `lib/jarvis/memory.ts` — read/write `jarvis_facts` with confidence reinforcement
-- `lib/jarvis/runner.ts` — `runWorker(id)` orchestration loop with tool use
+- `lib/jarvis/cc-bridge.ts` — typed helpers for dispatching, listing, monitoring, stopping, and defining Claude Code agents via the Tauri shell
 
 **Memory:** `jarvis_facts` table. Jarvis writes facts via `remember_fact` tool, reads them on every conversation. Duplicates reinforce confidence rather than create new rows.
 
-**Workers (autonomous sub-agents):** `jarvis_workers` defines them, `jarvis_worker_runs` tracks each run.
-- Vercel Cron at `*/15 * * * *` hits `/api/jarvis/cron/dispatch` (auth via `CRON_SECRET`)
-- Dispatcher finds workers with `next_run_at <= now()` and fires `runWorker` for each
-- Each run: build context + worker's system prompt + `learned_facts` → Claude with the worker's `allowed_tools` → loop tool calls → save output + AI summary
-- Jarvis can `create_worker`, `dispatch_worker`, `list_workers` via tool calls (deploy workers conversationally)
-- Each run can write back to `learned_facts` JSONB (this is the "gets smarter" mechanic)
+**Agent runtime (Claude Code `claude agents`):** the autonomous business agent fleet is hosted by Claude Code's native agent supervisor — NOT a custom in-house runner. Each agent is a markdown file at `<repo>/.claude/agents/<name>.md` with frontmatter (`name`, `description`, `tools`, `model`, `permissionMode`, `isolation`) and a system prompt body. CC picks them up automatically when run from the repo. Sessions are dispatched with `claude --bg [--agent <name>] "<prompt>"` and managed via `claude agents` (terminal UI), `claude logs <id>`, `claude stop <id>`. Sessions survive terminal close but stop on machine sleep — for always-on, use [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web). Framework docs live at [.claude/agents/README.md](.claude/agents/README.md); a starter template sits at [.claude/agents/_TEMPLATE.md](.claude/agents/_TEMPLATE.md).
 
 **Tools Jarvis has** (`lib/ai/tools.ts`):
 - **Logging**: log_water, log_protein, log_meditation, log_mood, log_weight, log_alcohol, log_concerta, log_supplement, complete_goal, mark_prayed, mark_bible, mark_church
 - **Memory**: remember_fact, recall_facts
-- **Workers**: dispatch_worker, create_worker, list_workers
-- **Capabilities (primitives that make workers actually useful)**:
+- **Capabilities (server-side)**:
   - `fetch_url(url, method?, headers?, body?)` — generic HTTP, 80KB cap, SSRF-blocked for private IPs
   - `web_search(query, max_results?)` — Tavily API (free tier; needs TAVILY_API_KEY env var)
   - `write_artifact(name, content, type?)` — persists substantial outputs to `jarvis_artifacts`
@@ -376,38 +370,35 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
   - `read_artifact(id_or_name)` — retrieve full content
 - **Client interaction**: open_url (returns __OPEN_URL__ marker → SSE openUrl → window.open in browser)
 
-**Workers have a SMALLER tool set** (`WORKER_TOOLS` constant) — focused on business/project work. Personal logging tools (log_water, log_protein, log_mood, log_alcohol, log_weight, log_concerta, log_supplement, complete_goal, mark_prayed, mark_bible, mark_church) are deliberately excluded — those are direct Jarvis chat actions, not worker tasks.
+**Native tools (Tauri-only)** — when Jarvis chat runs inside the desktop shell (`isTauri()` returns true), `NATIVE_TOOLS` are appended to its tool list:
+- OS surface: `take_screenshot`, `mouse_click`, `keyboard_type`, `keyboard_key`, `run_shell`, `read_file`, `write_file`, `list_directory`
+- CC agent runtime: `cc_run_agent`, `cc_list_agents`, `cc_agent_logs`, `cc_stop_agent`, `cc_define_agent`, `cc_list_defined_agents`, `cc_read_agent`
 
-**Native tools (Tauri-only)** — when Jarvis chat runs inside the desktop shell (`isTauri()` returns true), `NATIVE_TOOLS` are appended to its tool list: `take_screenshot`, `mouse_click`, `keyboard_type`, `keyboard_key`, `run_shell`, `read_file`, `write_file`, `list_directory`. The server never executes these — when Claude calls one, the chat route emits a `pendingNative` SSE event with the full assistant turn + tool_use blocks, then closes the stream. The client (`JarvisHUD`) executes each native tool through the Tauri bridge, builds tool_result content (screenshots come back as `image` blocks so Claude actually sees the screen), and POSTs back with `resumeFrom: { messages, toolResults }`. The server's `resumeFrom` path skips the initial Claude call and continues the conversation with the appended tool_results. The round-trip loops up to 6 times per user message. In a regular browser, native tools are stripped from the toolset entirely.
+The server never executes native tools — when Claude calls one, the chat route emits a `pendingNative` SSE event with the full assistant turn + tool_use blocks, then closes the stream. The client (`JarvisHUD`) executes each native tool through the Tauri bridge, builds tool_result content (screenshots come back as `image` blocks so Claude actually sees the screen), and POSTs back with `resumeFrom: { messages, toolResults }`. The server's `resumeFrom` path skips the initial Claude call and continues the conversation with the appended tool_results. The round-trip loops up to 6 times per user message. In a regular browser, native tools are stripped from the toolset entirely.
 
-Workers can call:
-- **`code_execution`** — Anthropic-hosted Python sandbox (server tool, beta header `code-execution-2025-08-25`). Worker writes + runs Python at runtime: pip-install packages, scrape pages, parse JSON/CSV, do math, generate plots. This is the "figure it out without me hand-coding" capability — workers can do almost anything code can do.
-- fetch_url, web_search
-- write_artifact, list_artifacts, read_artifact
-- remember_fact, recall_facts
-- dispatch_worker, list_workers (coordinate with other workers)
-- open_url
+The CC agent native tools shell out to the `claude` CLI from within the Tauri shell:
+- `cc_run_agent` → `claude --bg [--agent <name>] "<prompt>"`
+- `cc_list_agents` → `claude agents --json` (best-effort parse)
+- `cc_agent_logs` → `claude logs <id>`
+- `cc_stop_agent` → `claude stop <id>`
+- `cc_define_agent` → writes a markdown file directly to `.claude/agents/<name>.md`
+- `cc_list_defined_agents` / `cc_read_agent` → enumerate or read those markdown files
 
-Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropic.messages.create`. Server tool blocks (`server_tool_use`, `code_execution_tool_result`) are preserved in the assistant message verbatim so Claude can iterate on results.
+CC sessions inherit the FULL Claude Code tool surface — Bash, Read, Edit, WebFetch, WebSearch, MCP servers — so an agent can `pip install playwright`, run a real browser, hit APIs, edit files, open PRs, etc. The tool allowlist per agent is controlled by the `tools:` frontmatter in its markdown file.
 
-**Compound improvement (two tiers — universal + individual):** after every worker run, the runner fires a parallel Haiku call that extracts BOTH:
-- **UNIVERSAL** lessons — craft principles every worker (current + future) should follow. Written to `jarvis_universal_lessons` table (deduped case-insensitively). Examples: "wrap fetch_url in try/except and continue on failure rather than crash", "cite sources in artifacts", "save partial progress as an artifact even on partial failure".
-- **INDIVIDUAL** lessons — specific to this worker's domain. Appended to `jarvis_workers.learned_facts.lessons` (FIFO, cap 50). Examples: "HN /best.json is faster than scraping homepage", "Roblox trends API rate-limits at 30/min".
-
-Haiku returns JSON `{individual: <str|null>, universal: <str|null>}` — most runs produce 0 lessons. Each worker's next run sees BOTH the universal fleet wisdom AND its own accumulated knowledge in its system prompt, surfaced as separate "UNIVERSAL WORKER PRINCIPLES" and "LESSONS FROM YOUR PAST RUNS" sections. Zero behavioral change needed from workers.
-
-**When does Jarvis create a worker vs do it directly?** Per the sharpened `create_worker` description: only when the task is (a) more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/web search. "Log a glass of water" → direct tool call. "Scrape Hacker News daily and digest the AI infra launches" → worker.
+**When does Jarvis dispatch a CC agent vs handle it directly?** Single-turn answers, personal logging, opening URLs — handle directly. "Research X / build Y / monitor Z / draft N posts / scrape / deploy" — dispatch a CC agent. The `cc_run_agent` description in `tools.ts` enforces this distinction in Claude's tool description.
 
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
 
 **Voice quality:** ElevenLabs "Daniel" (British, authoritative news-anchor delivery — closest pre-made voice to Paul Bettany's Jarvis). Model `eleven_turbo_v2_5` for low latency. Browser `speechSynthesis` is the fallback if the API errors so the assistant still talks.
 
 ### Future (V2+)
-- Native desktop wrapper (Tauri) for true computer control — open IDEs, run shell commands, manipulate windows
-- ElevenLabs / Cartesia voice for cinematic Jarvis sound
 - pgvector embeddings memory (upgrade from ILIKE search)
-- Specific pre-built workers: SEO content generator, GoDaddy domain monitor, Roblox trend scraper, email auto-responder
+- First agent definitions in `.claude/agents/` (e.g. Upwork auto-proposer, content factory, lead scraper) — framework is in place, agent design is yours
+- Always-on cloud execution via [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web) for agents that need to run while machine sleeps
+- Playwright skill bundled into CC for browser automation against authed sites
 - Apple HealthKit via Capacitor wrapper (HR + calories from Apple Watch into context)
+- (Stale, not active) The old in-house worker runtime + jarvis_workers/jarvis_worker_runs/jarvis_universal_lessons tables. The tables remain in Supabase but nothing reads or writes them. Drop in a future migration if not reactivated.
 
 ### Pending (needs user action)
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
@@ -419,7 +410,7 @@ Haiku returns JSON `{individual: <str|null>, universal: <str|null>}` — most ru
 - Run `0008_jarvis.sql` in Supabase SQL Editor — Jarvis tables (facts, workers, runs, conversations)
 - Run `0009_jarvis_artifacts.sql` in Supabase SQL Editor — artifact storage for worker outputs
 - Run `0010_jarvis_universal_lessons.sql` in Supabase SQL Editor — universal lesson table
-- Add `CRON_SECRET` env var in Vercel (any random string) so the worker dispatcher can authenticate
+- (Obsolete) `CRON_SECRET` is no longer needed — the in-house cron dispatcher has been removed in favor of Claude Code's native scheduling (`/loop` from inside an agent).
 - Optional: add `TAVILY_API_KEY` env var (free tier at tavily.com — 1000 searches/mo) to enable `web_search` tool. Without it, workers that try to search get an error message but everything else works.
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
