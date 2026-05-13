@@ -115,19 +115,49 @@ export async function runWorker(service: SupabaseClient, workerId: string, oneSh
     runError = e instanceof Error ? e.message : "Unknown error";
   }
 
-  // Generate one-line summary headline via Haiku
+  // Post-run Haiku passes:
+  //   1) Generate one-line summary headline.
+  //   2) Extract ONE durable lesson the worker should remember for next time (compound improvement).
   let aiSummary: string | null = null;
+  let lesson: string | null = null;
   if (finalText) {
     try {
-      const summaryMessage = await anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 80,
-        messages: [{
-          role: "user",
-          content: `Compress this worker output into one punchy headline sentence (start with a verb, max 15 words). Output ONLY the sentence.\n\nOutput:\n${finalText.slice(0, 2000)}`,
-        }],
-      });
+      const [summaryMessage, lessonMessage] = await Promise.all([
+        anthropic.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 80,
+          messages: [{
+            role: "user",
+            content: `Compress this worker output into one punchy headline sentence (start with a verb, max 15 words). Output ONLY the sentence.\n\nOutput:\n${finalText.slice(0, 2000)}`,
+          }],
+        }),
+        anthropic.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 120,
+          messages: [{
+            role: "user",
+            content: `You are reviewing one run of an autonomous worker named "${w.name}" so its NEXT run is better.
+
+Worker's job (system prompt):
+${w.system_prompt.slice(0, 800)}
+
+This run's output:
+${finalText.slice(0, 2000)}
+
+This run's tool calls (summary):
+${JSON.stringify(toolCalls.map((c) => ({ name: c.name, ok: c.result.ok }))).slice(0, 500)}
+
+What is ONE specific lesson this worker should remember for next time — something that would make its next run better (faster, more accurate, more focused, avoids a problem it hit, uses a better source/method)?
+
+If the run was routine and there's nothing worth saving as a durable lesson, respond with EXACTLY: NONE
+
+Otherwise respond with ONE short sentence (max 25 words). Just the lesson — no preamble, no "the lesson is".`,
+          }],
+        }),
+      ]);
       aiSummary = (summaryMessage.content[0] as { text: string }).text.trim();
+      const lessonText = (lessonMessage.content[0] as { text: string }).text.trim();
+      if (lessonText && lessonText !== "NONE" && lessonText.length >= 5) lesson = lessonText;
     } catch { /* ignore */ }
   }
 
@@ -143,11 +173,20 @@ export async function runWorker(service: SupabaseClient, workerId: string, oneSh
     }).eq("id", runId);
   }
 
-  // Update worker's last_run_at + next_run_at
+  // Compound-improvement: append lesson to worker's learned_facts.lessons (FIFO, cap 50).
+  const existingFacts: { lessons?: string[]; [k: string]: unknown } = (w.learned_facts ?? {}) as { lessons?: string[]; [k: string]: unknown };
+  let updatedLearned: { lessons?: string[]; [k: string]: unknown } | undefined = undefined;
+  if (lesson) {
+    const lessons = [...(existingFacts.lessons ?? []), lesson].slice(-50);
+    updatedLearned = { ...existingFacts, lessons };
+  }
+
+  // Update worker's last_run_at + next_run_at (and learned_facts if we have a new lesson)
   const nextRunAt = w.schedule ? computeNextRun(w.schedule) : null;
   await service.from("jarvis_workers").update({
     last_run_at: new Date().toISOString(),
     next_run_at: nextRunAt,
+    ...(updatedLearned ? { learned_facts: updatedLearned } : {}),
   }).eq("id", w.id);
 }
 

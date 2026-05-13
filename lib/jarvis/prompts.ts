@@ -62,9 +62,18 @@ export function buildWorkerSystemPrompt(
   workerLearnedFacts: Record<string, unknown>,
   context: object,
 ): string {
-  const learnedSection = Object.keys(workerLearnedFacts).length > 0
-    ? `\n\nWhat you've learned in past runs (use to improve):\n${JSON.stringify(workerLearnedFacts, null, 2)}`
+  // Surface lessons from past runs prominently; they're the compound-improvement signal.
+  const lessons = (workerLearnedFacts as { lessons?: string[] }).lessons ?? [];
+  const otherLearned = Object.fromEntries(
+    Object.entries(workerLearnedFacts).filter(([k]) => k !== "lessons")
+  );
+  const lessonsBlock = lessons.length > 0
+    ? `\n\nLESSONS FROM PAST RUNS (apply these — they're why you're getting better):\n${lessons.map((l) => `  • ${l}`).join("\n")}`
     : "";
+  const otherBlock = Object.keys(otherLearned).length > 0
+    ? `\n\nOther accumulated knowledge:\n${JSON.stringify(otherLearned, null, 2)}`
+    : "";
+  const learnedSection = lessonsBlock + otherBlock;
 
   return `You are "${workerName}" — a specialized autonomous agent deployed by Jarvis on behalf of Sir.
 

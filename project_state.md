@@ -385,6 +385,8 @@ Workers can call:
 
 Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropic.messages.create`. Server tool blocks (`server_tool_use`, `code_execution_tool_result`) are preserved in the assistant message verbatim so Claude can iterate on results.
 
+**Compound improvement (the "gets smarter" mechanism):** after every worker run, the runner fires a parallel Haiku call that asks "what's ONE durable lesson this worker should remember for next time?" If Haiku returns a real lesson (vs "NONE"), it's appended to the worker's `learned_facts.lessons` array (FIFO, cap 50). The next run's system prompt prominently surfaces those lessons under "LESSONS FROM PAST RUNS — apply these." Zero behavioral change needed from the worker; the system extracts and reinjects automatically.
+
 **When does Jarvis create a worker vs do it directly?** Per the sharpened `create_worker` description: only when the task is (a) more than a quick LLM response, (b) repeats on a schedule, OR (c) needs code/scraping/web search. "Log a glass of water" → direct tool call. "Scrape Hacker News daily and digest the AI infra launches" → worker.
 
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
