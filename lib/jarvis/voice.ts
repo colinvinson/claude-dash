@@ -6,33 +6,55 @@
 // TTS — ElevenLabs proxy with sequential queue + cancellation
 // ============================================================
 
-type SpeakItem = {
-  audio: HTMLAudioElement;
+// Order matters: every speak() reserves a slot in the queue at call time, then
+// fills it when the ElevenLabs MP3 arrives. The player only advances when the
+// HEAD of the queue is ready — so sentences play in call order regardless of
+// which TTS request returns first.
+type Slot = {
+  ready: boolean;
+  audio?: HTMLAudioElement;
+  fallbackText?: string;
   onEnd?: () => void;
-  revoke: () => void;
+  revoke?: () => void;
 };
 
 let currentAudio: HTMLAudioElement | null = null;
-const playQueue: SpeakItem[] = [];
+const playQueue: Slot[] = [];
 const activeAborts = new Set<AbortController>();
 
-function playNext() {
-  const next = playQueue.shift();
-  if (!next) { currentAudio = null; return; }
-  currentAudio = next.audio;
-  const finish = () => {
-    try { next.revoke(); } catch {}
-    next.onEnd?.();
-    playNext();
-  };
-  next.audio.addEventListener("ended", finish, { once: true });
-  next.audio.addEventListener("error", finish, { once: true });
-  next.audio.play().catch(() => finish());
+function tryPlayNext() {
+  if (currentAudio) return;
+  while (playQueue.length > 0) {
+    const head = playQueue[0];
+    if (!head.ready) return;
+    playQueue.shift();
+    if (head.audio) {
+      currentAudio = head.audio;
+      const finish = () => {
+        try { head.revoke?.(); } catch {}
+        head.onEnd?.();
+        currentAudio = null;
+        tryPlayNext();
+      };
+      head.audio.addEventListener("ended", finish, { once: true });
+      head.audio.addEventListener("error", finish, { once: true });
+      head.audio.play().catch(() => finish());
+      return;
+    }
+    if (head.fallbackText) {
+      fallbackSpeak(head.fallbackText, () => { head.onEnd?.(); tryPlayNext(); });
+      return;
+    }
+    head.onEnd?.();
+  }
 }
 
 export async function speak(text: string, opts?: { onEnd?: () => void }): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed) { opts?.onEnd?.(); return; }
+
+  const slot: Slot = { ready: false, onEnd: opts?.onEnd };
+  playQueue.push(slot);
 
   const ctrl = new AbortController();
   activeAborts.add(ctrl);
@@ -46,24 +68,27 @@ export async function speak(text: string, opts?: { onEnd?: () => void }): Promis
     if (!res.ok) throw new Error(`tts ${res.status}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    playQueue.push({ audio, onEnd: opts?.onEnd, revoke: () => URL.revokeObjectURL(url) });
-    if (!currentAudio) playNext();
+    slot.audio = new Audio(url);
+    slot.revoke = () => URL.revokeObjectURL(url);
   } catch (err) {
-    if ((err as { name?: string })?.name === "AbortError") return;
-    // Fallback to browser speechSynthesis so the assistant still talks if ElevenLabs is down.
-    fallbackSpeak(trimmed, opts);
+    if ((err as { name?: string })?.name === "AbortError") {
+      slot.ready = true;
+      return;
+    }
+    slot.fallbackText = trimmed;
   } finally {
+    slot.ready = true;
     activeAborts.delete(ctrl);
+    tryPlayNext();
   }
 }
 
-function fallbackSpeak(text: string, opts?: { onEnd?: () => void }) {
-  if (typeof window === "undefined" || !window.speechSynthesis) { opts?.onEnd?.(); return; }
+function fallbackSpeak(text: string, onEnd?: () => void) {
+  if (typeof window === "undefined" || !window.speechSynthesis) { onEnd?.(); return; }
   const utter = new SpeechSynthesisUtterance(text);
   utter.rate = 0.95;
   utter.pitch = 0.95;
-  if (opts?.onEnd) utter.addEventListener("end", opts.onEnd);
+  if (onEnd) utter.addEventListener("end", onEnd);
   window.speechSynthesis.speak(utter);
 }
 
