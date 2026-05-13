@@ -1,9 +1,8 @@
 use base64::Engine;
 use enigo::{Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
-use image::ImageFormat;
 use serde::Serialize;
-use std::io::Cursor;
-use xcap::Monitor;
+use std::fs;
+use std::process::Command;
 
 // ============================================================
 // Shared types
@@ -14,12 +13,6 @@ struct AppInfo {
     name: String,
     version: String,
     platform: String,
-}
-
-#[derive(Serialize)]
-struct ScreenSize {
-    width: u32,
-    height: u32,
 }
 
 // ============================================================
@@ -35,38 +28,45 @@ fn app_info() -> AppInfo {
     }
 }
 
-#[tauri::command]
-fn screen_size() -> Result<ScreenSize, String> {
-    let monitors = Monitor::all().map_err(|e| e.to_string())?;
-    let primary = monitors.first().ok_or_else(|| "no monitors".to_string())?;
-    Ok(ScreenSize {
-        width: primary.width(),
-        height: primary.height(),
-    })
-}
-
 // ============================================================
-// Screenshot — primary monitor, returns base64 PNG
-// (macOS needs Screen Recording permission the first time)
+// Screenshot — shells to macOS `screencapture` (zero deps, native quality).
+// First call prompts for Screen Recording permission.
 // ============================================================
 
 #[tauri::command]
 fn take_screenshot() -> Result<String, String> {
-    let monitors = Monitor::all().map_err(|e| e.to_string())?;
-    let primary = monitors.first().ok_or_else(|| "no monitors".to_string())?;
-    let image = primary.capture_image().map_err(|e| e.to_string())?;
+    let tmp_path = std::env::temp_dir().join(format!(
+        "jarvis-screenshot-{}.png",
+        std::process::id()
+    ));
 
-    let mut bytes: Vec<u8> = Vec::new();
-    image
-        .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
-        .map_err(|e| e.to_string())?;
+    let status = if cfg!(target_os = "macos") {
+        Command::new("screencapture")
+            .arg("-t").arg("png")
+            .arg("-x") // suppress shutter sound
+            .arg(&tmp_path)
+            .status()
+            .map_err(|e| format!("screencapture exec failed: {}", e))?
+    } else {
+        return Err(format!(
+            "take_screenshot not implemented for {}",
+            std::env::consts::OS
+        ));
+    };
+
+    if !status.success() {
+        return Err(format!("screencapture exited with status {:?}", status.code()));
+    }
+
+    let bytes = fs::read(&tmp_path).map_err(|e| format!("read screenshot failed: {}", e))?;
+    let _ = fs::remove_file(&tmp_path);
 
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
 // ============================================================
 // Mouse / keyboard via enigo
-// (macOS needs Accessibility permission the first time)
+// First call on macOS triggers an Accessibility permission prompt.
 // ============================================================
 
 fn new_enigo() -> Result<Enigo, String> {
@@ -131,7 +131,6 @@ fn parse_key(name: &str) -> Key {
 
 #[tauri::command]
 fn keyboard_key(combo: String) -> Result<(), String> {
-    // Accepts "enter", "cmd+s", "cmd+shift+a", etc. Last token is the main key; others are modifiers.
     let parts: Vec<&str> = combo.split('+').collect();
     if parts.is_empty() {
         return Err("empty combo".into());
@@ -162,7 +161,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             app_info,
-            screen_size,
             take_screenshot,
             mouse_move,
             mouse_click,

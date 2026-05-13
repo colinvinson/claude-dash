@@ -49,8 +49,10 @@ export function appInfo(): Promise<NativeAppInfo | null> {
 
 export type ScreenSize = { width: number; height: number };
 
-export function screenSize(): Promise<ScreenSize | null> {
-  return safeInvoke<ScreenSize>("screen_size");
+// Browser API has this for free — no Rust roundtrip needed.
+export function screenSize(): ScreenSize | null {
+  if (typeof window === "undefined") return null;
+  return { width: window.screen.width, height: window.screen.height };
 }
 
 // ============================================================
