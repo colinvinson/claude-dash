@@ -2,26 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sparkles, Plus, Dumbbell, Briefcase } from "lucide-react";
+import { Home, Sparkles, Dumbbell, Briefcase } from "lucide-react";
 import { useState } from "react";
-import LogSheet from "./LogSheet";
+import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
 const tabs = [
   { href: "/home",     label: "Home",    icon: Home },
   { href: "/lifemax",  label: "LifeMax", icon: Sparkles },
-  { center: true,      label: "Log",     icon: Plus },
+  { center: true,      label: "Jarvis" },
   { href: "/gym",      label: "Gym",     icon: Dumbbell },
   { href: "/business", label: "Bizz",    icon: Briefcase },
 ] as const;
 
-const TAB_W   = 56;
-const GAP     = 4;
+const TAB_W    = 56;
+const GAP      = 4;
 const CENTER_W = 48;
 const PILL_PAD = 6;
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [logOpen, setLogOpen] = useState(false);
+  const [jarvisOpen, setJarvisOpen] = useState(false);
 
   const activeIndex = (() => {
     for (let i = 0; i < tabs.length; i++) {
@@ -47,7 +47,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
+      {jarvisOpen && <JarvisHUD onClose={() => setJarvisOpen(false)} />}
 
       <div
         className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"
@@ -87,21 +87,21 @@ export default function BottomNav() {
             if ("center" in tab && tab.center) {
               return (
                 <button
-                  key="log"
-                  onClick={() => setLogOpen(true)}
+                  key="jarvis"
+                  onClick={() => setJarvisOpen(true)}
                   className="relative flex items-center justify-center w-12 h-12 rounded-full transition-transform active:scale-95"
                   style={{
-                    background: "#ffffff",
-                    boxShadow: "0 0 18px rgba(255,255,255,0.22), 0 4px 12px rgba(0,0,0,0.25)",
+                    background: "radial-gradient(circle at 35% 30%, rgba(220,235,255,0.95) 0%, rgba(96,165,250,0.55) 50%, rgba(59,130,246,0.20) 100%)",
+                    boxShadow: "0 0 22px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
+                    animation: "jarvisOrbPulse 4s ease-in-out infinite",
                   }}
-                  aria-label="Log"
-                >
-                  <Plus size={20} strokeWidth={2.5} className="text-black" />
-                </button>
+                  aria-label="Open Jarvis"
+                />
               );
             }
 
-            const { href, label, icon: Icon } = tab as { href: string; label: string; icon: typeof Home };
+            const tabWithHref = tab as { href: string; label: string; icon: typeof Home };
+            const { href, label, icon: Icon } = tabWithHref;
             const active = activeIndex === i;
 
             return (
@@ -124,6 +124,13 @@ export default function BottomNav() {
           })}
         </nav>
       </div>
+
+      <style>{`
+        @keyframes jarvisOrbPulse {
+          0%, 100% { transform: scale(1);    filter: brightness(1); }
+          50%      { transform: scale(1.06); filter: brightness(1.12); }
+        }
+      `}</style>
     </>
   );
 }

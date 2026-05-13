@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/jarvis/cron/dispatch", "schedule": "*/15 * * * *" }
+  ]
+}

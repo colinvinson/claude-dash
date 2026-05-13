@@ -94,7 +94,99 @@ export const OVERSEER_TOOLS: Anthropic.Tool[] = [
       required: ["score"],
     },
   },
+  {
+    name: "log_alcohol",
+    description: "Log an alcoholic drink (beer/wine/spirits/cocktail).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", description: "Beer | Wine | Spirits | Cocktail" },
+        count: { type: "number", description: "How many drinks (default 1)" },
+      },
+      required: ["type"],
+    },
+  },
+  {
+    name: "log_weight",
+    description: "Log the user's current bodyweight in kg.",
+    input_schema: {
+      type: "object" as const,
+      properties: { kg: { type: "number" } },
+      required: ["kg"],
+    },
+  },
 ];
+
+// ============================================================
+// Jarvis-only tools — memory + worker orchestration
+// ============================================================
+
+export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "remember_fact",
+    description: "Persist a durable fact about Sir (preferences, skills, goals, context) so you can recall it in future conversations.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        fact: { type: "string", description: "A concise factual statement, e.g. 'Sir prefers morning lifts at Les Roches gym.'" },
+        confidence: { type: "number", description: "0-1, how sure you are. Default 0.8." },
+      },
+      required: ["fact"],
+    },
+  },
+  {
+    name: "recall_facts",
+    description: "Search persisted facts about Sir. Returns up to 10 matching facts. Use when Sir references something he's told you before.",
+    input_schema: {
+      type: "object" as const,
+      properties: { query: { type: "string", description: "Free-text query — matched as substring against stored facts." } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "dispatch_worker",
+    description: "Manually fire a specific worker now. Returns immediately; result will appear in worker history shortly.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        worker_id: { type: "string", description: "UUID or name substring of the worker to dispatch" },
+        instructions: { type: "string", description: "Optional one-shot override instructions for this run" },
+      },
+      required: ["worker_id"],
+    },
+  },
+  {
+    name: "create_worker",
+    description: "Define a new specialized worker. The worker will run on its schedule (or on-demand if no schedule given).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string" },
+        description: { type: "string", description: "What this worker does, one sentence." },
+        system_prompt: { type: "string", description: "Full system prompt that defines the worker's job, style, and constraints." },
+        schedule: { type: "string", description: "Optional cron string (e.g. '0 7 * * *' for daily 7am). Omit for on-demand only." },
+        allowed_tools: { type: "array", items: { type: "string" }, description: "Tool names this worker is allowed to use." },
+      },
+      required: ["name", "system_prompt"],
+    },
+  },
+  {
+    name: "list_workers",
+    description: "List all active workers and their recent run summaries.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "open_url",
+    description: "Open a URL in a new browser tab on Sir's device. Use this to show him a webpage, dashboard, or document.",
+    input_schema: {
+      type: "object" as const,
+      properties: { url: { type: "string" } },
+      required: ["url"],
+    },
+  },
+];
+
+export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
 
 type ToolInput = Record<string, unknown>;
 
@@ -214,6 +306,109 @@ export async function executeTool(
         await supabase.from("mood_logs").insert({ user_id: userId, log_date: today, score });
         const emojis = ["😞", "😐", "🙂", "😊", "🤩"];
         return { ok: true, message: `Mood logged: ${emojis[score - 1]} (${score}/5)` };
+      }
+
+      case "log_alcohol": {
+        const drinkType = String(input.type ?? "Beer");
+        const count = Number(input.count ?? 1);
+        await supabase.from("alcohol_logs").insert({
+          user_id: userId, log_date: today, drink_type: drinkType, drink_count: count,
+        });
+        return { ok: true, message: `Logged ${count} ${drinkType.toLowerCase()}` };
+      }
+
+      case "log_weight": {
+        const kg = Number(input.kg);
+        if (!kg || kg <= 0) return { ok: false, error: "Invalid weight" };
+        await supabase.from("weight_logs").insert({ user_id: userId, weight_kg: kg });
+        return { ok: true, message: `Logged weight: ${kg}kg` };
+      }
+
+      // ── Jarvis memory tools ────────────────────────────
+      case "remember_fact": {
+        const fact = String(input.fact ?? "").trim();
+        if (!fact) return { ok: false, error: "Empty fact" };
+        const confidence = Number(input.confidence ?? 0.8);
+        const { data: existing } = await supabase
+          .from("jarvis_facts").select("id, confidence").eq("user_id", userId).eq("fact", fact).maybeSingle();
+        if (existing) {
+          const newConf = Math.min(1, Number(existing.confidence) + 0.1);
+          await supabase.from("jarvis_facts")
+            .update({ confidence: newConf, last_referenced_at: new Date().toISOString() })
+            .eq("id", existing.id);
+          return { ok: true, message: `Reinforced: "${fact.slice(0, 60)}"` };
+        }
+        await supabase.from("jarvis_facts").insert({ user_id: userId, fact, source: "chat", confidence });
+        return { ok: true, message: `Remembered: "${fact.slice(0, 60)}"` };
+      }
+
+      case "recall_facts": {
+        const query = String(input.query ?? "").trim();
+        if (!query) return { ok: false, error: "Empty query" };
+        const escaped = query.replace(/[%_]/g, (m) => `\\${m}`);
+        const { data: facts } = await supabase
+          .from("jarvis_facts")
+          .select("fact, confidence")
+          .eq("user_id", userId)
+          .ilike("fact", `%${escaped}%`)
+          .order("confidence", { ascending: false })
+          .limit(10);
+        if (!facts || facts.length === 0) return { ok: true, message: `No facts matching "${query}"` };
+        return { ok: true, message: facts.map((f) => `• ${f.fact}`).join("\n") };
+      }
+
+      // ── Jarvis worker tools ────────────────────────────
+      case "dispatch_worker": {
+        const idOrName = String(input.worker_id ?? "");
+        const { data: workers } = await supabase
+          .from("jarvis_workers").select("id, name").eq("user_id", userId).eq("is_active", true);
+        const worker =
+          (workers ?? []).find((w) => w.id === idOrName) ??
+          (workers ?? []).find((w) => w.name.toLowerCase().includes(idOrName.toLowerCase()));
+        if (!worker) return { ok: false, error: `No worker matching "${idOrName}"` };
+        // Schedule it for immediate next run by setting next_run_at to now()
+        await supabase.from("jarvis_workers").update({ next_run_at: new Date().toISOString() }).eq("id", worker.id);
+        return { ok: true, message: `Dispatched "${worker.name}". Result will appear shortly.` };
+      }
+
+      case "create_worker": {
+        const name          = String(input.name ?? "").trim();
+        const description   = (input.description as string | undefined) ?? null;
+        const system_prompt = String(input.system_prompt ?? "").trim();
+        const schedule      = (input.schedule as string | undefined) ?? null;
+        const allowed_tools = Array.isArray(input.allowed_tools) ? input.allowed_tools as string[] : [];
+        if (!name || !system_prompt) return { ok: false, error: "Name and system_prompt required" };
+        const { data, error } = await supabase.from("jarvis_workers").insert({
+          user_id: userId,
+          name, description, system_prompt, schedule, allowed_tools,
+          next_run_at: schedule ? new Date(Date.now() + 60_000).toISOString() : null,
+        }).select("id, name").single();
+        if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+        return { ok: true, message: `Created worker "${data.name}"${schedule ? ` (cron: ${schedule})` : " (on-demand)"}` };
+      }
+
+      case "list_workers": {
+        const { data: workers } = await supabase
+          .from("jarvis_workers")
+          .select("name, description, schedule, last_run_at, is_active")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+        if (!workers || workers.length === 0) return { ok: true, message: "No workers deployed." };
+        return {
+          ok: true,
+          message: workers.map((w) =>
+            `• ${w.name}${w.schedule ? ` (${w.schedule})` : " (on-demand)"}${w.last_run_at ? ` — last ran ${new Date(w.last_run_at).toLocaleString()}` : ""}`
+          ).join("\n"),
+        };
+      }
+
+      case "open_url": {
+        // Server-side: just acknowledge — actual window.open happens client-side
+        // via a special SSE event in the chat stream.
+        const url = String(input.url ?? "");
+        if (!url) return { ok: false, error: "Empty URL" };
+        return { ok: true, message: `__OPEN_URL__${url}` };
       }
 
       default:

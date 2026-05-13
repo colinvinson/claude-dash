@@ -50,9 +50,9 @@ A personal performance OS — not a collection of trackers. Every data source (O
 
 | Tab | Route | Description |
 |-----|-------|-------------|
-| Home | `/home` | Daily score, goals ticker, briefing, weekly review, day ring + floating Overseer chat bubble |
+| Home | `/home` | Daily score, goals ticker, briefing, weekly review, day ring |
 | LifeMax | `/lifemax` | VIEW: Oura biometrics, protein progress, routine items (supps/meds/injections/skincare — tappable inline), long-term goals, recent personal journal entries |
-| **+LOG** | no route — bottom sheet | UNIVERSAL logging surface (single-event + counter logs): water, protein, meditation, mood, weight, alcohol, faith (prayer/bible/church), brain dump (with Personal/Business/Other tag) |
+| **Jarvis (center)** | full-screen overlay | The system operator. Pulsing orb HUD with voice-to-voice chat, ambient telemetry, tool execution. Replaces +LOG button. |
 | Gym | `/gym` | Hypertrophy coach + recovery + strain + weekly volume |
 | Business | `/business` | Business + career goals, recent business journal entries (view-only) |
 
@@ -188,7 +188,8 @@ rowan-dashboard/
 │       ├── 0004_oura_expansion.sql       # stress, resilience, vo2_max, oura_workouts columns
 │       ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
 │       ├── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
-│       └── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
+│       ├── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
+│       └── 0008_jarvis.sql                # jarvis_facts + jarvis_workers + jarvis_worker_runs + jarvis_conversations
 │
 └── rowan-watch/                          # Standalone native watchOS companion app
     ├── README.md                         # Build/install guide (Xcode + dev cert)
@@ -340,12 +341,47 @@ Active profile is shown under the live counter. Editing `exercise_type` in the d
 
 **Accuracy realism:** ~90% on upper-body compound/isolation; ~40-60% on squat/deadlift/leg press (the wrist barely moves). The Done screen's manual count adjustment is the safety net for poorly-tracked lifts.
 
+### Jarvis (system operator)
+Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives at the center of the bottom nav — tap the glowing orb to open the HUD.
+
+**Architecture:**
+- `app/(app)/jarvis/JarvisHUD.tsx` — full-screen overlay: pulsing animated orb (`Orb.tsx`) + corner telemetry (time, recovery, goals, protein, streak) + hold-to-talk mic + text fallback
+- `lib/jarvis/voice.ts` — `webkitSpeechRecognition` STT + `speechSynthesis` TTS, picks "Daniel" UK voice when available, sentence-buffered streaming speaker
+- `lib/jarvis/prompts.ts` — Jarvis persona prompt (formal, dry, addresses user as "Sir")
+- `lib/jarvis/memory.ts` — read/write `jarvis_facts` with confidence reinforcement
+- `lib/jarvis/runner.ts` — `runWorker(id)` orchestration loop with tool use
+
+**Memory:** `jarvis_facts` table. Jarvis writes facts via `remember_fact` tool, reads them on every conversation. Duplicates reinforce confidence rather than create new rows.
+
+**Workers (autonomous sub-agents):** `jarvis_workers` defines them, `jarvis_worker_runs` tracks each run.
+- Vercel Cron at `*/15 * * * *` hits `/api/jarvis/cron/dispatch` (auth via `CRON_SECRET`)
+- Dispatcher finds workers with `next_run_at <= now()` and fires `runWorker` for each
+- Each run: build context + worker's system prompt + `learned_facts` → Claude with the worker's `allowed_tools` → loop tool calls → save output + AI summary
+- Jarvis can `create_worker`, `dispatch_worker`, `list_workers` via tool calls (deploy workers conversationally)
+- Each run can write back to `learned_facts` JSONB (this is the "gets smarter" mechanic)
+
+**Tools Jarvis has** (`lib/ai/tools.ts`): all existing log tools + `remember_fact`, `recall_facts`, `dispatch_worker`, `create_worker`, `list_workers`, `open_url`, `log_alcohol`, `log_weight`.
+
+**`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
+
+**Voice quality:** free system voice for V1. Easy upgrade to ElevenLabs/Cartesia via API swap later.
+
+### Future (V2+)
+- Native desktop wrapper (Tauri) for true computer control — open IDEs, run shell commands, manipulate windows
+- ElevenLabs / Cartesia voice for cinematic Jarvis sound
+- pgvector embeddings memory (upgrade from ILIKE search)
+- Specific pre-built workers: SEO content generator, GoDaddy domain monitor, Roblox trend scraper, email auto-responder
+- Apple HealthKit via Capacitor wrapper (HR + calories from Apple Watch into context)
+
 ### Pending (needs user action)
 - Run `0002_redesign_tables.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0003_fitness_intelligence.sql` in Supabase SQL Editor (if not yet applied)
 - Run `0004_oura_expansion.sql` in Supabase SQL Editor — adds stress, resilience, vo2_max, workouts columns
 - Run `0005_protein_logger.sql` in Supabase SQL Editor — creates protein_logs table
 - Run `0006_coach_extensions.sql` in Supabase SQL Editor — creates morning_briefings, weekly_reviews, goal_templates tables
+- Run `0007_lifemax_business.sql` in Supabase SQL Editor — category columns on supplement_stack + journal_entries
+- Run `0008_jarvis.sql` in Supabase SQL Editor — Jarvis tables (facts, workers, runs, conversations)
+- Add `CRON_SECRET` env var in Vercel (any random string) so the worker dispatcher can authenticate
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
 ### Known issues
