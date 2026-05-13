@@ -378,6 +378,8 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 
 **Workers have a SMALLER tool set** (`WORKER_TOOLS` constant) — focused on business/project work. Personal logging tools (log_water, log_protein, log_mood, log_alcohol, log_weight, log_concerta, log_supplement, complete_goal, mark_prayed, mark_bible, mark_church) are deliberately excluded — those are direct Jarvis chat actions, not worker tasks.
 
+**Native tools (Tauri-only)** — when Jarvis chat runs inside the desktop shell (`isTauri()` returns true), `NATIVE_TOOLS` are appended to its tool list: `take_screenshot`, `mouse_click`, `keyboard_type`, `keyboard_key`, `run_shell`, `read_file`, `write_file`, `list_directory`. The server never executes these — when Claude calls one, the chat route emits a `pendingNative` SSE event with the full assistant turn + tool_use blocks, then closes the stream. The client (`JarvisHUD`) executes each native tool through the Tauri bridge, builds tool_result content (screenshots come back as `image` blocks so Claude actually sees the screen), and POSTs back with `resumeFrom: { messages, toolResults }`. The server's `resumeFrom` path skips the initial Claude call and continues the conversation with the appended tool_results. The round-trip loops up to 6 times per user message. In a regular browser, native tools are stripped from the toolset entirely.
+
 Workers can call:
 - **`code_execution`** — Anthropic-hosted Python sandbox (server tool, beta header `code-execution-2025-08-25`). Worker writes + runs Python at runtime: pip-install packages, scrape pages, parse JSON/CSV, do math, generate plots. This is the "figure it out without me hand-coding" capability — workers can do almost anything code can do.
 - fetch_url, web_search

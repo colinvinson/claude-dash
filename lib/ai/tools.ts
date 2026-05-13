@@ -247,6 +247,96 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
 export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
 
 // ============================================================
+// NATIVE tools — only available when Jarvis runs inside the Tauri
+// desktop shell. The server NEVER executes these; the client does,
+// via the Tauri bridge, then sends results back to resume the
+// conversation. Schemas live here so prompts + server know they exist.
+// ============================================================
+
+export const NATIVE_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "take_screenshot",
+    description: "Capture the user's primary display and look at it. Use this whenever the user asks about something on their screen, references 'this' or 'that', or you need visual context to help with a UI task. The screenshot is returned to you as an image you can actually see.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "mouse_click",
+    description: "Click at absolute screen coordinates (x, y) on the primary display. Use after take_screenshot so you know what's where. Always prefer keyboard shortcuts when the same action exists — clicking is fragile across resolutions.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+        button: { type: "string", enum: ["left", "right", "middle"], description: "Default: left" },
+      },
+      required: ["x", "y"],
+    },
+  },
+  {
+    name: "keyboard_type",
+    description: "Type text at the current focus. Use for filling fields, writing code, composing messages.",
+    input_schema: {
+      type: "object" as const,
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    },
+  },
+  {
+    name: "keyboard_key",
+    description: "Press a key or combo. Examples: 'enter', 'tab', 'cmd+s', 'cmd+shift+a', 'escape', 'f5'. Use cmd (not ctrl) on macOS.",
+    input_schema: {
+      type: "object" as const,
+      properties: { combo: { type: "string" } },
+      required: ["combo"],
+    },
+  },
+  {
+    name: "run_shell",
+    description: "Execute a program on Sir's machine. Returns stdout, stderr, and exit code. For git, npm, brew, python, node, ls, cat, open, etc. Be specific — these commands run against his actual filesystem.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        program: { type: "string", description: "Executable name or absolute path" },
+        args: { type: "array", items: { type: "string" }, description: "Arguments to pass" },
+      },
+      required: ["program"],
+    },
+  },
+  {
+    name: "read_file",
+    description: "Read the text contents of a file on Sir's machine. Pass an absolute path.",
+    input_schema: {
+      type: "object" as const,
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+  {
+    name: "write_file",
+    description: "Write text contents to a file on Sir's machine (overwrites if exists). Pass an absolute path. Confirm intent before overwriting something important.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string" },
+        content: { type: "string" },
+      },
+      required: ["path", "content"],
+    },
+  },
+  {
+    name: "list_directory",
+    description: "List filenames inside a directory on Sir's machine. Pass an absolute path.",
+    input_schema: {
+      type: "object" as const,
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+];
+
+export const NATIVE_TOOL_NAMES = new Set(NATIVE_TOOLS.map((t) => t.name));
+
+// ============================================================
 // Server tools (Anthropic runs these — we don't implement an executor)
 // ============================================================
 

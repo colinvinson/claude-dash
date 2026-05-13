@@ -8,6 +8,17 @@ import { useProtein } from "@/hooks/useProtein";
 import { useToast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptic";
 import { listen, cancelSpeech, StreamingSpeaker, primeVoices, speechRecognitionAvailable } from "@/lib/jarvis/voice";
+import {
+  isTauri,
+  takeScreenshot,
+  mouseClick,
+  keyboardType,
+  keyboardKey,
+  runShell,
+  readFile,
+  writeFile,
+  listDir,
+} from "@/lib/tauri/bridge";
 import Orb, { OrbState } from "./Orb";
 
 type ChatTurn = {
@@ -171,6 +182,69 @@ export default function JarvisHUD({ onClose }: { onClose: () => void }) {
     }
   }
 
+  // Execute a single native tool via the Tauri bridge and produce a tool_result
+  // payload Anthropic understands. Screenshots come back as image blocks so Claude actually sees the screen.
+  async function executeNativeTool(
+    name: string,
+    input: Record<string, unknown>
+  ): Promise<{ content: string | Array<{ type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } }>; is_error: boolean }> {
+    try {
+      switch (name) {
+        case "take_screenshot": {
+          const b64 = await takeScreenshot();
+          if (!b64) return { content: "Failed to capture screen (permission denied?)", is_error: true };
+          return {
+            content: [
+              { type: "text", text: "Screenshot of primary display:" },
+              { type: "image", source: { type: "base64", media_type: "image/png", data: b64 } },
+            ],
+            is_error: false,
+          };
+        }
+        case "mouse_click": {
+          const r = await mouseClick(input.x as number, input.y as number, (input.button as "left" | "right" | "middle" | undefined) ?? "left");
+          return { content: r === null ? "Click failed (permission denied?)" : `Clicked (${input.x},${input.y})`, is_error: r === null };
+        }
+        case "keyboard_type": {
+          const r = await keyboardType(input.text as string);
+          return { content: r === null ? "Type failed" : `Typed ${(input.text as string).length} chars`, is_error: r === null };
+        }
+        case "keyboard_key": {
+          const r = await keyboardKey(input.combo as string);
+          return { content: r === null ? "Key press failed" : `Pressed ${input.combo}`, is_error: r === null };
+        }
+        case "run_shell": {
+          const r = await runShell(input.program as string, (input.args as string[]) ?? []);
+          if (!r) return { content: "Shell exec failed", is_error: true };
+          return {
+            content: `exit ${r.code}\nstdout:\n${r.stdout || "(empty)"}\nstderr:\n${r.stderr || "(empty)"}`,
+            is_error: r.code !== 0,
+          };
+        }
+        case "read_file": {
+          const r = await readFile(input.path as string);
+          return r === null
+            ? { content: `Failed to read ${input.path}`, is_error: true }
+            : { content: r, is_error: false };
+        }
+        case "write_file": {
+          const ok = await writeFile(input.path as string, input.content as string);
+          return { content: ok ? `Wrote ${input.path}` : `Failed to write ${input.path}`, is_error: !ok };
+        }
+        case "list_directory": {
+          const r = await listDir(input.path as string);
+          return r === null
+            ? { content: `Failed to list ${input.path}`, is_error: true }
+            : { content: r.length === 0 ? "(empty directory)" : r.join("\n"), is_error: false };
+        }
+        default:
+          return { content: `Unknown native tool: ${name}`, is_error: true };
+      }
+    } catch (err) {
+      return { content: `Tool error: ${(err as Error).message}`, is_error: true };
+    }
+  }
+
   async function sendMessage(content: string) {
     const text = content.trim();
     if (!text) return;
@@ -188,49 +262,99 @@ export default function JarvisHUD({ onClose }: { onClose: () => void }) {
 
     const history = chat.slice(-8).map((t) => ({ role: t.role, content: t.text || " " }));
     speakerRef.current = new StreamingSpeaker();
-    let firstChunk = true;
+    const tauriMode = isTauri();
+
+    type NativeCall = { id: string; name: string; input: Record<string, unknown> };
+    type ServerResult = { tool_use_id: string; content: string; is_error: boolean };
+
+    // Body for the first turn — subsequent turns substitute `resumeFrom`.
+    let body: Record<string, unknown> = { content: text, history, tauriMode };
+    let firstChunkOverall = true;
 
     try {
-      const res = await fetch("/api/jarvis/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, history }),
-      });
-      if (!res.body) throw new Error("No stream");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
+      // Loop while Claude keeps yielding for native tools.
+      for (let loop = 0; loop < 6; loop++) {
+        const res = await fetch("/api/jarvis/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.body) throw new Error("No stream");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = (loop === 0) ? "" : (chat.find((t) => t.id === assistantId)?.text ?? "");
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const line of decoder.decode(value).split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6);
-          if (raw === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed.text) {
-              if (firstChunk) { setOrbState("speaking"); firstChunk = false; }
-              accumulated += parsed.text;
-              speakerRef.current?.feed(parsed.text);
-              setChat((prev) => prev.map((t) => t.id === assistantId ? { ...t, text: accumulated } : t));
-            }
-            if (parsed.tool) {
-              setChat((prev) => prev.map((t) => t.id === assistantId ? { ...t, tools: [...(t.tools ?? []), parsed.tool] } : t));
-            }
-            if (parsed.openUrl && typeof window !== "undefined") {
-              window.open(parsed.openUrl, "_blank", "noopener,noreferrer");
-            }
-          } catch {}
+        let pendingMessages: unknown[] | null = null;
+        let pendingNativeCalls: NativeCall[] = [];
+        let priorServerResults: ServerResult[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const line of decoder.decode(value).split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6);
+            if (raw === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.text) {
+                if (firstChunkOverall) { setOrbState("speaking"); firstChunkOverall = false; }
+                accumulated += parsed.text;
+                speakerRef.current?.feed(parsed.text);
+                setChat((prev) => prev.map((t) => t.id === assistantId ? { ...t, text: accumulated } : t));
+              }
+              if (parsed.tool) {
+                setChat((prev) => prev.map((t) => t.id === assistantId ? { ...t, tools: [...(t.tools ?? []), parsed.tool] } : t));
+              }
+              if (parsed.openUrl && typeof window !== "undefined") {
+                window.open(parsed.openUrl, "_blank", "noopener,noreferrer");
+              }
+              if (parsed.pendingNative) {
+                pendingMessages = parsed.pendingNative.messages;
+                pendingNativeCalls = parsed.pendingNative.nativeCalls;
+              }
+              if (parsed.priorServerResults) {
+                priorServerResults = parsed.priorServerResults;
+              }
+              if (parsed.error) {
+                toast(`Jarvis error: ${parsed.error}`, "error");
+              }
+            } catch {}
+          }
         }
+
+        // If no native tools pending, we're done.
+        if (!pendingMessages || pendingNativeCalls.length === 0) break;
+
+        // Execute every native tool the client owes Claude.
+        setOrbState("thinking");
+        const nativeResults: Array<{ tool_use_id: string; content: unknown; is_error: boolean }> = [];
+        for (const call of pendingNativeCalls) {
+          const result = await executeNativeTool(call.name, call.input);
+          nativeResults.push({ tool_use_id: call.id, content: result.content, is_error: result.is_error });
+          setChat((prev) => prev.map((t) => t.id === assistantId
+            ? { ...t, tools: [...(t.tools ?? []), { name: call.name, message: result.is_error ? `Failed` : `Done`, ok: !result.is_error }] }
+            : t));
+        }
+
+        // Build resume payload: server results FIRST (preserve tool_use order), then native results.
+        const allResults = [
+          ...priorServerResults.map((r) => ({ tool_use_id: r.tool_use_id, content: r.content, is_error: r.is_error })),
+          ...nativeResults,
+        ];
+
+        body = {
+          history,
+          tauriMode,
+          resumeFrom: { messages: pendingMessages, toolResults: allResults },
+        };
       }
     } catch (e) {
       console.error(e);
       toast("Connection error", "error");
     } finally {
       speakerRef.current?.finish(() => setOrbState("idle"));
-      if (firstChunk) setOrbState("idle");
+      if (firstChunkOverall) setOrbState("idle");
     }
   }
 
