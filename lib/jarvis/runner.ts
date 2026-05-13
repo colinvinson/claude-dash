@@ -4,7 +4,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildContext } from "@/lib/ai/context-builder";
-import { ALL_JARVIS_TOOLS, executeTool, type ToolResult } from "@/lib/ai/tools";
+import { WORKER_TOOLS, CODE_EXECUTION_BETA, executeTool, type ToolResult } from "@/lib/ai/tools";
 import { buildWorkerSystemPrompt } from "./prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -44,10 +44,11 @@ export async function runWorker(service: SupabaseClient, workerId: string, oneSh
     const context = await buildContext(w.user_id);
     const systemPrompt = buildWorkerSystemPrompt(w.name, w.system_prompt, w.learned_facts ?? {}, context);
 
-    // Filter tools to the allowed list (or all if none specified)
+    // Filter tools to the allowed list (or all if none specified).
+    // WORKER_TOOLS includes code_execution which Anthropic runs server-side.
     const tools = w.allowed_tools && w.allowed_tools.length > 0
-      ? ALL_JARVIS_TOOLS.filter((t) => w.allowed_tools.includes(t.name))
-      : ALL_JARVIS_TOOLS;
+      ? WORKER_TOOLS.filter((t) => w.allowed_tools.includes(t.name))
+      : WORKER_TOOLS;
 
     // Initial user prompt — either the override or a generic "do your job" instruction
     const userPrompt = oneShotInstructions
@@ -63,7 +64,8 @@ export async function runWorker(service: SupabaseClient, workerId: string, oneSh
       { role: "user", content: userPrompt },
     ];
 
-    // Loop until Claude returns no more tool uses (max 5 iterations to prevent runaway)
+    // Loop until Claude returns no more tool uses (max 5 iterations to prevent runaway).
+    // Beta header enables the server-side code_execution tool included in WORKER_TOOLS.
     for (let i = 0; i < 5; i++) {
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
@@ -71,22 +73,26 @@ export async function runWorker(service: SupabaseClient, workerId: string, oneSh
         system: systemPrompt,
         tools,
         messages: messages as Anthropic.MessageParam[],
+      }, {
+        headers: { "anthropic-beta": CODE_EXECUTION_BETA },
       });
 
-      // Collect text + tool uses
-      const assistantBlocks: ContentBlock[] = [];
+      // Collect text + tool uses. Pass server-tool blocks (e.g. code_execution) through
+      // by using response.content directly as the next turn's assistant message — Anthropic
+      // needs the full block sequence to maintain conversational state.
       const pendingTools: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
+      type AnyBlock = { type: string; text?: string; id?: string; name?: string; input?: unknown };
 
-      for (const block of response.content) {
-        if (block.type === "text") {
+      for (const block of response.content as AnyBlock[]) {
+        if (block.type === "text" && typeof block.text === "string") {
           finalText += block.text;
-          assistantBlocks.push({ type: "text", text: block.text });
-        } else if (block.type === "tool_use") {
-          pendingTools.push({ id: block.id, name: block.name, input: block.input as Record<string, unknown> });
-          assistantBlocks.push({ type: "tool_use", id: block.id, name: block.name, input: block.input as Record<string, unknown> });
+        } else if (block.type === "tool_use" && block.id && block.name) {
+          pendingTools.push({ id: block.id, name: block.name, input: (block.input ?? {}) as Record<string, unknown> });
         }
+        // server_tool_use + code_execution_tool_result blocks: ignore here — Anthropic handles them.
       }
-      messages.push({ role: "assistant", content: assistantBlocks });
+      // Push raw response.content (preserves server-tool blocks) — cast to satisfy types.
+      messages.push({ role: "assistant", content: response.content as unknown as ContentBlock[] });
 
       if (pendingTools.length === 0 || response.stop_reason !== "tool_use") break;
 

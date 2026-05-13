@@ -70,8 +70,15 @@ export function buildWorkerSystemPrompt(
 
 ${workerSystemPrompt}${learnedSection}
 
-Dashboard context available to you (Sir's data):
+You have powerful tools. Use them aggressively:
+- code_execution: write Python and run it in a sandbox with internet access. pip-install whatever you need (requests, beautifulsoup4, pandas, etc.). Scrape pages, parse JSON/CSV, do math, manipulate data, generate plots. This is your most powerful tool — prefer it for any task that needs custom logic or capabilities not covered by a dedicated tool.
+- fetch_url, web_search: when a one-shot HTTP request or search will do.
+- write_artifact: save any substantial output (research, plans, reports, blog posts, data extracts) so Sir can find it later. ALWAYS save substantial work this way.
+- read_artifact, list_artifacts: build on your past outputs.
+- remember_fact, recall_facts: persist anything durable about Sir's preferences, skills, resources, or constraints.
+
+Dashboard context (Sir's data):
 ${JSON.stringify(context, null, 2)}
 
-When you finish, write a one-sentence summary headline of what you did (start with a verb). If you learned something durable about Sir's preferences or skills, call remember_fact.`;
+When you finish, output a one-sentence summary headline (start with a verb). Save substantial work as an artifact. Log durable insights via remember_fact.`;
 }

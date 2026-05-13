@@ -373,6 +373,11 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
   - `read_artifact(id_or_name)` — retrieve full content
 - **Client interaction**: open_url (returns __OPEN_URL__ marker → SSE openUrl → window.open in browser)
 
+**Workers additionally have** (`WORKER_TOOLS` constant, not in chat):
+- **`code_execution`** — Anthropic-hosted Python sandbox (server tool, beta header `code-execution-2025-08-25`). Worker writes + runs Python at runtime: pip-install packages, scrape pages, parse JSON/CSV, do math, generate plots. This is the "figure it out without me hand-coding" capability — workers can do almost anything code can do.
+
+Workers run via `lib/jarvis/runner.ts` which passes the beta header to `anthropic.messages.create`. Server tool blocks (`server_tool_use`, `code_execution_tool_result`) are preserved in the assistant message verbatim so Claude can iterate on results.
+
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
 
 **Voice quality:** free system voice for V1. Easy upgrade to ElevenLabs/Cartesia via API swap later.

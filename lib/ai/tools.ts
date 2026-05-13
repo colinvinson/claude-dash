@@ -246,6 +246,27 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
 
 export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
 
+// ============================================================
+// Server tools (Anthropic runs these — we don't implement an executor)
+// ============================================================
+
+// Code Execution — Claude writes + runs Python in Anthropic's managed sandbox.
+// Has internet access; can pip-install packages on the fly. Requires the beta
+// header `anthropic-beta: code-execution-2025-08-25` on the messages.create call.
+// Wrapped as `unknown` since the public `Anthropic.Tool` type doesn't include
+// server tools in the stable typings yet.
+export const CODE_EXECUTION_TOOL = {
+  type: "code_execution_20250825",
+  name: "code_execution",
+} as unknown as Anthropic.Tool;
+
+export const CODE_EXECUTION_BETA = "code-execution-2025-08-25";
+
+// Tools workers get (everything Jarvis has + code execution).
+// Code execution doesn't go into Jarvis chat because runs can take 30+s
+// and that would block voice/chat UX. Workers are async — they can wait.
+export const WORKER_TOOLS: Anthropic.Tool[] = [...ALL_JARVIS_TOOLS, CODE_EXECUTION_TOOL];
+
 type ToolInput = Record<string, unknown>;
 
 export async function executeTool(
