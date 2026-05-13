@@ -184,6 +184,64 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
       required: ["url"],
     },
   },
+
+  // ── Primitive capability tools — let workers do real work ───────
+  {
+    name: "fetch_url",
+    description: "GET (or POST/etc) a URL and return the response body as text. Use for scraping pages, polling APIs, checking external services. Response truncated to 80KB. Blocks private/internal IPs.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        url:     { type: "string", description: "Full URL to fetch." },
+        method:  { type: "string", description: "HTTP method. Default GET." },
+        headers: { type: "object", description: "Optional headers as a flat object." },
+        body:    { type: "string", description: "Optional request body for POST/PUT/PATCH." },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "web_search",
+    description: "Search the web via Tavily. Returns top results with title, URL, and content snippet. Use for market research, trend analysis, finding sources. Requires TAVILY_API_KEY.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query:       { type: "string" },
+        max_results: { type: "number", description: "Default 5, max 10." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "write_artifact",
+    description: "Save a substantial output (blog post, plan, report, research, code, anything text). Returns the artifact id. Use for any output that should persist beyond this conversation.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name:    { type: "string", description: "Short title for the artifact." },
+        content: { type: "string" },
+        type:    { type: "string", description: "markdown | text | json | html. Default markdown." },
+      },
+      required: ["name", "content"],
+    },
+  },
+  {
+    name: "list_artifacts",
+    description: "List the most recent artifacts. Returns names + ids + types + dates so you can reference or read them.",
+    input_schema: {
+      type: "object" as const,
+      properties: { limit: { type: "number", description: "Default 20." } },
+    },
+  },
+  {
+    name: "read_artifact",
+    description: "Read the full content of an artifact by id or name substring.",
+    input_schema: {
+      type: "object" as const,
+      properties: { id_or_name: { type: "string" } },
+      required: ["id_or_name"],
+    },
+  },
 ];
 
 export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
@@ -409,6 +467,142 @@ export async function executeTool(
         const url = String(input.url ?? "");
         if (!url) return { ok: false, error: "Empty URL" };
         return { ok: true, message: `__OPEN_URL__${url}` };
+      }
+
+      // ── Primitive capability tools ──────────────────────────
+      case "fetch_url": {
+        const url = String(input.url ?? "");
+        if (!url) return { ok: false, error: "Empty URL" };
+        // SSRF prevention: block private/internal IPs
+        try {
+          const parsed = new URL(url);
+          const host = parsed.hostname;
+          const blocked = [
+            "localhost", "127.0.0.1", "0.0.0.0", "::1",
+            "169.254.169.254",  // AWS instance metadata
+          ];
+          if (blocked.includes(host)) return { ok: false, error: "Blocked host" };
+          if (/^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+            return { ok: false, error: "Private network blocked" };
+          }
+          if (!/^https?:$/.test(parsed.protocol)) return { ok: false, error: "Only http(s) allowed" };
+        } catch {
+          return { ok: false, error: "Invalid URL" };
+        }
+
+        const method  = String(input.method ?? "GET").toUpperCase();
+        const headers = (input.headers as Record<string, string>) ?? {};
+        const body    = (input.body as string) ?? undefined;
+
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const res = await fetch(url, {
+            method,
+            headers: { "User-Agent": "JarvisWorker/1.0", ...headers },
+            body: ["GET", "HEAD"].includes(method) ? undefined : body,
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          const text = await res.text();
+          const truncated = text.length > 80_000 ? text.slice(0, 80_000) + "\n…[truncated]" : text;
+          return { ok: true, message: `HTTP ${res.status} ${res.statusText}\n\n${truncated}` };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Fetch failed" };
+        }
+      }
+
+      case "web_search": {
+        const apiKey = process.env.TAVILY_API_KEY;
+        if (!apiKey) return { ok: false, error: "TAVILY_API_KEY not configured. Set it in Vercel env vars (free tier at tavily.com)." };
+        const query = String(input.query ?? "");
+        if (!query) return { ok: false, error: "Empty query" };
+        const maxResults = Math.min(10, Math.max(1, Number(input.max_results) || 5));
+
+        try {
+          const res = await fetch("https://api.tavily.com/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key: apiKey,
+              query,
+              max_results: maxResults,
+              search_depth: "basic",
+              include_answer: true,
+            }),
+          });
+          if (!res.ok) return { ok: false, error: `Tavily ${res.status}` };
+          const data = await res.json() as {
+            answer?: string;
+            results?: Array<{ title: string; url: string; content: string }>;
+          };
+          const lines: string[] = [];
+          if (data.answer) lines.push(`Answer: ${data.answer}\n`);
+          for (const r of data.results ?? []) {
+            lines.push(`• ${r.title}\n  ${r.url}\n  ${r.content.slice(0, 400)}`);
+          }
+          return { ok: true, message: lines.join("\n\n") };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Search failed" };
+        }
+      }
+
+      case "write_artifact": {
+        const name    = String(input.name ?? "").trim();
+        const content = String(input.content ?? "");
+        const type    = String(input.type ?? "markdown");
+        if (!name || !content) return { ok: false, error: "name and content required" };
+        const { data, error } = await supabase.from("jarvis_artifacts").insert({
+          user_id: userId, name, type, content,
+        }).select("id").single();
+        if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+        return { ok: true, message: `Wrote "${name}" (${type}, ${content.length} chars). id: ${data.id}` };
+      }
+
+      case "list_artifacts": {
+        const limit = Math.min(50, Math.max(1, Number(input.limit) || 20));
+        const { data } = await supabase
+          .from("jarvis_artifacts")
+          .select("id, name, type, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (!data || data.length === 0) return { ok: true, message: "No artifacts yet." };
+        return {
+          ok: true,
+          message: data.map((a) => `• ${a.name} [${a.type}] · ${new Date(a.created_at).toLocaleString()} · id ${a.id.slice(0, 8)}`).join("\n"),
+        };
+      }
+
+      case "read_artifact": {
+        const idOrName = String(input.id_or_name ?? "").trim();
+        if (!idOrName) return { ok: false, error: "Empty id_or_name" };
+        // Try exact id match first (UUIDs are 36 chars)
+        let artifact: { name: string; type: string; content: string } | null = null;
+        if (idOrName.length >= 8) {
+          const { data } = await supabase
+            .from("jarvis_artifacts")
+            .select("name, type, content")
+            .eq("user_id", userId)
+            .eq("id", idOrName)
+            .maybeSingle();
+          if (data) artifact = data as { name: string; type: string; content: string };
+        }
+        if (!artifact) {
+          // Fall back to name substring match (most recent first)
+          const escaped = idOrName.replace(/[%_]/g, (m) => `\\${m}`);
+          const { data } = await supabase
+            .from("jarvis_artifacts")
+            .select("name, type, content")
+            .eq("user_id", userId)
+            .ilike("name", `%${escaped}%`)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) artifact = data as { name: string; type: string; content: string };
+        }
+        if (!artifact) return { ok: false, error: `No artifact matching "${idOrName}"` };
+        return { ok: true, message: `[${artifact.name}]\n\n${artifact.content}` };
       }
 
       default:

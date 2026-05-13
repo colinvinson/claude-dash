@@ -189,7 +189,8 @@ rowan-dashboard/
 │       ├── 0005_protein_logger.sql       # protein_logs table (manual + photo + barcode)
 │       ├── 0006_coach_extensions.sql     # morning_briefings + weekly_reviews + goal_templates
 │       ├── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
-│       └── 0008_jarvis.sql                # jarvis_facts + jarvis_workers + jarvis_worker_runs + jarvis_conversations
+│       ├── 0008_jarvis.sql                # jarvis_facts + jarvis_workers + jarvis_worker_runs + jarvis_conversations
+│       └── 0009_jarvis_artifacts.sql      # jarvis_artifacts — worker outputs (blog posts, plans, reports)
 │
 └── rowan-watch/                          # Standalone native watchOS companion app
     ├── README.md                         # Build/install guide (Xcode + dev cert)
@@ -360,7 +361,17 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 - Jarvis can `create_worker`, `dispatch_worker`, `list_workers` via tool calls (deploy workers conversationally)
 - Each run can write back to `learned_facts` JSONB (this is the "gets smarter" mechanic)
 
-**Tools Jarvis has** (`lib/ai/tools.ts`): all existing log tools + `remember_fact`, `recall_facts`, `dispatch_worker`, `create_worker`, `list_workers`, `open_url`, `log_alcohol`, `log_weight`.
+**Tools Jarvis has** (`lib/ai/tools.ts`):
+- **Logging**: log_water, log_protein, log_meditation, log_mood, log_weight, log_alcohol, log_concerta, log_supplement, complete_goal, mark_prayed, mark_bible, mark_church
+- **Memory**: remember_fact, recall_facts
+- **Workers**: dispatch_worker, create_worker, list_workers
+- **Capabilities (primitives that make workers actually useful)**:
+  - `fetch_url(url, method?, headers?, body?)` — generic HTTP, 80KB cap, SSRF-blocked for private IPs
+  - `web_search(query, max_results?)` — Tavily API (free tier; needs TAVILY_API_KEY env var)
+  - `write_artifact(name, content, type?)` — persists substantial outputs to `jarvis_artifacts`
+  - `list_artifacts(limit?)` — recent artifacts
+  - `read_artifact(id_or_name)` — retrieve full content
+- **Client interaction**: open_url (returns __OPEN_URL__ marker → SSE openUrl → window.open in browser)
 
 **`open_url` mechanic:** server-side returns a special `__OPEN_URL__<url>` marker → SSE `openUrl` event → client `window.open()`. The only client-side "computer interaction" a PWA can do.
 
@@ -381,7 +392,9 @@ Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives a
 - Run `0006_coach_extensions.sql` in Supabase SQL Editor — creates morning_briefings, weekly_reviews, goal_templates tables
 - Run `0007_lifemax_business.sql` in Supabase SQL Editor — category columns on supplement_stack + journal_entries
 - Run `0008_jarvis.sql` in Supabase SQL Editor — Jarvis tables (facts, workers, runs, conversations)
+- Run `0009_jarvis_artifacts.sql` in Supabase SQL Editor — artifact storage for worker outputs
 - Add `CRON_SECRET` env var in Vercel (any random string) so the worker dispatcher can authenticate
+- Optional: add `TAVILY_API_KEY` env var (free tier at tavily.com — 1000 searches/mo) to enable `web_search` tool. Without it, workers that try to search get an error message but everything else works.
 - Call `POST /api/workouts/update-exercises` once to classify all 43 exercises by type
 
 ### Known issues
