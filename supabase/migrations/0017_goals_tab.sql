@@ -1,19 +1,40 @@
 -- Goals tab — Life + Businesses sub-tab structure.
 -- Replaces the half-finished Business tab with a unified bucketed goals surface.
 --
--- Decision: wipe + restart. Per-user-direction. All existing long_term_goals
--- get archived (is_active=false) so they stay in history but don't clutter the
--- new tab. User re-adds what's still relevant into the bucketed structure.
+-- This migration is SELF-SUFFICIENT: it creates `long_term_goals` from scratch
+-- if migration 0002 was never applied, so you can run it standalone.
 
--- 1. Archive all existing long-term goals.
-UPDATE long_term_goals SET is_active = false;
+-- 1. Ensure the base table exists with all the original columns. No-op if 0002
+--    was already applied.
+CREATE TABLE IF NOT EXISTS public.long_term_goals (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id        UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title          TEXT NOT NULL,
+  category       TEXT DEFAULT 'general',
+  target_date    DATE,
+  ai_action_plan TEXT,
+  is_active      BOOLEAN DEFAULT true,
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
 
--- 2. Add bucket (drives Life vs Businesses tab) + the per-goal fields the
---    widgets need: free-form current_state + next_steps notes, schemaless
---    metrics for business KPIs, sort_order for manual ordering, and an
---    AI-summary surface (lazy-refreshed weekly, never auto on render).
-ALTER TABLE long_term_goals
-  ADD COLUMN IF NOT EXISTS bucket TEXT NOT NULL DEFAULT 'personal',
+-- RLS — idempotent (safe to re-run).
+ALTER TABLE public.long_term_goals ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'long_term_goals' AND policyname = 'ltgoals_own'
+  ) THEN
+    CREATE POLICY "ltgoals_own" ON public.long_term_goals FOR ALL USING (auth.uid() = user_id);
+  END IF;
+END $$;
+
+-- 2. Wipe + restart: archive all existing rows. NOOP if the table was just created above.
+UPDATE public.long_term_goals SET is_active = false;
+
+-- 3. Add the new columns the Goals tab needs.
+ALTER TABLE public.long_term_goals
+  ADD COLUMN IF NOT EXISTS bucket                TEXT NOT NULL DEFAULT 'personal',
   ADD COLUMN IF NOT EXISTS current_state         TEXT,
   ADD COLUMN IF NOT EXISTS next_steps            TEXT,
   ADD COLUMN IF NOT EXISTS metrics               JSONB,
@@ -21,27 +42,27 @@ ALTER TABLE long_term_goals
   ADD COLUMN IF NOT EXISTS ai_summary            TEXT,
   ADD COLUMN IF NOT EXISTS ai_summary_updated_at TIMESTAMPTZ;
 
--- Constrain bucket to the two values the UI actually uses. CHECK on its own
--- ALTER is the safest path: doesn't conflict with the IF NOT EXISTS ADD above.
+-- Constrain bucket to the two values the UI uses. CHECK added in a separate
+-- block so re-running this migration doesn't error.
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'long_term_goals_bucket_check'
   ) THEN
-    ALTER TABLE long_term_goals
+    ALTER TABLE public.long_term_goals
       ADD CONSTRAINT long_term_goals_bucket_check CHECK (bucket IN ('personal', 'business'));
   END IF;
 END $$;
 
--- 3. Routine → goal linkage. Lets the widget compute progress from adherence.
-ALTER TABLE supplement_stack
-  ADD COLUMN IF NOT EXISTS linked_goal_id UUID REFERENCES long_term_goals(id) ON DELETE SET NULL;
+-- 4. Routine → goal linkage. Lets the widget compute progress from adherence.
+ALTER TABLE public.supplement_stack
+  ADD COLUMN IF NOT EXISTS linked_goal_id UUID REFERENCES public.long_term_goals(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_supplement_stack_linked_goal
-  ON supplement_stack(linked_goal_id)
+  ON public.supplement_stack(linked_goal_id)
   WHERE linked_goal_id IS NOT NULL;
 
--- 4. Active-goal lookups should be fast even with years of archived rows.
+-- 5. Active-goal lookups should be fast even with years of archived rows.
 CREATE INDEX IF NOT EXISTS idx_long_term_goals_active_bucket
-  ON long_term_goals(user_id, bucket, sort_order)
+  ON public.long_term_goals(user_id, bucket, sort_order)
   WHERE is_active = true;
