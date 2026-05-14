@@ -131,8 +131,20 @@ function TimelineRow({
             <span className="text-[11px] text-zinc-500 tabular-nums">{range}</span>
             {recurring && <Repeat size={11} className="text-zinc-600" />}
             {insight && insight.streak >= 2 && (
-              <span className="flex items-center gap-0.5 text-[10px] text-orange-400 tabular-nums">
+              <span
+                className={`flex items-center gap-0.5 text-[10px] tabular-nums ${
+                  insight.streak >= insight.longestStreak && insight.streak >= 7
+                    ? "text-amber-300"
+                    : "text-orange-400"
+                }`}
+                title={insight.longestStreak > insight.streak
+                  ? `Best ever: ${insight.longestStreak}d · logged ${insight.totalLogged}× since ${insight.firstLoggedDate ?? "?"}`
+                  : `All-time best · logged ${insight.totalLogged}× since ${insight.firstLoggedDate ?? "?"}`}
+              >
                 <Flame size={10} /> {insight.streak}
+                {insight.longestStreak > insight.streak && (
+                  <span className="text-zinc-600"> / {insight.longestStreak}</span>
+                )}
               </span>
             )}
             {insight && insight.expected7d > 0 && (

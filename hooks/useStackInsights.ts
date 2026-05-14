@@ -14,9 +14,13 @@ import type { StackItem } from "./useStack";
 export type StackInsight = {
   itemId: string;
   streak: number;
-  ratio7d: number;        // 0..1
+  ratio7d: number;          // 0..1
   expected7d: number;
   done7d: number;
+  // Lifetime — derived from the FULL log history, no time-window cap.
+  totalLogged: number;
+  longestStreak: number;
+  firstLoggedDate: string | null;
 };
 
 function ymd(d: Date): string {
@@ -42,15 +46,14 @@ export function useStackInsights(items: StackItem[]) {
       if (!user) { setLoading(false); return; }
 
       const today = new Date();
-      // Walk back 60 days max — that's enough room for any realistic streak.
-      const since = new Date(today);
-      since.setDate(since.getDate() - 60);
 
+      // Fetch the FULL log history. Adherence is allowed to look back arbitrarily
+      // far — we want all-time longest streak + total logged, not just last 60 days.
+      // The query is indexed on (user_id, log_date) so cost stays low.
       const { data: logs } = await supabase
         .from("supplement_logs")
         .select("supplement_id, log_date")
-        .eq("user_id", user.id)
-        .gte("log_date", ymd(since));
+        .eq("user_id", user.id);
 
       // Index logs by (item, date) for O(1) lookups
       const byItem: Record<string, Set<string>> = {};
@@ -66,17 +69,35 @@ export function useStackInsights(items: StackItem[]) {
 
         // Streak: walk back from today; for each day the item IS scheduled,
         // require it to be logged. Skip days it wasn't scheduled on.
-        // Note: today not yet completed shouldn't break the streak, so if
-        // today is scheduled and not logged, we still start counting from
-        // yesterday — UNTIL it's late in the day. Simple rule: skip today
-        // and start at yesterday.
+        // Skip today (not yet late enough to count as a miss).
+        // Bounded only by ~5 years so a pathological loop can't run forever.
         let streak = 0;
-        for (let i = 1; i <= 60; i++) {
+        for (let i = 1; i <= 1825; i++) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
           if (!isScheduledOn(item, d)) continue;
           if (logged.has(ymd(d))) streak += 1;
           else break;
+        }
+
+        // Lifetime stats from the full log history.
+        const sortedDates = [...logged].sort();
+        const firstLoggedDate = sortedDates[0] ?? null;
+        const totalLogged = logged.size;
+        let longestStreak = 0;
+        if (firstLoggedDate) {
+          const start = new Date(firstLoggedDate);
+          const end = new Date(today);
+          let cur = 0;
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            if (!isScheduledOn(item, d)) continue;
+            if (logged.has(ymd(d))) {
+              cur += 1;
+              if (cur > longestStreak) longestStreak = cur;
+            } else {
+              cur = 0;
+            }
+          }
         }
 
         // 7d compliance: count expected days vs logged days in the last 7
@@ -97,6 +118,9 @@ export function useStackInsights(items: StackItem[]) {
           ratio7d: expected === 0 ? 0 : done / expected,
           expected7d: expected,
           done7d: done,
+          totalLogged,
+          longestStreak,
+          firstLoggedDate,
         };
       }
 

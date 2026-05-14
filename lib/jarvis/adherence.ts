@@ -35,17 +35,48 @@ type ItemStats = {
   expected7d: number;
   donePrev7d: number;
   expectedPrev7d: number;
+  // Lifetime — derived from the FULL log history, no time-window cap.
+  totalLogged: number;
+  longestStreak: number;
+  firstLoggedDate: string | null;  // ISO date, oldest entry
 };
+
+// Effectively-forever cap — 5 years (~1825 days). Real human streaks won't
+// exceed this, and the bounded loop guards against pathological / NaN dates.
+const MAX_STREAK_DAYS = 1825;
 
 function statsFor(item: StackRow, loggedDates: Set<string>, today: Date): ItemStats {
   // Streak — walk back from yesterday until a scheduled day is missed.
+  // No artificial 60/90-day cap: a 2-year Concerta streak deserves to be seen.
   let streak = 0;
-  for (let i = 1; i <= 90; i++) {
+  for (let i = 1; i <= MAX_STREAK_DAYS; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     if (!scheduledOn(d.getDay(), item.days_of_week)) continue;
     if (loggedDates.has(ymd(d))) streak += 1;
     else break;
+  }
+
+  // Lifetime: total log count + longest streak ever + first-logged date.
+  // Compute longest-ever streak by walking the SORTED list of dates and
+  // tracking runs of consecutive scheduled-and-logged days.
+  const sortedDates = [...loggedDates].sort();
+  const firstLoggedDate = sortedDates[0] ?? null;
+  const totalLogged = loggedDates.size;
+  let longestStreak = 0;
+  if (firstLoggedDate) {
+    const start = new Date(firstLoggedDate);
+    const end = new Date(today);
+    let cur = 0;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (!scheduledOn(d.getDay(), item.days_of_week)) continue;
+      if (loggedDates.has(ymd(d))) {
+        cur += 1;
+        if (cur > longestStreak) longestStreak = cur;
+      } else {
+        cur = 0;
+      }
+    }
   }
 
   // Trailing 7 (incl today) and prior 7 (days 7-13 back).
@@ -65,7 +96,11 @@ function statsFor(item: StackRow, loggedDates: Set<string>, today: Date): ItemSt
     if (loggedDates.has(ymd(d))) donePrev7d += 1;
   }
 
-  return { name: item.name, streak, done7d, expected7d, donePrev7d, expectedPrev7d };
+  return {
+    name: item.name,
+    streak, done7d, expected7d, donePrev7d, expectedPrev7d,
+    totalLogged, longestStreak, firstLoggedDate,
+  };
 }
 
 export async function buildAdherenceSummary(
@@ -73,9 +108,11 @@ export async function buildAdherenceSummary(
   userId: string,
 ): Promise<string> {
   const today = new Date();
-  const since = new Date(today);
-  since.setDate(since.getDate() - 30);
 
+  // Pull the user's FULL adherence history. Sir asked for the algorithm to
+  // keep history forever — that means streaks aren't artificially capped at
+  // 30 days, and lifetime context ("longest ever streak") is reachable.
+  // Indexed on user_id; cost is negligible up to ~100k log rows.
   const [stackRes, logsRes] = await Promise.all([
     supabase
       .from("supplement_stack")
@@ -85,8 +122,7 @@ export async function buildAdherenceSummary(
     supabase
       .from("supplement_logs")
       .select("supplement_id, log_date")
-      .eq("user_id", userId)
-      .gte("log_date", ymd(since)),
+      .eq("user_id", userId),
   ]);
 
   const stack: StackRow[] = stackRes.data ?? [];
@@ -131,7 +167,26 @@ export async function buildAdherenceSummary(
   if (hot.length > 0) {
     lines.push("Long streaks:");
     for (const s of hot.slice(0, 3)) {
-      lines.push(`  🔥 ${s.name}: ${s.streak} days`);
+      // Frame against lifetime: "matches all-time best" / "second-longest run" is more meaningful than raw "21 days".
+      const isAllTimeBest = s.streak >= s.longestStreak;
+      const tag = isAllTimeBest ? " (all-time best)" : (s.longestStreak > s.streak ? ` (best: ${s.longestStreak})` : "");
+      lines.push(`  🔥 ${s.name}: ${s.streak} days${tag}`);
+    }
+  }
+
+  // Lifetime callouts — items with notable historical weight worth Jarvis knowing about.
+  const veterans = stats
+    .filter((s) => s.totalLogged >= 30 || (s.longestStreak >= 14 && s.longestStreak > s.streak + 7))
+    .sort((a, b) => b.totalLogged - a.totalLogged)
+    .slice(0, 3);
+  if (veterans.length > 0) {
+    lines.push("Lifetime context (don't recite — for proactive framing only):");
+    for (const s of veterans) {
+      const parts: string[] = [];
+      parts.push(`logged ${s.totalLogged} times`);
+      if (s.longestStreak > 0) parts.push(`best streak ${s.longestStreak}d`);
+      if (s.firstLoggedDate) parts.push(`since ${s.firstLoggedDate}`);
+      lines.push(`  · ${s.name}: ${parts.join(", ")}`);
     }
   }
 
