@@ -181,27 +181,48 @@ export default function AddScheduleItem({
         </div>
 
         {/* Time + Duration */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <label>
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Time</span>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            />
-          </label>
-          <label>
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Duration (min)</span>
-            <input
-              type="number"
-              min={0}
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="0"
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            />
-          </label>
+        <div className="mb-3">
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5 block">Time</span>
+          {/* Quick-pick buckets — set canonical clock times. User can override below. */}
+          <div className="flex gap-1.5 mb-2">
+            {[
+              { label: "Morning", value: "07:00" },
+              { label: "Day",     value: "13:00" },
+              { label: "Night",   value: "21:00" },
+            ].map((b) => (
+              <button
+                key={b.label}
+                onClick={() => setTime(b.value)}
+                className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                  time === b.value ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific (optional)</span>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              />
+            </label>
+            <label>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Duration (min)</span>
+              <input
+                type="number"
+                min={0}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="0"
+                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Recurrence */}

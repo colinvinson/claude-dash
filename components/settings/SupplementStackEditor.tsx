@@ -217,25 +217,39 @@ export default function SupplementStackEditor() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Scheduled time (optional)</span>
+        <div>
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Time (quick-pick or specific)</span>
+          <div className="flex gap-1.5 mb-2">
+            {[
+              { label: "Morning", value: "07:00" },
+              { label: "Day",     value: "13:00" },
+              { label: "Night",   value: "21:00" },
+            ].map((b) => (
+              <button
+                key={b.label}
+                onClick={() => setScheduledAt(b.value)}
+                className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                  scheduledAt === b.value ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
             <input
               type="time"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              className="flex-1 bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
             />
-          </div>
-          <div className="flex-1">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Duration (min)</span>
             <input
               type="number"
               min={0}
               value={durationMin}
               onChange={(e) => setDurationMin(e.target.value)}
-              placeholder="0"
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              placeholder="duration (min)"
+              className="w-40 bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
             />
           </div>
         </div>
