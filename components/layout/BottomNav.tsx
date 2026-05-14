@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sparkles, Dumbbell, Briefcase } from "lucide-react";
+import { Home, CalendarClock, Dumbbell, Briefcase } from "lucide-react";
 import { useState } from "react";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
 const tabs = [
-  { href: "/home",     label: "Home",    icon: Home },
-  { href: "/lifemax",  label: "LifeMax", icon: Sparkles },
+  { href: "/home",     label: "Home",     icon: Home },
+  { href: "/schedule", label: "Schedule", icon: CalendarClock },
   { center: true,      label: "Jarvis" },
-  { href: "/gym",      label: "Gym",     icon: Dumbbell },
-  { href: "/business", label: "Bizz",    icon: Briefcase },
+  { href: "/gym",      label: "Gym",      icon: Dumbbell },
+  { href: "/business", label: "Bizz",     icon: Briefcase },
 ] as const;
 
 const TAB_W    = 56;

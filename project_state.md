@@ -45,13 +45,13 @@ A personal performance OS — not a collection of trackers. Every data source (O
 ## Navigation (5 Tabs)
 
 ```
-[ Home ]  [ LifeMax ]  [ +LOG ]  [ Gym ]  [ Business ]
+[ Home ]  [ Schedule ]  [ Jarvis ]  [ Gym ]  [ Business ]
 ```
 
 | Tab | Route | Description |
 |-----|-------|-------------|
 | Home | `/home` | Daily score, goals ticker, briefing, weekly review, day ring |
-| LifeMax | `/lifemax` | VIEW: Oura biometrics, protein progress, routine items (supps/meds/injections/skincare — tappable inline), long-term goals, recent personal journal entries |
+| Schedule | `/schedule` | Time-of-day ordered checklist: **Morning** routine (sunlight, supplements, medications, morning skincare) → **Today** (non-recurring daily goals) → **Night** routine (blue light glasses, meditation, evening supplements). Above the schedule: Oura biometrics + protein strip (continuous). Below: long-term goals + recent personal journal entries. Items are grouped purely by `timing` field — categories (supplement/medication/injection/skincare) show as inline icons rather than separate sections. `/lifemax` redirects here. |
 | **Jarvis (center)** | full-screen overlay | The system operator. Pulsing orb HUD with voice-to-voice chat, ambient telemetry, tool execution. Replaces +LOG button. |
 | Gym | `/gym` | Hypertrophy coach + recovery + strain + weekly volume |
 | Business | `/business` | Business + career goals, recent business journal entries (view-only) |

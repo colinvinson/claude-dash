@@ -11,7 +11,7 @@ function DataRedirect() {
   useEffect(() => {
     if (tab === "fitness") router.replace("/gym");
     else if (tab === "finances") router.replace("/business");
-    else router.replace("/lifemax");
+    else router.replace("/schedule");
   }, [tab, router]);
 
   return null;
