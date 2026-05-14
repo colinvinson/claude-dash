@@ -191,19 +191,7 @@ rowan-dashboard/
 │       ├── 0007_lifemax_business.sql     # category columns on supplement_stack + journal_entries
 │       ├── 0008_jarvis.sql                # jarvis_facts + jarvis_workers + jarvis_worker_runs + jarvis_conversations
 │       ├── 0009_jarvis_artifacts.sql      # jarvis_artifacts — worker outputs (blog posts, plans, reports)
-│       └── 0010_jarvis_universal_lessons.sql  # craft principles shared across all workers (current + future)
-│
-└── rowan-watch/                          # Standalone native watchOS companion app
-    ├── README.md                         # Build/install guide (Xcode + dev cert)
-    └── RowanWatch Watch App/
-        ├── Constants.swift               # apiBase + apiKey + userId (paste-in setup)
-        ├── APIClient.swift               # fetchExercises + logSet → calls Rowan API
-        ├── RowanWatchApp.swift           # App entry
-        ├── ContentView.swift             # Split picker (Push/Pull/Legs) + exercise list
-        ├── SetupView.swift               # Weight picker (Digital Crown, 2.5kg steps)
-        ├── ActiveSetView.swift           # Live rep counter + post-set confirm + log
-        └── RepDetector.swift             # Schmitt-trigger over Core Motion (50Hz),
-                                          # auto-tunes thresholds per exercise type
+│       └── 0014_schedule_recurrence.sql  # days_of_week INT[] for per-item recurrence
 ```
 
 ---
@@ -321,28 +309,6 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - 4-digit passcode auth flow (proxy.ts gates non-public paths)
 - Deployed on Vercel + accessible on iPhone as PWA (manifest, apple touch icon SVG, status bar styling)
 
-### Native Apple Watch companion app (`rowan-watch/`)
-Standalone watchOS SwiftUI app. NOT bundled with the PWA — built separately in Xcode and installed via free or paid Apple Developer account.
-
-**Workflow on the watch:**
-1. Pick split day (Push/Pull/Legs) → exercise list loads from `/api/workouts/exercises`
-2. Pick exercise → SetupView
-3. Set weight via Digital Crown (2.5kg steps)
-4. Tap "Start Set" → `RepDetector` starts accelerometer at 50Hz, counts reps live with haptic per rep
-5. Tap "Done" → confirm screen, scroll crown to adjust if miscounted
-6. Tap "Log Set ✓" → POSTs to `/api/workouts/log-set` with `WORKOUT_API_KEY` auth
-7. PWA dashboard updates via Supabase Realtime (no refresh needed)
-
-**Rep detection algorithm:** Schmitt-trigger on EMA-smoothed accel magnitude. Per-rep haptic. Thresholds **auto-tune per exercise** based on `muscle_group` + `exercise_type`:
-- `lower-body` (Quads/Hams/Glutes/Calves): HIGH 0.18g, LOW 0.08g, gap 0.7s — wrist barely moves under heavy bracing
-- `isolation` (upper-body Isolation): HIGH 0.25g, LOW 0.12g, gap 0.7s — slower controlled tempo
-- `compound` (upper-body Compound): HIGH 0.35g, LOW 0.15g, gap 0.5s — strong predictable motion
-- `default` (everything else): HIGH 0.30g, LOW 0.13g, gap 0.55s
-
-Active profile is shown under the live counter. Editing `exercise_type` in the dashboard Settings page automatically updates the profile on the watch's next fetch.
-
-**Accuracy realism:** ~90% on upper-body compound/isolation; ~40-60% on squat/deadlift/leg press (the wrist barely moves). The Done screen's manual count adjustment is the safety net for poorly-tracked lifts.
-
 ### Jarvis (system operator)
 Full-screen voice-to-voice assistant. Modeled after Tony Stark's Jarvis. Lives at the center of the bottom nav — tap the glowing orb to open the HUD.
 
@@ -403,7 +369,7 @@ CC sessions inherit the FULL Claude Code tool surface — Bash, Read, Edit, WebF
 - First agent definitions in `.claude/agents/` (e.g. Upwork auto-proposer, content factory, lead scraper) — framework is in place, agent design is yours
 - Always-on cloud execution via [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web) for agents that need to run while machine sleeps
 - Playwright skill bundled into CC for browser automation against authed sites
-- Apple HealthKit via Capacitor wrapper (HR + calories from Apple Watch into context)
+- (Decided against) Apple Watch / HealthKit integration. Native watch app (`rowan-watch/`) was scrapped in favor of manual weight + rep entry from the dashboard. If HealthKit becomes useful later, the easiest path is the "Health Auto Export" app → daily CSV → ingestion script, not another Swift codebase.
 - (Stale, not active) The old in-house worker runtime + jarvis_workers/jarvis_worker_runs/jarvis_universal_lessons tables. The tables remain in Supabase but nothing reads or writes them. Drop in a future migration if not reactivated.
 
 ### Pending (needs user action)
