@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Sparkles } from "lucide-react";
 import type { StackCategory, CreateItemArgs } from "@/hooks/useStack";
+import { useLongTermGoals } from "@/hooks/useLongTermGoals";
 
 type Classification = {
   category: StackCategory;
@@ -53,7 +54,9 @@ export default function AddScheduleItem({
   const [classifying, setClassifying] = useState(false);
   const [classification, setClassification] = useState<Classification | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [linkedGoalId, setLinkedGoalId] = useState<string>("");
   const classifyTimer = useRef<NodeJS.Timeout | null>(null);
+  const { goals: allGoals } = useLongTermGoals();
 
   // Auto-classify ~600ms after the user stops typing the name.
   useEffect(() => {
@@ -99,19 +102,18 @@ export default function AddScheduleItem({
       name: name.trim(),
       dose: dose.trim(),
       notes: classification?.notes ?? undefined,
-      // Time, duration, AND timing bucket are all OPTIONAL. Untimed items
-      // render in the "Anytime" section of the Schedule tab.
       timing: time ? (classification?.timing_bucket ?? undefined) : undefined,
       category,
       scheduled_at: time || null,
       duration_min: parsedDuration && !Number.isNaN(parsedDuration) ? parsedDuration : null,
       days_of_week: days,
+      linked_goal_id: linkedGoalId || null,
     });
     setSubmitting(false);
     if (id) {
-      // Reset + close
       setName(""); setDose(""); setTime(""); setDuration("");
       setCategory("habit"); setRecurrence("daily"); setSpecificDays([]);
+      setLinkedGoalId("");
       setClassification(null);
       onClose();
     }
@@ -289,6 +291,25 @@ export default function AddScheduleItem({
             </div>
           )}
         </div>
+
+        {/* Optional goal linkage — surfaces this item under its parent goal in /goals. */}
+        {allGoals.length > 0 && (
+          <div className="mb-4">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5 block">Link to a goal (optional)</span>
+            <select
+              value={linkedGoalId}
+              onChange={(e) => setLinkedGoalId(e.target.value)}
+              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+            >
+              <option value="">— not linked —</option>
+              {allGoals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.bucket === "business" ? "Biz" : "Life"} · {g.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <button
           onClick={submit}

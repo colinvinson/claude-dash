@@ -10,7 +10,7 @@ function DataRedirect() {
 
   useEffect(() => {
     if (tab === "fitness") router.replace("/gym");
-    else if (tab === "finances") router.replace("/business");
+    else if (tab === "finances") router.replace("/goals?tab=business");
     else router.replace("/schedule");
   }, [tab, router]);
 

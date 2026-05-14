@@ -37,6 +37,9 @@ export type StackItem = {
   color: string | null;          // hex/hsl color override
   // null OR [0..6] (Sunday=0). null = daily.
   days_of_week: number[] | null;
+  // Optional FK linking this routine to a long-term goal so the Goals tab can
+  // compute per-goal adherence. null = unlinked (counts toward nothing).
+  linked_goal_id: string | null;
 };
 
 export type CreateItemArgs = {
@@ -48,6 +51,7 @@ export type CreateItemArgs = {
   scheduled_at?: string | null;   // "HH:MM"
   duration_min?: number | null;
   days_of_week?: number[] | null;
+  linked_goal_id?: string | null;
 };
 
 export function useStack() {
@@ -64,7 +68,7 @@ export function useStack() {
     const today = getLogDate();
 
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week, linked_goal_id").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
@@ -133,19 +137,20 @@ export function useStack() {
     if (!userId) return null;
     const maxOrder = Math.max(0, ...items.map((i) => i.sort_order));
     const payload = {
-      user_id:      userId,
-      name:         args.name.trim(),
-      dose:         args.dose?.trim() || null,
-      notes:        args.notes?.trim() || null,
-      // timing / scheduled_at / duration_min are all OPTIONAL. Items without
-      // any time anchor render in the "Anytime" section of the Schedule tab.
-      timing:       args.timing ?? null,
-      category:     args.category ?? "habit",
-      scheduled_at: args.scheduled_at || null,
-      duration_min: args.duration_min ?? null,
-      days_of_week: args.days_of_week ?? null,
-      sort_order:   maxOrder + 1,
-      is_active:    true,
+      user_id:        userId,
+      name:           args.name.trim(),
+      dose:           args.dose?.trim() || null,
+      notes:          args.notes?.trim() || null,
+      // timing / scheduled_at / duration_min are all OPTIONAL. Untimed items
+      // render in the "Anytime" section of the Schedule tab.
+      timing:         args.timing ?? null,
+      category:       args.category ?? "habit",
+      scheduled_at:   args.scheduled_at || null,
+      duration_min:   args.duration_min ?? null,
+      days_of_week:   args.days_of_week ?? null,
+      linked_goal_id: args.linked_goal_id ?? null,
+      sort_order:     maxOrder + 1,
+      is_active:      true,
     };
     const { data, error } = await supabase
       .from("supplement_stack")

@@ -45,7 +45,7 @@ A personal performance OS — not a collection of trackers. Every data source (O
 ## Navigation (5 Tabs)
 
 ```
-[ Home ]  [ Schedule ]  [ Jarvis ]  [ Gym ]  [ Business ]
+[ Home ]  [ Schedule ]  [ Jarvis ]  [ Gym ]  [ Goals ]
 ```
 
 | Tab | Route | Description |
@@ -54,7 +54,7 @@ A personal performance OS — not a collection of trackers. Every data source (O
 | Schedule | `/schedule` | Vertical timeline of today's routine: time gutter on the left, colored category circles in the middle, checkboxes on the right. Items are filtered to TODAY's day-of-week (per `days_of_week` column). Above: Oura biometrics + protein strip. Below: non-recurring daily goals → long-term goals → recent personal journal entries. Inline **Add** button opens a sheet (name + time + duration + category + recurrence picker: every day / weekdays / weekends / specific days). Jarvis auto-classifies free-form names via `/api/jarvis/classify-item` (Haiku) → suggests category, duration, timing, and a useful note. Per-item streak (🔥) and 7-day compliance ratio surface next to each row (derived from `supplement_logs`). `/lifemax` redirects here. |
 | **Jarvis (center)** | full-screen overlay | The system operator. Pulsing orb HUD with voice-to-voice chat, ambient telemetry, tool execution. Replaces +LOG button. |
 | Gym | `/gym` | Hypertrophy coach + recovery + strain + weekly volume |
-| Business | `/business` | Business + career goals, recent business journal entries (view-only) |
+| Goals | `/goals` | Two pill sub-tabs (Life / Businesses). One widget per long-term goal: title + category chip + progress bar (avg `ratio7d` across linked routine items) + target-date countdown when collapsed. Expanded: editable `current_state` + `next_steps`, linked routine items with adherence pills, business `metrics` JSON editor, "Jarvis's take" (Haiku 4.5, 1-hour cooldown, lazy weekly auto-refresh on page open), original `ai_action_plan`, move-between-buckets + archive. `/business` redirects here with `?tab=business`. |
 
 **Logging architecture principle:** the interaction *shape* drives where it lives, not whether it's daily.
 - **Checklist** (recurring fixed list — supplements, meds, injections, skincare) → tapped inline on LifeMax (you need to see what's left)

@@ -47,3 +47,4 @@ next-env.d.ts
 # tauri source-icon staging
 /tauri icon/
 src-tauri/Cargo.lock
+.jarvis-bridge.log
