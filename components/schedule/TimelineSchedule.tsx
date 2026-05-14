@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import type { StackItem, StackCategory } from "@/hooks/useStack";
+import type { StackItem } from "@/hooks/useStack";
+import type { StackInsight } from "@/hooks/useStackInsights";
 import {
-  Pill, Beaker, Syringe, Sparkles, Sun, Activity, Utensils, Clock, Repeat,
+  Pill, Beaker, Syringe, Sparkles, Sun, Activity, Utensils, Clock, Repeat, Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -74,12 +75,14 @@ function TimeGutter({ time }: { time: string }) {
 
 function TimelineRow({
   item,
+  insight,
   showGutterTime,
   isFirst,
   isLast,
   onToggle,
 }: {
   item: StackItem;
+  insight?: StackInsight;
   showGutterTime: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -127,6 +130,16 @@ function TimelineRow({
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-zinc-500 tabular-nums">{range}</span>
             {recurring && <Repeat size={11} className="text-zinc-600" />}
+            {insight && insight.streak >= 2 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-orange-400 tabular-nums">
+                <Flame size={10} /> {insight.streak}
+              </span>
+            )}
+            {insight && insight.expected7d > 0 && (
+              <span className="text-[10px] text-zinc-600 tabular-nums">
+                · {insight.done7d}/{insight.expected7d} this wk
+              </span>
+            )}
           </div>
           <div className={`text-sm font-semibold mt-0.5 truncate ${item.taken ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
             {item.name}
@@ -154,9 +167,11 @@ function TimelineRow({
 
 export default function TimelineSchedule({
   items,
+  insights,
   onToggle,
 }: {
   items: StackItem[];
+  insights?: Record<string, StackInsight>;
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
 }) {
   // Sort by effective time; stable on sort_order within the same minute.
@@ -189,6 +204,7 @@ export default function TimelineSchedule({
           <TimelineRow
             key={item.id}
             item={item}
+            insight={insights?.[item.id]}
             showGutterTime={showGutterTime}
             isFirst={i === 0}
             isLast={i === ordered.length - 1}

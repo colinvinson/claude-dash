@@ -35,6 +35,19 @@ export type StackItem = {
   duration_min: number | null;
   icon: string | null;           // Lucide icon name override
   color: string | null;          // hex/hsl color override
+  // null OR [0..6] (Sunday=0). null = daily.
+  days_of_week: number[] | null;
+};
+
+export type CreateItemArgs = {
+  name: string;
+  dose?: string;
+  notes?: string;
+  timing?: string;
+  category?: StackCategory;
+  scheduled_at?: string | null;   // "HH:MM"
+  duration_min?: number | null;
+  days_of_week?: number[] | null;
 };
 
 export function useStack() {
@@ -51,7 +64,7 @@ export function useStack() {
     const today = getLogDate();
 
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
@@ -112,5 +125,36 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, items]);
 
-  return { items, loading, toggle, addToStack };
+  // createItem — the richer add path used by the Schedule "+ Add" sheet.
+  // If `category` is omitted, the caller is expected to have already classified
+  // the item (via /api/jarvis/classify-item). We don't auto-classify here so
+  // that the user can preview / override the classification before saving.
+  const createItem = useCallback(async (args: CreateItemArgs) => {
+    if (!userId) return null;
+    const maxOrder = Math.max(0, ...items.map((i) => i.sort_order));
+    const payload = {
+      user_id:      userId,
+      name:         args.name.trim(),
+      dose:         args.dose?.trim() || null,
+      notes:        args.notes?.trim() || null,
+      timing:       args.timing ?? "Morning",
+      category:     args.category ?? "habit",
+      scheduled_at: args.scheduled_at || null,
+      duration_min: args.duration_min ?? null,
+      days_of_week: args.days_of_week ?? null,
+      sort_order:   maxOrder + 1,
+      is_active:    true,
+    };
+    const { data, error } = await supabase
+      .from("supplement_stack")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error) return null;
+    await load();
+    return data?.id ?? null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, items]);
+
+  return { items, loading, toggle, addToStack, createItem };
 }

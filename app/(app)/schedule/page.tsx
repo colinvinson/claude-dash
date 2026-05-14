@@ -1,7 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { useGoals } from "@/hooks/useGoals";
 import { useStack } from "@/hooks/useStack";
+import { useStackInsights } from "@/hooks/useStackInsights";
 import { useProtein } from "@/hooks/useProtein";
 import { useJournal } from "@/hooks/useJournal";
 import SectionLabel from "@/components/layout/SectionLabel";
@@ -9,6 +12,7 @@ import Card from "@/components/ui/Card";
 import HealthCard from "@/components/health/HealthCard";
 import LongTermGoalsCard from "@/components/life/LongTermGoalsCard";
 import TimelineSchedule from "@/components/schedule/TimelineSchedule";
+import AddScheduleItem from "@/components/schedule/AddScheduleItem";
 
 function GoalRow({ id, title, isComplete, onToggle }: {
   id: string;
@@ -39,10 +43,24 @@ function GoalRow({ id, title, isComplete, onToggle }: {
 }
 
 export default function SchedulePage() {
-  const { items, toggle } = useStack();
+  const { items, toggle, createItem } = useStack();
   const { goals, toggleGoal } = useGoals();
   const { totalToday, target, pctOfTarget } = useProtein();
   const { entries } = useJournal({ entryCategory: "personal" });
+  const [addOpen, setAddOpen] = useState(false);
+
+  // Filter the routine items down to ones scheduled for TODAY (by day-of-week).
+  // days_of_week NULL or full-week = daily.
+  const todayDow = new Date().getDay();
+  const todayItems = useMemo(() => {
+    return items.filter((i) => {
+      if (!i.days_of_week || i.days_of_week.length === 0 || i.days_of_week.length === 7) return true;
+      return i.days_of_week.includes(todayDow);
+    });
+  }, [items, todayDow]);
+
+  // Compliance + streak per item — uses 30d of supplement_logs.
+  const { insights } = useStackInsights(items);
 
   const sortedGoals = [...goals].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const goalsDone = goals.filter((g) => g.is_complete).length;
@@ -94,11 +112,21 @@ export default function SchedulePage() {
         <Card>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] uppercase tracking-widest text-zinc-500">— Today</span>
-            <span className="text-[11px] text-zinc-600">{items.filter((i) => i.taken).length}/{items.length} done · resets 6 AM</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-zinc-600">{todayItems.filter((i) => i.taken).length}/{todayItems.length} done · resets 6 AM</span>
+              <button
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-white text-zinc-900 text-[11px] font-semibold hover:opacity-90 transition-opacity"
+              >
+                <Plus size={12} /> Add
+              </button>
+            </div>
           </div>
-          <TimelineSchedule items={items} onToggle={toggle} />
+          <TimelineSchedule items={todayItems} insights={insights} onToggle={toggle} />
         </Card>
       </div>
+
+      <AddScheduleItem open={addOpen} onClose={() => setAddOpen(false)} onCreate={createItem} />
 
       {/* Today's non-recurring goals — untimed, sit below the timeline */}
       <div className="anim-fade-up stagger-4">
