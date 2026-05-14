@@ -98,15 +98,27 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
                 className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
               />
             </label>
-            <label className="w-44">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Target date (optional)</span>
+            <div className="w-44">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500">Target date</span>
+                {newDate ? (
+                  <button
+                    onClick={() => setNewDate("")}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Clear
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-zinc-600">No deadline</span>
+                )}
+              </div>
               <input
                 type="date"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
                 className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
               />
-            </label>
+            </div>
           </div>
           <button
             onClick={handleAdd}
