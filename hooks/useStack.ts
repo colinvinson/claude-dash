@@ -13,7 +13,12 @@ function getLogDate() {
   return now.toISOString().split("T")[0];
 }
 
-export type StackCategory = "supplement" | "medication" | "injection" | "skincare";
+// Categories are stored as TEXT in Postgres so new ones can be added without
+// a migration. The common set:
+//   supplement | medication | injection | skincare | habit | exercise | meal
+export type StackCategory =
+  | "supplement" | "medication" | "injection" | "skincare"
+  | "habit" | "exercise" | "meal" | string;
 
 export type StackItem = {
   id: string;
@@ -25,6 +30,11 @@ export type StackItem = {
   sort_order: number;
   taken: boolean;
   log_id: string | null;
+  // New: real clock time + duration. Both nullable.
+  scheduled_at: string | null;   // "HH:MM:SS" or null
+  duration_min: number | null;
+  icon: string | null;           // Lucide icon name override
+  color: string | null;          // hex/hsl color override
 };
 
 export function useStack() {
@@ -41,7 +51,7 @@ export function useStack() {
     const today = getLogDate();
 
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
