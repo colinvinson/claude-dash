@@ -78,26 +78,35 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
         <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-2">
           {bucket === "business" ? "Add a business / project" : "Add a life goal"}
         </span>
-        <div className="space-y-2">
-          <input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder={bucket === "business" ? "e.g. Ship SaaS v1" : "e.g. Get tan"}
-            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-          />
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Title</span>
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder={bucket === "business" ? "e.g. Ship SaaS v1" : "e.g. Get tan"}
+              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+            />
+          </label>
           <div className="flex gap-2">
-            <input
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="Tag (optional)"
-              className="flex-1 bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            />
-            <input
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              className="w-44 bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            />
+            <label className="flex-1">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Tag (optional)</span>
+              <input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder={bucket === "business" ? "SaaS" : "Tan / Sleep / …"}
+                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              />
+            </label>
+            <label className="w-44">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Target date (optional)</span>
+              <input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+              />
+            </label>
           </div>
           <button
             onClick={handleAdd}
