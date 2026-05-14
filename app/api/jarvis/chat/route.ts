@@ -93,6 +93,36 @@ export async function POST(req: NextRequest) {
     ];
   }
 
+  // Capture user.id locally so the persist closure isn't re-checking the
+  // narrowed type at every call site.
+  const persistUserId = user.id;
+
+  // Track the full assistant utterance produced in THIS HTTP request so we can
+  // persist it to jarvis_messages when the response ends. Native-tool yields
+  // and normal completions both call the persistTurn helper. Cross-session
+  // continuity reads back from this table in buildContext.
+  let fullAssistantText = "";
+  async function persistTurn(opts: { writeUser: boolean }) {
+    try {
+      if (opts.writeUser && content && content.trim()) {
+        await service.from("jarvis_messages").insert({
+          user_id: persistUserId,
+          role: "user",
+          content: content.trim(),
+        });
+      }
+      if (fullAssistantText.trim()) {
+        await service.from("jarvis_messages").insert({
+          user_id: persistUserId,
+          role: "assistant",
+          content: fullAssistantText.trim(),
+        });
+      }
+    } catch {
+      // Persistence failure must not break the response.
+    }
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -135,6 +165,7 @@ export async function POST(req: NextRequest) {
             } else if (event.type === "content_block_delta") {
               if (event.delta.type === "text_delta" && currentBlock?.type === "text") {
                 currentBlock.text += event.delta.text;
+                fullAssistantText += event.delta.text;
                 sendText(event.delta.text);
               } else if (event.delta.type === "input_json_delta") {
                 toolInputBuffer += event.delta.partial_json;
@@ -221,6 +252,10 @@ export async function POST(req: NextRequest) {
             })}\n\n`));
           }
 
+          // Native-tool yield path — persist the partial assistant text so it's
+          // visible in future chat context. User message was sent on the INITIAL
+          // request, so only write it if this call introduced one.
+          await persistTurn({ writeUser: !resumeFrom });
           done();
           controller.close();
           return;
@@ -230,6 +265,8 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
       }
 
+      // Normal completion — persist user + assistant before closing.
+      await persistTurn({ writeUser: !resumeFrom });
       done();
       controller.close();
     },

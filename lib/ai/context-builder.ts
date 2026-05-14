@@ -50,6 +50,8 @@ export async function buildContext(userId: string) {
     todaySetsRes,
     sets21dRes, medLogs21dRes, recentInsightsRes,
     proteinTodayRes, latestWeightRes,
+    alcoholTodayRes, meditationTodayRes,
+    recentArtifactsRes, recentMessagesRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -79,6 +81,15 @@ export async function buildContext(userId: string) {
     supabase.from("jarvis_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
     supabase.from("protein_logs").select("protein_g, ai_score").eq("user_id", userId).eq("log_date", today),
     supabase.from("weight_logs").select("weight_kg").eq("user_id", userId).order("logged_at", { ascending: false }).limit(1),
+    // Same-day surfaces so Jarvis knows TODAY's count, not just 21-day pattern.
+    supabase.from("alcohol_logs").select("drink_count, drink_type, logged_at").eq("user_id", userId).eq("log_date", today),
+    supabase.from("meditation_logs").select("duration_min, logged_at").eq("user_id", userId).eq("log_date", today),
+    // Recent agent deliverables Jarvis should know exist without being asked.
+    supabase.from("jarvis_artifacts").select("id, name, type, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
+    // Cross-session memory — last 30 chat turns from the past 48h. Lets Jarvis
+    // pick up the thread from a prior conversation without needing the user
+    // to repeat themselves.
+    supabase.from("jarvis_messages").select("role, content, created_at").eq("user_id", userId).gte("created_at", new Date(Date.now() - 48 * 3600 * 1000).toISOString()).order("created_at", { ascending: false }).limit(30),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -567,16 +578,30 @@ export async function buildContext(userId: string) {
         .reduce((sum, r) => sum + Number(r.protein_g), 0);
       const latestWeight = (latestWeightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null;
       const proteinTarget = latestWeight ? Math.round(latestWeight * 2.0) : 150;
+      const alcoholRows = (alcoholTodayRes.data ?? []) as Array<{ drink_count: number; drink_type: string | null }>;
+      const meditationRows = (meditationTodayRes.data ?? []) as Array<{ duration_min: number }>;
+      const drinksToday = alcoholRows.reduce((s, r) => s + Number(r.drink_count ?? 1), 0);
+      const meditationMinToday = meditationRows.reduce((s, r) => s + Number(r.duration_min ?? 0), 0);
       return {
-        dailyPlan:     dailyCtxRes.data?.raw_text ?? null,
-        waterGlasses:  waterRes.data?.glasses ?? 0,
-        faith:         faithRes.data ?? null,
-        latestMood:    (moodRes.data as Array<{ score: number }> | null)?.[0]?.score ?? null,
-        proteinToday:  Math.round(proteinToday),
+        dailyPlan:        dailyCtxRes.data?.raw_text ?? null,
+        waterGlasses:     waterRes.data?.glasses ?? 0,
+        faith:             faithRes.data ?? null,
+        latestMood:       (moodRes.data as Array<{ score: number }> | null)?.[0]?.score ?? null,
+        proteinToday:     Math.round(proteinToday),
         proteinTarget,
-        proteinPct:    proteinTarget > 0 ? Math.round((proteinToday / proteinTarget) * 100) : 0,
+        proteinPct:       proteinTarget > 0 ? Math.round((proteinToday / proteinTarget) * 100) : 0,
+        // Newly surfaced in same-day context (previously snapshot-only):
+        drinksToday,
+        drinkTypes:       Array.from(new Set(alcoholRows.map((r) => r.drink_type).filter(Boolean))),
+        meditationMinToday,
       };
     })(),
+    recentArtifacts: (recentArtifactsRes.data ?? []) as Array<{ id: string; name: string; type: string; created_at: string }>,
+    // Cross-session breadcrumbs — reverse so chronological order reads
+    // naturally for Claude (oldest first).
+    recentChatHistory: ((recentMessagesRes.data ?? []) as Array<{ role: string; content: string; created_at: string }>)
+      .reverse()
+      .map((m) => ({ role: m.role, content: m.content.length > 400 ? m.content.slice(0, 400) + "…" : m.content })),
     journal:       (journalRes.data ?? []) as Array<{ content: string; ai_summary: string | null }>,
     longTermGoals: (ltGoalsRes.data ?? []) as Array<{ title: string; category: string; ai_action_plan: string | null }>,
     dailyScore,

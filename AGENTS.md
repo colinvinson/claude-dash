@@ -4,6 +4,41 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+<!-- BEGIN:tracked-data-rule -->
+# Tracked data must flow into the algorithm (MANDATORY)
+
+When you add a new logging feature, tracked field, table, or column to this dashboard, it is NOT done until ALL FIVE of the following are wired up. No exceptions. Sir's directive: "nothing is just for me to track — everything must feed the algorithm."
+
+## The five places every new tracked field must land:
+
+1. **`lib/ai/context-builder.ts`** — Add a parallel query for TODAY's value in the `Promise.all` block. Surface in the returned object (usually under `lifestyle`, `biometrics`, or as a top-level key). This is what Jarvis chat sees on every turn.
+
+2. **`lib/ai/snapshot-builder.ts`** — Add a column to the 21-day CSV `Row` type and emit it in the row builder. This is what enables autonomous correlation discovery across all metrics. Use the dynamic indexer pattern (`med_<type>`, `supp_<name>`) for high-cardinality fields.
+
+3. **`lib/scoring.ts`** — If the field is a behavior Sir is trying to improve (something with a target or a "done/not done" state), wire it into the score as a new component with self-exclusion. Don't include passive data (biometrics, weight) in scoring — only volitional behaviors.
+
+4. **`lib/jarvis/adherence.ts`** OR **`lib/jarvis/baselines.ts`** — If it's a recurring behavior, surface streak / drift via adherence. If it's a biometric, add to baselines so Jarvis can phrase responses relative to Sir's own norm.
+
+5. **`lib/jarvis/prompts.ts`** — Document the new context field under the "Context you have access to" section so Jarvis knows the field exists and how to phrase responses about it.
+
+## How to verify it's wired
+
+Before considering a tracking feature done, confirm:
+- [ ] The new data appears in today's chat context (logged, then ask Jarvis "what did I log?")
+- [ ] The new data appears in the 21-day snapshot CSV (check via tool or temporary log)
+- [ ] If volitional, it moves the daily score on Home
+- [ ] If recurring, streak/drift shows in adherence summary
+- [ ] If biometric, vsBaseline is computed once there's 7+ days of history
+
+## What NOT to add
+
+- Don't add fields purely for "I want to see this on the dashboard later." Every tracked field has a token cost (it's in Jarvis's context every turn). Add it because the algorithm should reason over it.
+- Don't add ephemeral state (UI toggles, drafts, etc.) to logged tables.
+- Don't hardcode substance names or specific products in prompts / context (Concerta, Magnesium, etc.) — use generic mechanisms that work for whatever Sir actually logs.
+
+This rule is non-negotiable. If you're tempted to skip a step "for now," you're creating tech debt that misleads Sir into thinking the algorithm sees something it doesn't.
+<!-- END:tracked-data-rule -->
+
 <!-- BEGIN:token-discipline -->
 # Token discipline (mandatory for every agent run)
 
