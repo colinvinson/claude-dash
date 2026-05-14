@@ -45,6 +45,8 @@ export default function HomePage() {
     supplementsTaken,
     supplementsTotal,
     checkedIn: hasCheckedIn,
+    proteinPct:    proteinTarget > 0 ? proteinToday / proteinTarget : null,
+    proteinTarget: proteinTarget,
   });
 
   // Sync score accent to body for radial wash color shift

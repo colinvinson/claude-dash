@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { buildContext } from "@/lib/ai/context-builder";
 import { buildJarvisStaticPrompt, buildJarvisDynamicContext } from "@/lib/jarvis/prompts";
 import { getRelevantFacts } from "@/lib/jarvis/memory";
+import { buildAdherenceSummary } from "@/lib/jarvis/adherence";
 import { ALL_JARVIS_TOOLS, OS_NATIVE_TOOLS, CC_NATIVE_TOOLS, NATIVE_TOOL_NAMES, executeTool, type ToolResult } from "@/lib/ai/tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -50,9 +51,10 @@ export async function POST(req: NextRequest) {
   const { content, history, tauriMode, resumeFrom } = body;
   const service = createServiceClient();
 
-  const [context, facts] = await Promise.all([
+  const [context, facts, adherence] = await Promise.all([
     buildContext(user.id),
     getRelevantFacts(service, user.id, undefined, 40),
+    buildAdherenceSummary(service, user.id),
   ]);
 
   // Anthropic prompt caching: the persona/capabilities text is large and
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
   // that isn't cached.
   const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
     { type: "text", text: buildJarvisStaticPrompt(), cache_control: { type: "ephemeral" } },
-    { type: "text", text: buildJarvisDynamicContext(context, facts) },
+    { type: "text", text: buildJarvisDynamicContext(context, facts, adherence) },
   ];
   // CC agent tools work in both environments (Tauri direct shell, or Supabase bridge from web).
   // OS native tools (screenshot, mouse, keyboard, shell, fs) require Tauri — strip in browser mode.

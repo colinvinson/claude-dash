@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.colinvinson.jarvis-bridge</string>
+
+  <!-- Run the bridge daemon via the project-local tsx binary. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/colinvinson/rowan-dashboard/node_modules/.bin/tsx</string>
+    <string>/Users/colinvinson/rowan-dashboard/scripts/jarvis-bridge.ts</string>
+  </array>
+
+  <!-- Repo root: tsx + the script need this to find .env.local and .claude/agents/. -->
+  <key>WorkingDirectory</key>
+  <string>/Users/colinvinson/rowan-dashboard</string>
+
+  <!-- Restart automatically on crash; start at login; survive logout/reboot. -->
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+    <key>Crashed</key><true/>
+  </dict>
+
+  <!-- Throttle restarts so a broken bridge doesn't hammer the system. -->
+  <key>ThrottleInterval</key><integer>30</integer>
+
+  <!-- Logs land next to the project so they're easy to tail. -->
+  <key>StandardOutPath</key>
+  <string>/Users/colinvinson/rowan-dashboard/.jarvis-bridge.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/colinvinson/rowan-dashboard/.jarvis-bridge.log</string>
+
+  <!-- Make sure homebrew binaries are on PATH (otherwise tsx + node may not resolve). -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <!-- Keep an explicit nice level so the daemon never blocks foreground work. -->
+  <key>Nice</key><integer>5</integer>
+</dict>
+</plist>

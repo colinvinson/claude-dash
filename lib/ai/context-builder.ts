@@ -470,6 +470,12 @@ export async function buildContext(userId: string) {
   const goalsComplete = goals.filter((g) => g.is_complete).length;
   const suppsTaken = stack.filter((s) => logs.some((l) => l.supplement_id === s.id)).length;
 
+  // Protein for the score: sum today's grams, target = bodyweight × 2 (matches useProtein default).
+  const proteinTodayG = ((proteinTodayRes.data ?? []) as Array<{ protein_g: number }>)
+    .reduce((sum, r) => sum + Number(r.protein_g), 0);
+  const latestWeightKg = (latestWeightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null;
+  const proteinTargetG = latestWeightKg ? Math.round(latestWeightKg * 2.0) : 150;
+
   const dailyScore = computeDailyScore({
     goalsComplete,
     goalsTotal: goals.length,
@@ -478,6 +484,8 @@ export async function buildContext(userId: string) {
     supplementsTaken: suppsTaken,
     supplementsTotal: stack.length,
     checkedIn: !!dailyCtxRes.data?.raw_text,
+    proteinPct:    proteinTargetG > 0 ? proteinTodayG / proteinTargetG : null,
+    proteinTarget: proteinTargetG,
   });
 
   return {

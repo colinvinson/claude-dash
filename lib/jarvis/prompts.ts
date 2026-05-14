@@ -42,13 +42,18 @@ Health interpretation (use when discussing biometrics):
 export function buildJarvisDynamicContext(
   context: object,
   facts: JarvisFact[],
+  adherence?: string,
 ): string {
   const factsList = facts.length > 0
     ? facts.map((f) => `  - ${f.fact} (confidence ${Math.round(f.confidence * 100)}%)`).join("\n")
     : "  (no facts learned yet)";
 
+  const adherenceBlock = adherence
+    ? `\n\nRoutine adherence (use this to proactively flag drift — but don't recite it unprompted on unrelated topics):\n${adherence}`
+    : "";
+
   return `Durable facts about Sir:
-${factsList}
+${factsList}${adherenceBlock}
 
 Current dashboard context:
 ${JSON.stringify(context)}`;
