@@ -95,8 +95,22 @@ export async function buildContext(userId: string) {
   const totalAwake = (awakeEnd - awakeStart) * 60;
   const pctDay     = Math.round((elapsed / totalAwake) * 100);
 
-  const concerta  = medLogs.find((l) => l.medication_type === "concerta");
-  const veloCount = medLogs.filter((l) => l.medication_type === "velo").length;
+  // Generic medication log surface — every medication_type taken today, with counts.
+  // No hardcoded biases toward specific substances; whatever Sir actually logged shows up.
+  const medsTodayMap = new Map<string, { count: number; firstAt: string | null }>();
+  for (const l of medLogs) {
+    const type = l.medication_type;
+    if (!type) continue;
+    const cur = medsTodayMap.get(type) ?? { count: 0, firstAt: null };
+    cur.count += 1;
+    if (!cur.firstAt && l.taken_at) cur.firstAt = l.taken_at;
+    medsTodayMap.set(type, cur);
+  }
+  const medsToday = Array.from(medsTodayMap.entries()).map(([type, v]) => ({
+    type,
+    count: v.count,
+    firstAt: v.firstAt ? new Date(v.firstAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : null,
+  }));
 
   const supplementsTaken  = stack.filter((s) => logs.some((l) => l.supplement_id === s.id)).map((s) => s.name);
   const supplementsMissed = stack.filter((s) => !logs.some((l) => l.supplement_id === s.id)).map((s) => ({ name: s.name, timing: s.timing }));
@@ -130,19 +144,13 @@ export async function buildContext(userId: string) {
     isFinal:      health.is_final,
   } : null;
 
-  // Cross-domain interpretation hints for the AI
+  // Cross-domain interpretation hints for the AI. No hardcoded substance assumptions
+  // anymore — pass through what Sir actually logged and let Claude reason over it
+  // using the (now generic) health-interpretation rules in the system prompt.
   const behavioralContext = {
-    concertaTaken:    !!concerta,
-    concertaAt:       concerta?.taken_at ? new Date(concerta.taken_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : null,
-    concertaNote:     concerta ? "Concerta (methylphenidate stimulant) reliably suppresses overnight HRV by 15-25ms. Factor this into readiness interpretation." : null,
-    veloCountToday:   veloCount,
-    veloNote:         veloCount >= 3 ? "High Velo nicotine use — can elevate RHR and fragment sleep if used late." : null,
+    medsToday,
     supplementsTaken,
     supplementsMissed,
-    magnesiumMissed:  supplementsMissed.some(s => s.name.toLowerCase().includes("magnesium")),
-    magnesiumNote:    supplementsMissed.some(s => s.name.toLowerCase().includes("magnesium")) && health?.deep_min != null && health.deep_min < 60
-      ? "Magnesium glycinate missed — directly supports deep sleep stages. This likely explains reduced deep sleep."
-      : null,
     yesterdayWorkout: yesterdayWorkoutSummary,
     yesterdaySplit:   yesterdaySplitDay,
     yesterdayNote:    yesterdaySplitDay
@@ -329,22 +337,34 @@ export async function buildContext(userId: string) {
     }
   }
 
-  // ── Concerta → workout performance ────────────────────────────────────
+  // ── Generic per-medication → workout volume effect ────────────────────
+  // No hardcoded substance — computes the volume delta for every medication_type
+  // that has ≥3 sessions on/off in the 21-day window, with ≥15% spread.
   const medLogs21 = (medLogs21dRes.data ?? []) as Array<{ medication_type: string; log_date: string }>;
-  const concertaDates = new Set(medLogs21.filter((m) => m.medication_type === "concerta").map((m) => m.log_date));
-  const concertaWorkouts:    number[] = [];
-  const noConcertaWorkouts:  number[] = [];
-  for (const [date, ds] of sessionsByDate) {
-    if (concertaDates.has(date)) concertaWorkouts.push(ds.volume);
-    else noConcertaWorkouts.push(ds.volume);
+  const datesByMed = new Map<string, Set<string>>();
+  for (const m of medLogs21) {
+    if (!m.medication_type) continue;
+    const set = datesByMed.get(m.medication_type) ?? new Set();
+    set.add(m.log_date);
+    datesByMed.set(m.medication_type, set);
   }
-  let concertaEffect: string | null = null;
-  if (concertaWorkouts.length >= 3 && noConcertaWorkouts.length >= 3) {
-    const onAvg  = Math.round(avg(concertaWorkouts));
-    const offAvg = Math.round(avg(noConcertaWorkouts));
-    const pct    = offAvg > 0 ? Math.round(((onAvg - offAvg) / offAvg) * 100) : 0;
-    if (Math.abs(pct) >= 15) {
-      concertaEffect = `Concerta days: ${onAvg.toLocaleString()}kg avg session volume vs ${offAvg.toLocaleString()}kg off-Concerta (${pct > 0 ? "+" : ""}${pct}%)`;
+  const medicationEffects: string[] = [];
+  for (const [medType, takenDates] of datesByMed) {
+    const sessionsOn:  number[] = [];
+    const sessionsOff: number[] = [];
+    for (const [date, ds] of sessionsByDate) {
+      if (takenDates.has(date)) sessionsOn.push(ds.volume);
+      else sessionsOff.push(ds.volume);
+    }
+    if (sessionsOn.length >= 3 && sessionsOff.length >= 3) {
+      const onAvg  = Math.round(avg(sessionsOn));
+      const offAvg = Math.round(avg(sessionsOff));
+      const pct    = offAvg > 0 ? Math.round(((onAvg - offAvg) / offAvg) * 100) : 0;
+      if (Math.abs(pct) >= 15) {
+        medicationEffects.push(
+          `${medType}: ${onAvg.toLocaleString()}kg avg session volume on days taken vs ${offAvg.toLocaleString()}kg off (${pct > 0 ? "+" : ""}${pct}%, ${sessionsOn.length + sessionsOff.length} sessions)`
+        );
+      }
     }
   }
 
@@ -392,7 +412,7 @@ export async function buildContext(userId: string) {
     recoveryEffect,
     sleepEffect,
     supplementEffects,
-    concertaEffect,
+    medicationEffects,
     prsThisWeek,
     stalled,
     sessionsIn21d: sessionsByDate.size,

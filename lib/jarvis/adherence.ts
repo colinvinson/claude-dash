@@ -47,7 +47,7 @@ const MAX_STREAK_DAYS = 1825;
 
 function statsFor(item: StackRow, loggedDates: Set<string>, today: Date): ItemStats {
   // Streak — walk back from yesterday until a scheduled day is missed.
-  // No artificial 60/90-day cap: a 2-year Concerta streak deserves to be seen.
+  // No artificial 60/90-day cap: a multi-year streak deserves to be seen.
   let streak = 0;
   for (let i = 1; i <= MAX_STREAK_DAYS; i++) {
     const d = new Date(today);

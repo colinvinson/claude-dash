@@ -50,11 +50,6 @@ export const LOG_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "log_concerta",
-    description: "Mark Concerta as taken today.",
-    input_schema: { type: "object", properties: {} },
-  },
-  {
     name: "log_protein",
     description: "Log a protein entry (just the grams, like a manual entry). Use when user reports a meal.",
     input_schema: {
@@ -478,13 +473,6 @@ export async function executeTool(
           user_id: userId, log_date: today, duration_min: min,
         });
         return { ok: true, message: `Logged ${min}min meditation` };
-      }
-
-      case "log_concerta": {
-        await supabase.from("medication_logs").insert({
-          user_id: userId, medication_type: "concerta", log_date: today, taken_at: new Date().toISOString(),
-        });
-        return { ok: true, message: "Concerta logged" };
       }
 
       case "log_protein": {

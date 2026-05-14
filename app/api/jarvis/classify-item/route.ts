@@ -20,7 +20,7 @@ type Classification = {
 const SYSTEM = `You classify single-line routine items in a personal performance app into one of seven categories. Be decisive and concise.
 
 Categories:
-- supplement   — vitamins, minerals, nootropics, adaptogens, fish oil, magnesium, creatine, etc.
+- supplement   — vitamins, minerals, nootropics, adaptogens, fish oil, etc.
 - medication   — prescriptions, OTC drugs, hormones, peptides taken orally/sublingually
 - injection    — anything injected (insulin, GLP-1s, TRT, peptides via syringe)
 - skincare     — topical products (sunscreen, retinoid, moisturizer, serum, cleanser)
@@ -37,9 +37,9 @@ Return STRICT JSON:
   "notes": "<short, useful, optional>" or null
 }
 
-Examples:
-- "Magnesium Glycinate"            → category: supplement, duration_min: null, timing_bucket: Pre-bed, suggested_time: "22:00", notes: "400mg ~1h before sleep"
-- "Concerta"                       → category: medication, duration_min: null, timing_bucket: Morning, suggested_time: "07:00", notes: null
+Examples (illustrative — do NOT assume the user is on any of these):
+- "Creatine monohydrate"           → category: supplement, duration_min: null, timing_bucket: Morning, suggested_time: "08:00", notes: "5g daily, timing doesn't matter much"
+- "Levothyroxine"                  → category: medication, duration_min: null, timing_bucket: Morning, suggested_time: "06:30", notes: "empty stomach, 30 min before food"
 - "Morning sunlight"               → category: habit, duration_min: 10, timing_bucket: Morning, suggested_time: "07:15", notes: "within 30 min of waking"
 - "Yoga"                           → category: exercise, duration_min: 30, timing_bucket: Morning, suggested_time: "08:15", notes: null
 - "Blue light glasses"             → category: habit, duration_min: 60, timing_bucket: Pre-bed, suggested_time: "21:30", notes: "1h before bed"

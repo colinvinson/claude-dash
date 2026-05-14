@@ -68,18 +68,9 @@ export async function POST() {
     { user_id: user.id, name: "Clever Fit" },
   ]);
 
-  // Supplement stack
-  await service.from("supplement_stack").insert([
-    { user_id: user.id, name: "Caffeine",           dose: "coffee or monster",    timing: "Morning", notes: "Cutoff 12 PM",                                           sort_order: 1 },
-    { user_id: user.id, name: "L-theanine",          dose: "100–200mg",            timing: "Morning", notes: "Take WITH the caffeine — same drink, same minute",        sort_order: 2 },
-    { user_id: user.id, name: "Concerta 18mg",       dose: "1 capsule",            timing: "Morning", notes: "After breakfast / with food",                             sort_order: 3 },
-    { user_id: user.id, name: "Vitamin C",           dose: "500mg–1g",             timing: "Morning", notes: "With breakfast",                                          sort_order: 4 },
-    { user_id: user.id, name: "Omega-3",             dose: "2–3g EPA+DHA",         timing: "Lunch",   notes: "Needs fat to absorb — biggest meal of the day",           sort_order: 5 },
-    { user_id: user.id, name: "Creatine",            dose: "5g Monohydrate",       timing: "Lunch",   notes: "Timing doesn't matter, just be consistent",               sort_order: 6 },
-    { user_id: user.id, name: "Zinc",                dose: "15–30mg",              timing: "Evening", notes: "With small snack — keep +2hrs from magnesium",            sort_order: 7 },
-    { user_id: user.id, name: "Ashwagandha",         dose: "300–600mg",            timing: "Evening", notes: "At night — calms cortisol before bed",                   sort_order: 8 },
-    { user_id: user.id, name: "Magnesium glycinate", dose: "300–400mg",            timing: "Evening", notes: "30–60 min before bed — sleep helper",                    sort_order: 9 },
-  ]);
+  // Supplement stack — intentionally empty by default. Sir adds his actual stack
+  // from Settings or via the Schedule "+ Add" sheet (with AI classification).
+  // Pre-seeding specific items was creating phantom adherence + algorithmic bias.
 
   // Exercise library (gym_id: null = available at any gym)
   await service.from("exercises").insert(EXERCISE_LIBRARY.map((e) => ({ ...e, user_id: user.id })));

@@ -38,9 +38,9 @@ export type DaySnapshot = {
   prayed:           0 | 1 | null;
   bible_min:        number | null;
   church:           0 | 1 | null;
-  // meds
-  concerta:         0 | 1 | null;
-  velo_count:       number | null;
+  // meds — generic per-medication-type counts emitted as `med_<type>` keys
+  // (filled in via dynamic indexer below — see slug rules in row builder).
+  [medCountKey: `med_${string}`]: number | null;
   // training
   workout_volume_kg: number | null;
   workout_sets:      number | null;
@@ -113,11 +113,17 @@ export async function buildDailySnapshot(
     suppLogsBySupp.get(log.supplement_id)?.add(log.log_date);
   }
 
-  const concertaDates = new Set<string>();
-  const veloByDate = new Map<string, number>();
+  // Generic per-medication-type count per day. No hardcoded substance names —
+  // whatever medication_types are actually logged in the window become columns.
+  // Schema: medCountsByDate.get(date)?.get(medType) → count for that day.
+  const medCountsByDate = new Map<string, Map<string, number>>();
+  const allMedTypes = new Set<string>();
   for (const log of ((medLogsRes.data ?? []) as Array<{ medication_type: string; log_date: string }>)) {
-    if (log.medication_type === "concerta") concertaDates.add(log.log_date);
-    if (log.medication_type === "velo") veloByDate.set(log.log_date, (veloByDate.get(log.log_date) ?? 0) + 1);
+    if (!log.medication_type) continue;
+    allMedTypes.add(log.medication_type);
+    const dayMap = medCountsByDate.get(log.log_date) ?? new Map<string, number>();
+    dayMap.set(log.medication_type, (dayMap.get(log.medication_type) ?? 0) + 1);
+    medCountsByDate.set(log.log_date, dayMap);
   }
 
   const waterByDate = new Map<string, number>();
@@ -218,8 +224,7 @@ export async function buildDailySnapshot(
       prayed:           faith != null ? (faith.prayed ? 1 : 0) : null,
       bible_min:        faith?.bible_min                  ?? null,
       church:           faith != null ? (faith.church ? 1 : 0) : null,
-      concerta:         concertaDates.has(date) ? 1 : 0,
-      velo_count:       veloByDate.get(date) ?? 0,
+      // med_<type> columns get filled below — keeps row literal narrow
       workout_volume_kg: setsForDay.length > 0 ? Math.round(setVolume) : null,
       workout_sets:      setsForDay.length > 0 ? setsForDay.length      : null,
       workout_avg_rpe:   rpeVals.length > 0    ? Math.round(rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length * 10) / 10 : null,
@@ -240,6 +245,14 @@ export async function buildDailySnapshot(
       const key = `supp_${slug(supp.name)}` as const;
       const takenDates = suppLogsBySupp.get(supp.id);
       row[key] = takenDates && takenDates.has(date) ? 1 : 0;
+    }
+
+    // Per-medication-type count for this date. Whatever Sir has logged in the
+    // window becomes a column (`med_<slug>`). Days with no log → 0.
+    const dayMeds = medCountsByDate.get(date);
+    for (const medType of allMedTypes) {
+      const key = `med_${slug(medType)}` as const;
+      row[key] = dayMeds?.get(medType) ?? 0;
     }
 
     return row;

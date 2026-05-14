@@ -73,7 +73,7 @@ export default function GoalTemplatesEditor() {
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Take Concerta"
+          placeholder="e.g. Drink 2L water"
           onKeyDown={(e) => e.key === "Enter" && add()}
           className="flex-1 bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
         />

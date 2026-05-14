@@ -134,7 +134,7 @@ export default function AddScheduleItem({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Morning sunlight, Yoga, Magnesium, …"
+            placeholder="Morning sunlight, Yoga, …"
             className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
             autoFocus
           />
