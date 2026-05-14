@@ -119,12 +119,13 @@ export const LOG_TOOLS: Anthropic.Tool[] = [
 export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
   {
     name: "remember_fact",
-    description: "Persist a durable fact about Sir (preferences, skills, goals, context) so you can recall it in future conversations.",
+    description: "Persist a durable fact about Sir (preferences, skills, goals, context, relationships, locations, routines, plans, constraints). Call this whenever Sir says anything durable — no permission needed, no waiting for him to say 'remember this'. If the new fact contradicts an existing one (e.g. he switched gyms, ended a relationship, changed his program), pass the IDs of the stale facts in `supersede_ids` so they get marked as historical without polluting current context.",
     input_schema: {
       type: "object" as const,
       properties: {
         fact: { type: "string", description: "A concise factual statement, e.g. 'Sir prefers morning lifts at Les Roches gym.'" },
         confidence: { type: "number", description: "0-1, how sure you are. Default 0.8." },
+        supersede_ids: { type: "array", items: { type: "string" }, description: "Optional. IDs of existing facts this one replaces (obtained via prior recall_facts). The old facts stay in the DB for history but stop appearing in Sir's active memory." },
       },
       required: ["fact"],
     },
@@ -543,17 +544,35 @@ export async function executeTool(
         const fact = String(input.fact ?? "").trim();
         if (!fact) return { ok: false, error: "Empty fact" };
         const confidence = Number(input.confidence ?? 0.8);
+        const supersedeIds = Array.isArray(input.supersede_ids) ? (input.supersede_ids as string[]) : [];
+
+        // Dedupe against ACTIVE facts only (don't reinforce a superseded fact).
         const { data: existing } = await supabase
-          .from("jarvis_facts").select("id, confidence").eq("user_id", userId).eq("fact", fact).maybeSingle();
+          .from("jarvis_facts").select("id, confidence")
+          .eq("user_id", userId).eq("fact", fact).is("superseded_at", null).maybeSingle();
         if (existing) {
           const newConf = Math.min(1, Number(existing.confidence) + 0.1);
           await supabase.from("jarvis_facts")
             .update({ confidence: newConf, last_referenced_at: new Date().toISOString() })
             .eq("id", existing.id);
-          return { ok: true, message: `Reinforced: "${fact.slice(0, 60)}"` };
+          if (supersedeIds.length > 0) {
+            await supabase.from("jarvis_facts")
+              .update({ superseded_at: new Date().toISOString(), superseded_by: existing.id })
+              .in("id", supersedeIds);
+          }
+          return { ok: true, message: `Reinforced: "${fact.slice(0, 60)}"${supersedeIds.length > 0 ? ` (superseded ${supersedeIds.length})` : ""}` };
         }
-        await supabase.from("jarvis_facts").insert({ user_id: userId, fact, source: "chat", confidence });
-        return { ok: true, message: `Remembered: "${fact.slice(0, 60)}"` };
+        const { data: inserted } = await supabase
+          .from("jarvis_facts")
+          .insert({ user_id: userId, fact, source: "chat", confidence })
+          .select("id")
+          .single();
+        if (inserted && supersedeIds.length > 0) {
+          await supabase.from("jarvis_facts")
+            .update({ superseded_at: new Date().toISOString(), superseded_by: (inserted as { id: string }).id })
+            .in("id", supersedeIds);
+        }
+        return { ok: true, message: `Remembered: "${fact.slice(0, 60)}"${supersedeIds.length > 0 ? ` (superseded ${supersedeIds.length})` : ""}` };
       }
 
       case "recall_facts": {
@@ -562,13 +581,15 @@ export async function executeTool(
         const escaped = query.replace(/[%_]/g, (m) => `\\${m}`);
         const { data: facts } = await supabase
           .from("jarvis_facts")
-          .select("fact, confidence")
+          .select("id, fact, confidence")
           .eq("user_id", userId)
+          .is("superseded_at", null)
           .ilike("fact", `%${escaped}%`)
           .order("confidence", { ascending: false })
           .limit(10);
         if (!facts || facts.length === 0) return { ok: true, message: `No facts matching "${query}"` };
-        return { ok: true, message: facts.map((f) => `• ${f.fact}`).join("\n") };
+        // Include the IDs in the output so Jarvis can pass them as supersede_ids on a follow-up remember_fact call.
+        return { ok: true, message: facts.map((f) => `• [${f.id}] ${f.fact}`).join("\n") };
       }
 
       case "open_url": {

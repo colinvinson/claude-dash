@@ -24,6 +24,7 @@ import WeeklyReviewCard from "@/components/home/WeeklyReviewCard";
 import WelcomeCard from "@/components/home/WelcomeCard";
 import StreakCelebration from "@/components/home/StreakCelebration";
 import RightNowCard from "@/components/home/RightNowCard";
+import StreakForgivenessCard from "@/components/home/StreakForgivenessCard";
 
 export default function HomePage() {
   const { goals, streak, toggleGoal } = useGoals();
@@ -102,6 +103,7 @@ export default function HomePage() {
       {/* ADHD-optimized "Right Now" widget — one action, one tap. Sits ABOVE
           everything else so decision fatigue is killed before it starts. */}
       <div className="anim-fade-up"><RightNowCard /></div>
+      <div className="anim-fade-up"><StreakForgivenessCard /></div>
 
       <div className="anim-fade-up stagger-1"><MorningBriefing /></div>
       <div className="anim-fade-up stagger-2"><WeeklyReviewCard /></div>
