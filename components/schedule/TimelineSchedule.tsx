@@ -34,10 +34,14 @@ const BUCKET_FALLBACK_TIME: Record<string, string> = {
   "night":       "22:30",
 };
 
-function effectiveTime(item: StackItem): string {
-  if (item.scheduled_at) return item.scheduled_at.slice(0, 5); // "HH:MM"
+// Returns "HH:MM" when the item has any time anchor (specific clock time OR a
+// recognized timing bucket). Returns null when the item is truly untimed —
+// those render in the "Anytime" section below the timeline.
+function effectiveTime(item: StackItem): string | null {
+  if (item.scheduled_at) return item.scheduled_at.slice(0, 5);
   const key = (item.timing ?? "").trim().toLowerCase();
-  return BUCKET_FALLBACK_TIME[key] ?? "12:00";
+  if (key && BUCKET_FALLBACK_TIME[key]) return BUCKET_FALLBACK_TIME[key];
+  return null;
 }
 
 function formatTimeRange(start: string, durationMin: number | null): string {
@@ -88,7 +92,7 @@ function TimelineRow({
   isLast: boolean;
   onToggle: () => void;
 }) {
-  const start = effectiveTime(item);
+  const start = effectiveTime(item) ?? "12:00";  // TimelineRow only called for timed items
   const range = formatTimeRange(start, item.duration_min);
   const { Icon, color } = styleFor(item);
   const recurring = true; // every supplement_stack item is recurring daily by definition
@@ -177,6 +181,59 @@ function TimelineRow({
   );
 }
 
+function UntimedRow({
+  item,
+  insight,
+  onToggle,
+}: {
+  item: StackItem;
+  insight?: StackInsight;
+  onToggle: () => void;
+}) {
+  const { Icon, color } = styleFor(item);
+  const circleStyle = { background: `${color}22`, border: `1px solid ${color}55` };
+  const checkboxStyle = item.taken
+    ? { background: color, borderColor: color }
+    : { borderColor: color };
+
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-[#1f1f1f]/60 last:border-0 group">
+      <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={circleStyle}>
+        <Icon size={15} style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          {insight && insight.streak >= 2 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-orange-400 tabular-nums">
+              <Flame size={10} /> {insight.streak}
+              {insight.longestStreak > insight.streak && <span className="text-zinc-600"> / {insight.longestStreak}</span>}
+            </span>
+          )}
+          {insight && insight.expected7d > 0 && (
+            <span className="text-[10px] text-zinc-600 tabular-nums">{insight.done7d}/{insight.expected7d} this wk</span>
+          )}
+        </div>
+        <div className={`text-sm font-semibold truncate ${item.taken ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
+          {item.name}
+        </div>
+        {item.dose && <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{item.dose}</div>}
+      </div>
+      <button
+        onClick={onToggle}
+        aria-label={item.taken ? "Mark not done" : "Mark done"}
+        className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
+        style={checkboxStyle}
+      >
+        {item.taken && (
+          <svg viewBox="0 0 10 8" className="w-3 h-2.5" fill="none" stroke="white" strokeWidth="2">
+            <path d="M1 4l2.5 2.5L9 1" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function TimelineSchedule({
   items,
   insights,
@@ -186,20 +243,25 @@ export default function TimelineSchedule({
   insights?: Record<string, StackInsight>;
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
 }) {
-  // Sort by effective time; stable on sort_order within the same minute.
-  const ordered = useMemo(() => {
-    return [...items].sort((a, b) => {
-      const at = effectiveTime(a);
-      const bt = effectiveTime(b);
-      if (at !== bt) return at.localeCompare(bt);
-      return a.sort_order - b.sort_order;
-    });
+  // Split: items with an effective time render on the timeline; items with no
+  // time anchor at all render in a flat "Anytime" cluster below.
+  const { timed, untimed } = useMemo(() => {
+    const timed: Array<{ item: StackItem; t: string }>   = [];
+    const untimed: StackItem[]                            = [];
+    for (const item of items) {
+      const t = effectiveTime(item);
+      if (t) timed.push({ item, t });
+      else   untimed.push(item);
+    }
+    timed.sort((a, b) => a.t !== b.t ? a.t.localeCompare(b.t) : a.item.sort_order - b.item.sort_order);
+    untimed.sort((a, b) => a.sort_order - b.sort_order);
+    return { timed, untimed };
   }, [items]);
 
-  if (ordered.length === 0) {
+  if (timed.length === 0 && untimed.length === 0) {
     return (
       <p className="text-xs text-zinc-500 py-6 text-center">
-        No scheduled items yet. Add routines in Settings.
+        No items yet. Tap + Add to start.
       </p>
     );
   }
@@ -208,8 +270,7 @@ export default function TimelineSchedule({
   let prevTime = "";
   return (
     <div className="flex flex-col">
-      {ordered.map((item, i) => {
-        const t = effectiveTime(item);
+      {timed.map(({ item, t }, i) => {
         const showGutterTime = t !== prevTime;
         prevTime = t;
         return (
@@ -219,11 +280,25 @@ export default function TimelineSchedule({
             insight={insights?.[item.id]}
             showGutterTime={showGutterTime}
             isFirst={i === 0}
-            isLast={i === ordered.length - 1}
+            isLast={i === timed.length - 1}
             onToggle={() => onToggle(item.id, item.taken, item.log_id)}
           />
         );
       })}
+
+      {untimed.length > 0 && (
+        <div className={timed.length > 0 ? "mt-4 pt-3 border-t border-[#1f1f1f]" : ""}>
+          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Anytime today</div>
+          {untimed.map((item) => (
+            <UntimedRow
+              key={item.id}
+              item={item}
+              insight={insights?.[item.id]}
+              onToggle={() => onToggle(item.id, item.taken, item.log_id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

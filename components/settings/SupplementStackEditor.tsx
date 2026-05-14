@@ -218,7 +218,7 @@ export default function SupplementStackEditor() {
           </div>
         </div>
         <div>
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Time (quick-pick or specific)</span>
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1">Time + duration (both optional)</span>
           <div className="flex gap-1.5 mb-2">
             {[
               { label: "Morning", value: "07:00" },

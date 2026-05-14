@@ -137,7 +137,9 @@ export function useStack() {
       name:         args.name.trim(),
       dose:         args.dose?.trim() || null,
       notes:        args.notes?.trim() || null,
-      timing:       args.timing ?? "Morning",
+      // timing / scheduled_at / duration_min are all OPTIONAL. Items without
+      // any time anchor render in the "Anytime" section of the Schedule tab.
+      timing:       args.timing ?? null,
       category:     args.category ?? "habit",
       scheduled_at: args.scheduled_at || null,
       duration_min: args.duration_min ?? null,

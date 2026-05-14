@@ -73,10 +73,10 @@ export default function AddScheduleItem({
         if (!res.ok) return;
         const c = (await res.json()) as Classification;
         setClassification(c);
-        // Apply suggestions only if the user hasn't already edited those fields
+        // Apply CATEGORY suggestion silently (only if still on default).
         setCategory((prev) => (prev === "habit" ? c.category : prev));
-        if (c.suggested_time && !time) setTime(c.suggested_time);
-        if (c.duration_min != null && !duration) setDuration(String(c.duration_min));
+        // Time + duration are EXPLICITLY OPTIONAL — Jarvis surfaces a suggestion
+        // chip the user can tap to apply, but never auto-fills the fields.
       } finally {
         setClassifying(false);
       }
@@ -99,7 +99,9 @@ export default function AddScheduleItem({
       name: name.trim(),
       dose: dose.trim(),
       notes: classification?.notes ?? undefined,
-      timing: classification?.timing_bucket ?? "Morning",
+      // Time, duration, AND timing bucket are all OPTIONAL. Untimed items
+      // render in the "Anytime" section of the Schedule tab.
+      timing: time ? (classification?.timing_bucket ?? undefined) : undefined,
       category,
       scheduled_at: time || null,
       duration_min: parsedDuration && !Number.isNaN(parsedDuration) ? parsedDuration : null,
@@ -180,10 +182,20 @@ export default function AddScheduleItem({
           </div>
         </div>
 
-        {/* Time + Duration */}
+        {/* Time + Duration — BOTH OPTIONAL. Untimed items show in "Anytime". */}
         <div className="mb-3">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5 block">Time</span>
-          {/* Quick-pick buckets — set canonical clock times. User can override below. */}
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">Time (optional)</span>
+            {time && (
+              <button
+                onClick={() => setTime("")}
+                className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {/* Quick-pick buckets — tap to set canonical clock times. */}
           <div className="flex gap-1.5 mb-2">
             {[
               { label: "Morning", value: "07:00" },
@@ -203,7 +215,7 @@ export default function AddScheduleItem({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific (optional)</span>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific time</span>
               <input
                 type="time"
                 value={time}
@@ -212,17 +224,32 @@ export default function AddScheduleItem({
               />
             </label>
             <label>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Duration (min)</span>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Duration (optional)</span>
               <input
                 type="number"
                 min={0}
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="0"
+                placeholder="min"
                 className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
               />
             </label>
           </div>
+          {/* Jarvis classifier suggestion chip — tap to apply, never auto-fills */}
+          {classification && (classification.suggested_time || classification.duration_min != null) && !time && (
+            <button
+              onClick={() => {
+                if (classification.suggested_time) setTime(classification.suggested_time);
+                if (classification.duration_min != null) setDuration(String(classification.duration_min));
+              }}
+              className="mt-2 w-full text-[10px] text-left px-2.5 py-1.5 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors text-zinc-400"
+            >
+              <Sparkles size={9} className="inline mr-1" />
+              Suggestion: {classification.suggested_time ?? "—"}
+              {classification.duration_min != null && ` · ${classification.duration_min} min`}
+              <span className="text-zinc-600"> · tap to apply</span>
+            </button>
+          )}
         </div>
 
         {/* Recurrence */}
