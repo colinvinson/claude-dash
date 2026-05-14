@@ -34,6 +34,19 @@ export async function POST(req: NextRequest) {
         body:     parsed.insight,
         severity: parsed.severity ?? "green",
       });
+      // Push notify on yellow/red severity — green is informational + skippable.
+      if (parsed.severity === "yellow" || parsed.severity === "red") {
+        try {
+          const { pushToUser } = await import("@/lib/jarvis/push");
+          await pushToUser(user.id, {
+            title: parsed.severity === "red" ? "Jarvis — action needed" : "Jarvis — heads up",
+            body:  parsed.insight.slice(0, 240),
+            tag:   "jarvis-insight",
+            renotify: true,
+            url:   "/home",
+          });
+        } catch { /* push not configured / no subs — silent */ }
+      }
     } catch { /* ignore parse errors */ }
   });
   tasks.push(insightTask);
