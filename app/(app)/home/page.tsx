@@ -8,6 +8,7 @@ import { useWorkout } from "@/hooks/useWorkout";
 import { useDailyContext } from "@/hooks/useDailyContext";
 import { useLog } from "@/hooks/useLog";
 import { useProtein } from "@/hooks/useProtein";
+import { useHealthBaselines } from "@/hooks/useHealthBaselines";
 import { computeDailyScore } from "@/lib/scoring";
 import Card from "@/components/ui/Card";
 import GoalTicker from "@/components/productivity/GoalTicker";
@@ -31,6 +32,7 @@ export default function HomePage() {
   const { hasCheckedIn } = useDailyContext();
   const { state: logState } = useLog();
   const { totalToday: proteinToday, target: proteinTarget, pctOfTarget: proteinPct } = useProtein();
+  const { baselines } = useHealthBaselines();
 
   const supplementsTaken = stackItems.filter((s) => s.taken).length;
   const supplementsTotal = stackItems.length;
@@ -41,6 +43,7 @@ export default function HomePage() {
     goalsComplete,
     goalsTotal: goals.length,
     readinessScore: health.readiness_score,
+    readinessBaseline: baselines.readiness_score ?? null,
     workoutDoneToday,
     supplementsTaken,
     supplementsTotal,

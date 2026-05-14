@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeDailyScore } from "@/lib/scoring";
+import { computeBaselines, formatBaselineDelta } from "@/lib/jarvis/baselines";
 import { computeRecoveryScore, computeSessionStrain } from "@/lib/fitness/recovery";
 import { buildDailySnapshot } from "@/lib/ai/snapshot-builder";
 
@@ -67,7 +68,8 @@ export async function buildContext(userId: string) {
     // Trend + correlation data
     supabase.from("health_logs").select("date, readiness_score, hrv, sleep_hours, deep_min").eq("user_id", userId).gte("date", dateDaysAgo(7)).order("date", { ascending: true }),
     supabase.from("supplement_logs").select("supplement_id, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
-    supabase.from("health_logs").select("date, deep_min, hrv, readiness_score, sleep_hours").eq("user_id", userId).gte("date", dateDaysAgo(14)).order("date", { ascending: true }),
+    // Extended to 30 days + full biometric set so we can compute personal baselines (mean/stddev) for z-score scoring.
+    supabase.from("health_logs").select("date, deep_min, hrv, readiness_score, sleep_hours, rhr, sleep_score, rem_min").eq("user_id", userId).gte("date", dateDaysAgo(30)).order("date", { ascending: true }),
     supabase.from("mood_logs").select("score, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(7)).order("log_date", { ascending: true }),
     supabase.from("goals").select("title, is_complete, goal_date").eq("user_id", userId).gte("goal_date", dateDaysAgo(7)),
     supabase.from("workout_sets").select("weight_kg, reps, rpe, logged_at").eq("user_id", userId).eq("log_date", today),
@@ -128,17 +130,47 @@ export async function buildContext(userId: string) {
     ? (yesterdaySets[0] as SetRow & { exercises: { split_day?: string } | null }).exercises?.split_day ?? null
     : null;
 
-  // Health biometrics section — only included when Oura data exists
+  // Personal baselines (30d rolling mean + stddev per biometric).
+  // Used by scoring (z-score readiness) and surfaced inline in the biometrics
+  // block so Jarvis can phrase responses relative to Sir's own norm.
+  const baselineRows = (health14dRes.data ?? []) as Array<{
+    readiness_score: number | null; hrv: number | null; rhr: number | null;
+    sleep_score: number | null; sleep_hours: number | null;
+    deep_min: number | null; rem_min: number | null;
+  }>;
+  const baselines = computeBaselines(baselineRows);
+
+  // Health biometrics section — only included when Oura data exists.
+  // Each metric carries (a) the absolute value, (b) a baseline-relative delta
+  // string when there's enough history to compute one.
   const biometrics = health ? {
     readiness: health.readiness_score != null
       ? `${health.readiness_score}/100 (${health.readiness_label ?? "—"})`
       : null,
+    readinessVsBaseline: health.readiness_score != null
+      ? formatBaselineDelta(health.readiness_score, baselines.readiness_score)
+      : null,
     hrv:          health.hrv     != null ? `${health.hrv}ms`     : null,
+    hrvVsBaseline: health.hrv != null
+      ? formatBaselineDelta(health.hrv, baselines.hrv, { unit: "ms" })
+      : null,
     rhr:          health.rhr     != null ? `${health.rhr}bpm`    : null,
+    rhrVsBaseline: health.rhr != null
+      ? formatBaselineDelta(health.rhr, baselines.rhr, { unit: "bpm", invert: true })
+      : null,
     sleep:        health.sleep_score  != null ? `${health.sleep_score}/100` : null,
+    sleepVsBaseline: health.sleep_score != null
+      ? formatBaselineDelta(health.sleep_score, baselines.sleep_score)
+      : null,
     sleepHours:   health.sleep_hours  != null ? `${health.sleep_hours}h`   : null,
+    sleepHoursVsBaseline: health.sleep_hours != null
+      ? formatBaselineDelta(health.sleep_hours, baselines.sleep_hours, { unit: "h" })
+      : null,
     rem:          health.rem_min  != null ? `${health.rem_min}min`  : null,
     deep:         health.deep_min != null ? `${health.deep_min}min` : null,
+    deepVsBaseline: health.deep_min != null
+      ? formatBaselineDelta(health.deep_min, baselines.deep_min, { unit: "min" })
+      : null,
     activity:     health.activity_score != null ? `${health.activity_score}/100` : null,
     respRate:     health.resp_rate != null ? `${health.resp_rate}/min` : null,
     isFinal:      health.is_final,
@@ -159,9 +191,14 @@ export async function buildContext(userId: string) {
   };
 
   // ── Trend computation ──────────────────────────────────────────────────
-  type HealthRow = { date: string; readiness_score: number | null; hrv: number | null; sleep_hours: number | null; deep_min: number | null };
+  type HealthRow = {
+    date: string;
+    readiness_score: number | null; hrv: number | null;
+    sleep_hours: number | null; deep_min: number | null;
+    rhr?: number | null; sleep_score?: number | null; rem_min?: number | null;
+  };
   const h7d = (health7dRes.data ?? []) as HealthRow[];
-  const h14d = (health14dRes.data ?? []) as HealthRow[];
+  const h14d = (health14dRes.data ?? []) as HealthRow[];  // actually 30d after the recent extension
 
   const hrv7d       = h7d.map((r) => r.hrv);
   const ready7d     = h7d.map((r) => r.readiness_score);
@@ -500,6 +537,7 @@ export async function buildContext(userId: string) {
     goalsComplete,
     goalsTotal: goals.length,
     readinessScore: health?.readiness_score ?? null,
+    readinessBaseline: baselines.readiness_score ?? null,
     workoutDoneToday: sets.length > 0,
     supplementsTaken: suppsTaken,
     supplementsTotal: stack.length,

@@ -1,17 +1,21 @@
-// Daily score. Pre-rewrite this was a flat 100-point sum with hard-coded
-// weights and a free 12.5-point fallback for missing Oura data. That made
-// scores hard to interpret (was 75 a good day or a half-broken sensor?)
-// and ignored real signals like protein and routine adherence.
+// Daily score. Components self-EXCLUDE from both numerator and denominator
+// when their underlying data isn't available — no free credit, no false penalty.
+// Final score renormalizes to 0-100.
 //
-// New shape: each component reports {earned, max}; a component IS EXCLUDED
-// from BOTH the numerator and denominator when its underlying data isn't
-// available. The final score is renormalized to 0-100. No free credit for
-// missing data; no penalty for it either.
+// READINESS now uses personal-baseline normalization when a baseline is
+// available: today's value is mapped against the user's 30-day mean/stddev
+// rather than against an absolute 100-point scale. That makes a "great day for
+// you" earn full credit even when your absolute norm sits below population
+// average (or vice versa).
+
+import type { Baseline } from "@/lib/jarvis/baselines";
+import { zScoreToFactor } from "@/lib/jarvis/baselines";
 
 export type ScoreInputs = {
   goalsComplete: number;
   goalsTotal: number;
   readinessScore: number | null;          // Oura 0-100; null = no sync yet today
+  readinessBaseline?: Baseline | null;    // 30d personal baseline; null/missing → falls back to absolute /100
   workoutDoneToday: boolean;
   supplementsTaken: number;               // # routine items checked off today
   supplementsTotal: number;               // # routine items scheduled today
@@ -47,12 +51,14 @@ export function computeDailyScore(inputs: ScoreInputs): ScoreResult {
     });
   }
 
-  // Readiness — excluded when Oura hasn't synced. NO 12.5-point free credit anymore.
+  // Readiness — excluded when Oura hasn't synced. NO free credit for missing data.
+  // Prefers personal-baseline z-score mapping when we have ≥7 days of history;
+  // falls back to absolute /100 when the baseline isn't established yet.
   if (inputs.readinessScore != null) {
-    components.push({
-      earned: Math.max(0, Math.min(100, inputs.readinessScore)) / 100 * W.readiness,
-      max:    W.readiness,
-    });
+    const v = Math.max(0, Math.min(100, inputs.readinessScore));
+    const zFactor = inputs.readinessBaseline ? zScoreToFactor(v, inputs.readinessBaseline) : null;
+    const factor  = zFactor ?? (v / 100);
+    components.push({ earned: factor * W.readiness, max: W.readiness });
   }
 
   // Workout — binary, always counts. Lower weight than before so a rest day
