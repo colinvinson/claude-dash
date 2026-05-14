@@ -70,7 +70,7 @@ export function useJournal(opts?: { entryCategory?: JournalCategory; goalCategor
       if (!entryCategory || (data as JournalEntry).category === entryCategory) {
         setEntries((prev) => [data as JournalEntry, ...prev]);
       }
-      fetch("/api/overseer/parse-journal", {
+      fetch("/api/jarvis/parse-journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, entryId: data.id }),
@@ -98,7 +98,7 @@ export function useJournal(opts?: { entryCategory?: JournalCategory; goalCategor
       .single();
     if (data) {
       setLongTermGoals((prev) => [data as LongTermGoal, ...prev]);
-      fetch("/api/overseer/action-plan", {
+      fetch("/api/jarvis/action-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ goalId: data.id, title, category }),

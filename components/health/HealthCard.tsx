@@ -87,7 +87,7 @@ export default function HealthCard() {
             <p className="text-xs text-zinc-600">
               {r == null
                 ? "Oura data not synced yet. Data will appear here once your ring syncs after waking."
-                : "Today's call will appear once the Overseer analyzes your data."}
+                : "Today's call will appear once Jarvis analyzes your data."}
             </p>
           </div>
         )}

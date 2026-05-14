@@ -43,7 +43,7 @@ export async function POST() {
     max_tokens: 250,
     messages: [{
       role: "user",
-      content: `You are the Overseer writing this user's morning briefing.
+      content: `You are Jarvis writing this user's morning briefing.
 
 Write EXACTLY 3 sentences:
 1. State of recovery/sleep in concrete numbers (cite readiness, HRV, sleep hours).

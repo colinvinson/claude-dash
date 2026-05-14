@@ -7,7 +7,7 @@
 
 ## Core Objectives
 
-A personal performance OS — not a collection of trackers. Every data source (Oura ring, workouts, supplements, goals, mood, faith, journal) feeds a central AI brain (the Overseer) that reasons across all of them. ADHD-optimized: low cognitive load, quick logging, streak defense, priority-ordered UI.
+A personal performance OS — not a collection of trackers. Every data source (Oura ring, workouts, supplements, goals, mood, faith, journal) feeds a central AI brain (Jarvis) that reasons across all of them. ADHD-optimized: low cognitive load, quick logging, streak defense, priority-ordered UI.
 
 **Primary user:** single user (Colin), deployed as a PWA on iPhone + desktop.
 
@@ -30,7 +30,7 @@ A personal performance OS — not a collection of trackers. Every data source (O
 | Deployment | Vercel | — |
 
 **AI models in use:**
-- Chat (Overseer): `claude-sonnet-4-6` — streaming, 512 tokens max
+- Chat (Jarvis): `claude-sonnet-4-6` — streaming, 512 tokens max
 - Analysis / insights: `claude-haiku-4-5-20251001` — 200 tokens max
 - Journal parsing / action plans: `claude-haiku-4-5-20251001` — async, fire-and-forget
 
@@ -66,7 +66,7 @@ The `+` center button is NOT a route. `BottomNav.tsx` holds `useState<boolean>` 
 Old routes redirect:
 - `/main` → `/home`
 - `/life` → `/lifemax`
-- `/coach` → `/home` (Overseer is now a floating bubble on Home)
+- `/coach` → `/home` (Jarvis is now a floating bubble on Home)
 - `/health`, `/fitness`, `/finances` → respective new tabs
 - `/data?tab=health` → `/lifemax`, `/data?tab=fitness` → `/gym`, `/data?tab=finances` → `/business`
 
@@ -87,7 +87,7 @@ rowan-dashboard/
 │   │   ├── layout.tsx                  # App shell: TopHeader + BottomNav
 │   │   ├── home/page.tsx               # Daily score, CheckInCard, GoalTicker, DayRing
 │   │   ├── life/page.tsx               # Goals, LongTermGoalsCard, JournalCard
-│   │   ├── coach/page.tsx              # OverseerChat + insights strip
+│   │   ├── coach/page.tsx              # JarvisHUD + insights strip
 │   │   ├── data/page.tsx               # Sub-tab router (health/fitness/finances)
 │   │   ├── data/FinancesContent.tsx    # Finances content extracted as client component
 │   │   ├── main/page.tsx               # redirect → /home
@@ -97,8 +97,11 @@ rowan-dashboard/
 │   │   └── brand/page.tsx              # placeholder (empty)
 │   │
 │   └── api/
-│       ├── overseer/
-│       │   ├── chat/route.ts           # Streaming chat (Sonnet), saves to overseer_messages
+│       ├── jarvis/
+│       │   ├── chat/route.ts           # Streaming chat with prompt caching + native tool round-trip
+│       │   ├── tts/route.ts            # ElevenLabs proxy
+│       │   ├── briefing/route.ts       # Morning briefing (Haiku)
+│       │   ├── weekly-review/route.ts  # Sunday week-in-review letter (Sonnet)
 │       │   ├── analyze/route.ts        # Proactive insight + TodaysCall (Haiku)
 │       │   ├── parse-journal/route.ts  # AI summary for journal entries (Haiku)
 │       │   ├── action-plan/route.ts    # 3-step plan for long-term goals (Haiku)
@@ -143,9 +146,6 @@ rowan-dashboard/
 │   │   ├── VeloTracker.tsx             # Velo counter (capped at 5)
 │   │   └── TodaysCall.tsx              # AI health headline (green/yellow/red)
 │   │
-│   ├── overseer/
-│   │   └── OverseerChat.tsx            # Full-height flex chat (refactored from OverseerWidget)
-│   │
 │   ├── productivity/
 │   │   └── GoalTicker.tsx              # Scrollable today's goals
 │   │
@@ -162,8 +162,8 @@ rowan-dashboard/
 │   ├── useLog.ts           # Umbrella: water, meditation, alcohol, faith, mood, weight
 │   ├── useDailyContext.ts  # Morning check-in state
 │   ├── useJournal.ts       # Journal entries + long-term goals
-│   ├── useOverseer.ts      # Chat state, streaming, message history
-│   ├── useOverseerInsights.ts  # Last 5 insights + dismiss
+│   ├── (removed).ts      # Chat state, streaming, message history
+│   ├── (removed).ts  # Last 5 insights + dismiss
 │   ├── useMeditation.ts    # Meditation logs + streak
 │   ├── useMedications.ts   # Concerta/Velo log state
 │   └── useFinances.ts      # Subscriptions, budget, orders
@@ -171,7 +171,7 @@ rowan-dashboard/
 ├── lib/
 │   ├── ai/
 │   │   ├── context-builder.ts  # Builds full JSON context for AI (22 parallel queries, recovery + strain + perf correlations)
-│   │   ├── snapshot-builder.ts # 21-day wide-format CSV — auto-discovery layer for the Overseer
+│   │   ├── snapshot-builder.ts # 21-day wide-format CSV — auto-discovery layer for Jarvis
 │   │   └── prompts.ts          # buildSystemPrompt, buildAnalysisPrompt, buildTodaysCallPrompt
 │   ├── fitness/
 │   │   └── recovery.ts         # computeRecoveryScore, computeSessionStrain, muscleFatigue, adjustForRecovery — pure
@@ -222,8 +222,8 @@ rowan-dashboard/
 - `exercises` — exercise library (name, split_day, gym_id, muscle_group)
 - `workout_sets` — every set (weight_kg, reps, est_1rm, log_date, logged_at)
 - `meditation_logs` — duration_min, log_date
-- `overseer_messages` — chat history (role, content)
-- `overseer_insights` — proactive AI flags (insight, severity, dismissed_at)
+- `jarvis_messages` — chat history (role, content)
+- `jarvis_insights` — proactive AI flags (insight, severity, dismissed_at)
 - `subscriptions`, `budget_items`, `incoming_orders` — finances
 
 ### Redesign tables (0002)
@@ -259,7 +259,7 @@ Pure function, zero API cost. Runs client-side on Home page.
 - < 34 → red / "LOCK IN" | 34–66 → amber / "STEADY" | ≥ 67 → emerald / "CRUSHING IT"
 - Score sets `document.body.dataset.score` → triggers CSS radial gradient accent
 
-### Overseer Context (`lib/ai/context-builder.ts`)
+### Jarvis Context (`lib/ai/context-builder.ts`)
 Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes:
 - Today's snapshot: goals, supplements, medications, workouts, health, mood, faith, water, daily plan
 - **7-day trends**: HRV direction + declining streak, readiness direction, sleep avg, mood avg
@@ -267,13 +267,13 @@ Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes
 - **Goal patterns**: 7-day win rate, list of goals with <50% completion this week
 - **Recovery**: composite score (50% readiness + 30% HRV dev + 20% sleep), band, drivers, today's strain, hours since workout
 - **Performance correlations (21-day)**: readiness→volume %, sleep→reps gap, per-supplement→volume %, Concerta→volume %, PRs this week by exercise, stalled exercises by name
-- **Autonomous discovery layer (`lib/ai/snapshot-builder.ts`)**: 21-day wide-format CSV table — one row per date, one column per metric (health, supplements, meds, training, lifestyle, faith, goals, per-supplement booleans). Overseer scans for patterns NOT covered by pre-computed correlations. New metrics added to the app automatically become columns. **Used by both chat AND proactive analyze flow.**
+- **Autonomous discovery layer (`lib/ai/snapshot-builder.ts`)**: 21-day wide-format CSV table — one row per date, one column per metric (health, supplements, meds, training, lifestyle, faith, goals, per-supplement booleans). Jarvis scans for patterns NOT covered by pre-computed correlations. New metrics added to the app automatically become columns. **Used by both chat AND proactive analyze flow.**
 - **Anti-repeat memory**: context.recentInsights[] contains last 5 surfaced insights with hoursAgo. Analyze prompt explicitly avoids repeating the same insight within 24h — finds new angles or returns null.
 
 ### Proactive Surfacing
-- `components/layout/ProactiveCheck.tsx` lives in the (app) shell layout. On page mount, if last insight is > 90 min old, hits `/api/overseer/analyze`.
+- `components/layout/ProactiveCheck.tsx` lives in the (app) shell layout. On page mount, if last insight is > 90 min old, hits `/api/jarvis/analyze`.
 - Analyze runs Haiku with `buildAnalysisPrompt` — instructed to surface ONE insight that's either actionable OR a noteworthy pattern from the daily snapshot.
-- Inserts into `overseer_insights` table → surfaces as dismissible banner at top of every app page AND in Coach insights strip.
+- Inserts into `jarvis_insights` table → surfaces as dismissible banner at top of every app page AND in Coach insights strip.
 - Anti-repeat: AI sees its recent 5 insights and won't repeat them.
 
 ### Hypertrophy Coach (`hooks/useWorkout.ts` + `lib/fitness/recovery.ts`)
@@ -302,11 +302,11 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - 5-tab navigation with LogSheet overlay
 - Home page: daily score, check-in card, goal ticker, quick stats, day ring, streak alert
 - Life page: daily goals, long-term goals with AI action plans, journal with AI summaries
-- Coach page: full-height Overseer chat + insights history + context transparency
+- Coach page: full-height Jarvis chat + insights history + context transparency
 - Data page: health/fitness/finances sub-tabs
 - Health tab: Oura stats, meditation tracker, supplement stack, Concerta/Velo trackers
 - Fitness tab: pre-workout Ready screen, RecoveryStrainCard, ProgressiveOverloadCoach with auto-adjusted prescriptions + Force PR Mode, WeeklyVolumeCard with frequency
-- Overseer: trend-aware (7-day HRV/readiness/sleep/mood trends), supplement correlations, goal patterns, recovery + strain composite
+- Jarvis: trend-aware (7-day HRV/readiness/sleep/mood trends), supplement correlations, goal patterns, recovery + strain composite
 - Oura ring: auto-syncs on page load via PAT — fetches readiness, sleep, activity, **spo2, stress, resilience, vo2_max, workouts**
 - Whoop-style recovery scoring: 50% readiness + 30% HRV deviation + 20% sleep, banded into exceptional/primed/adequate/compromised/low
 - Protein logger (manual + photo + barcode) with AI vision scoring (0-100 for lean aesthetic muscle suitability); only protein persisted, score is metadata; daily target = weight × 2.0g/kg
@@ -316,7 +316,7 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - **Welcome card** auto-appears on Home when supplements + exercises + weight are all empty
 - **Morning briefing** — Haiku-generated 3-sentence brief, fires once per day on app open, stored in `morning_briefings`
 - **Weekly review** — Sonnet 4.6-generated letter, auto-fires Sunday after 8am, stored in `weekly_reviews`, shown as expandable card on Home
-- **Conversational goal completion** — Overseer chat now executes tool calls (log water, complete goal, log supplement, log protein, etc.) via Anthropic tool use. Tool results stream as ✓ chips above the assistant's text response.
+- **Conversational goal completion** — Jarvis chat now executes tool calls (log water, complete goal, log supplement, log protein, etc.) via Anthropic tool use. Tool results stream as ✓ chips above the assistant's text response.
 - **Goal templates** — recurring goals auto-populate daily goal list each morning via `goal_templates` table
 - 4-digit passcode auth flow (proxy.ts gates non-public paths)
 - Deployed on Vercel + accessible on iPhone as PWA (manifest, apple touch icon SVG, status bar styling)

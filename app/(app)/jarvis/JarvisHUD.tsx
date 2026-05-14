@@ -472,7 +472,7 @@ export default function JarvisHUD({ onClose }: { onClose: () => void }) {
   ];
 
   const diagnostics: string[] = [
-    `${timestamp} > overseer.context :: built ok`,
+    `${timestamp} > jarvis.context :: built ok`,
     `${timestamp} > supabase.realtime :: connected`,
     `${timestamp} > anthropic.sonnet :: handshake`,
     `${timestamp} > tools.registry :: ${17} loaded`,

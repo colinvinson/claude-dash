@@ -17,7 +17,7 @@ export default function ProactiveCheck() {
 
       // Check last insight time
       const { data } = await supabase
-        .from("overseer_insights")
+        .from("jarvis_insights")
         .select("triggered_at")
         .eq("user_id", user.id)
         .order("triggered_at", { ascending: false })
@@ -29,7 +29,7 @@ export default function ProactiveCheck() {
 
       if (!isStale) return;
 
-      const res  = await fetch("/api/overseer/analyze", { method: "POST" });
+      const res  = await fetch("/api/jarvis/analyze", { method: "POST" });
       const json = await res.json();
       if (json.insight) {
         setInsight(json.insight);

@@ -1,12 +1,12 @@
 // Daily snapshot builder — wide-format time-series for autonomous AI pattern detection.
 //
 // Each row in the returned snapshot is one calendar date with ALL tracked metrics.
-// The Overseer scans this for correlations we didn't hard-code.
+// The Jarvis scans this for correlations we didn't hard-code.
 //
 // TO ADD A NEW DAILY METRIC:
 //   1. Add a Supabase query to METRIC_QUERIES below (must be daily-keyed).
 //   2. Add a row mapper in buildDailySnapshot that pulls from the query result.
-//   3. That's it — the Overseer will pick it up automatically.
+//   3. That's it — Jarvis will pick it up automatically.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 

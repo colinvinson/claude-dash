@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (raw === "null" || !raw.startsWith("{")) return;
     try {
       const parsed = JSON.parse(raw) as { insight: string; severity: string };
-      await service.from("overseer_insights").insert({
+      await service.from("jarvis_insights").insert({
         user_id:  user.id,
         body:     parsed.insight,
         severity: parsed.severity ?? "green",
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   // Return the latest insight for the banner
   const { data: latestInsight } = await service
-    .from("overseer_insights")
+    .from("jarvis_insights")
     .select("body, severity")
     .eq("user_id", user.id)
     .order("triggered_at", { ascending: false })

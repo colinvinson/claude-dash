@@ -22,7 +22,7 @@ export default function JournalCard() {
     <Card>
       <div className="mb-4">
         <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Brain Dump</span>
-        <p className="text-[10px] text-zinc-600 mt-0.5">Goals, ideas, feelings, anything — Overseer reads this.</p>
+        <p className="text-[10px] text-zinc-600 mt-0.5">Goals, ideas, feelings, anything — Jarvis reads this.</p>
       </div>
 
       <textarea

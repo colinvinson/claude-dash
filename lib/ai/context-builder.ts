@@ -74,7 +74,7 @@ export async function buildContext(userId: string) {
     // Performance correlation data
     supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
     supabase.from("medication_logs").select("medication_type, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
-    supabase.from("overseer_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
+    supabase.from("jarvis_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
     supabase.from("protein_logs").select("protein_g, ai_score").eq("user_id", userId).eq("log_date", today),
     supabase.from("weight_logs").select("weight_kg").eq("user_id", userId).order("logged_at", { ascending: false }).limit(1),
   ]);
@@ -399,7 +399,7 @@ export async function buildContext(userId: string) {
   };
 
   // ── Autonomous discovery layer: 21-day daily snapshot as CSV table ────
-  // The Overseer scans this for correlations we didn't hard-code (including
+  // The Jarvis scans this for correlations we didn't hard-code (including
   // new metrics added later — they're auto-included via snapshot-builder).
   const snapshot = await buildDailySnapshot(supabase, userId, 21);
 

@@ -49,7 +49,7 @@ export function useWeeklyReview() {
       if (!isSunday || !isAfter8) { if (!cancelled) setLoading(false); return; }
 
       try {
-        const res = await fetch("/api/overseer/weekly-review", { method: "POST" });
+        const res = await fetch("/api/jarvis/weekly-review", { method: "POST" });
         if (!res.ok) throw new Error("generate failed");
         const data = await res.json() as { body: string; highlights: Highlights };
         if (!cancelled) {

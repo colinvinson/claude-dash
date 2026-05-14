@@ -134,7 +134,7 @@ export function useLog() {
       .single();
     // Fire AI parse async
     if (data?.id) {
-      fetch("/api/overseer/parse-journal", {
+      fetch("/api/jarvis/parse-journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text, entryId: data.id }),

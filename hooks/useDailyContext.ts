@@ -49,7 +49,7 @@ export function useDailyContext() {
       { onConflict: "user_id,log_date" }
     );
     // Fire AI parse async — don't await
-    fetch("/api/overseer/parse-daily-context", {
+    fetch("/api/jarvis/parse-daily-context", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contextText: rawText }),

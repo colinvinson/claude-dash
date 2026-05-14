@@ -64,7 +64,7 @@ export default function CheckInCard() {
   return (
     <Card style={{ border: "1px solid rgba(255,255,255,0.10)" }}>
       <p className="text-[13px] font-semibold text-zinc-200 mb-1">{greeting} What&apos;s the plan?</p>
-      <p className="text-[10px] text-zinc-500 mb-3 uppercase tracking-widest">Overseer will tailor your day around this</p>
+      <p className="text-[10px] text-zinc-500 mb-3 uppercase tracking-widest">Jarvis will tailor your day around this</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

@@ -39,7 +39,7 @@ Max 2 reminders. If nothing time-sensitive, return {"reminders": []}.`,
       const service = createServiceClient();
       await Promise.all(
         parsed.reminders.map((r) =>
-          service.from("overseer_insights").insert({
+          service.from("jarvis_insights").insert({
             user_id: user.id,
             body: r.text,
             severity: r.severity ?? "green",

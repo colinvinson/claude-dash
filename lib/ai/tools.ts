@@ -1,4 +1,4 @@
-// Tool definitions for the Overseer chat — Anthropic tool use schemas + server-side executors.
+// Tool definitions for Jarvis chat — Anthropic tool use schemas + server-side executors.
 // Each tool maps to ONE specific Supabase mutation, scoped to the authenticated user.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,7 +16,7 @@ function getLogDate() {
   return now.toISOString().split("T")[0];
 }
 
-export const OVERSEER_TOOLS: Anthropic.Tool[] = [
+export const LOG_TOOLS: Anthropic.Tool[] = [
   {
     name: "complete_goal",
     description: "Mark one of today's goals as complete. Use when the user reports finishing a goal in conversation.",
@@ -212,7 +212,7 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...OVERSEER_TOOLS, ...JARVIS_EXTRA_TOOLS];
+export const ALL_JARVIS_TOOLS: Anthropic.Tool[] = [...LOG_TOOLS, ...JARVIS_EXTRA_TOOLS];
 
 // ============================================================
 // CLIENT-EXECUTED tools — the server never runs these. When Claude

@@ -40,7 +40,7 @@ export async function POST() {
     max_tokens: 800,
     messages: [{
       role: "user",
-      content: `You are the Overseer writing this user's weekly review letter. You have access to a 21-day daily snapshot, performance correlations, and recovery trends in the context below.
+      content: `You are Jarvis writing this user's weekly review letter. You have access to a 21-day daily snapshot, performance correlations, and recovery trends in the context below.
 
 Write a 5-8 sentence letter covering:
 1. The week's training output — specific PRs by exercise name from performance.prsThisWeek, specific stalled lifts from performance.stalled, and overall volume trend

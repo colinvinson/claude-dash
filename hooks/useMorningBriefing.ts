@@ -44,7 +44,7 @@ export function useMorningBriefing() {
 
       // No briefing for today yet — generate one
       try {
-        const res = await fetch("/api/overseer/morning-briefing", { method: "POST" });
+        const res = await fetch("/api/jarvis/briefing", { method: "POST" });
         if (!res.ok) throw new Error("generate failed");
         const data = await res.json() as { body: string };
         if (!cancelled) {
