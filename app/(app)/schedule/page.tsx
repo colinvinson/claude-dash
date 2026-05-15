@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { useStack } from "@/hooks/useStack";
+import { useStack, type StackItem } from "@/hooks/useStack";
 import { useStackInsights } from "@/hooks/useStackInsights";
 import SectionLabel from "@/components/layout/SectionLabel";
 import Card from "@/components/ui/Card";
@@ -13,8 +13,9 @@ import AddScheduleItem from "@/components/schedule/AddScheduleItem";
 // no journal. Those live on their proper tabs (Home / Gym / Goals).
 
 export default function SchedulePage() {
-  const { items, toggle, createItem } = useStack();
+  const { items, toggle, createItem, updateItem, archiveItem } = useStack();
   const [addOpen, setAddOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<StackItem | null>(null);
 
   // Filter to today's day-of-week (recurrence support).
   const todayDow = new Date().getDay();
@@ -27,6 +28,14 @@ export default function SchedulePage() {
 
   const { insights } = useStackInsights(items);
   const doneCount = todayItems.filter((i) => i.taken).length;
+
+  // The sheet is reused for both add and edit. Whichever path opens it sets
+  // its own state — closing always resets editingItem.
+  const sheetOpen = addOpen || !!editingItem;
+  function closeSheet() {
+    setAddOpen(false);
+    setEditingItem(null);
+  }
 
   return (
     <div className="space-y-4">
@@ -41,18 +50,30 @@ export default function SchedulePage() {
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-zinc-600">{doneCount}/{todayItems.length} done · resets 6 AM</span>
               <button
-                onClick={() => setAddOpen(true)}
+                onClick={() => { setEditingItem(null); setAddOpen(true); }}
                 className="flex items-center gap-1 px-2 py-1 rounded-md bg-white text-zinc-900 text-[11px] font-semibold hover:opacity-90 transition-opacity"
               >
                 <Plus size={12} /> Add
               </button>
             </div>
           </div>
-          <TimelineSchedule items={todayItems} insights={insights} onToggle={toggle} />
+          <TimelineSchedule
+            items={todayItems}
+            insights={insights}
+            onToggle={toggle}
+            onEdit={(item) => { setAddOpen(false); setEditingItem(item); }}
+          />
         </Card>
       </div>
 
-      <AddScheduleItem open={addOpen} onClose={() => setAddOpen(false)} onCreate={createItem} />
+      <AddScheduleItem
+        open={sheetOpen}
+        onClose={closeSheet}
+        onCreate={createItem}
+        existingItem={editingItem}
+        onUpdate={updateItem}
+        onArchive={archiveItem}
+      />
     </div>
   );
 }

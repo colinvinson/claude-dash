@@ -87,6 +87,7 @@ function TimelineRow({
   isFirst,
   isLast,
   onToggle,
+  onEdit,
 }: {
   item: StackItem;
   insight?: StackInsight;
@@ -94,6 +95,7 @@ function TimelineRow({
   isFirst: boolean;
   isLast: boolean;
   onToggle: () => void;
+  onEdit?: () => void;
 }) {
   const start = effectiveTime(item) ?? "12:00";  // TimelineRow only called for timed items
   const range = formatTimeRange(start, item.duration_min);
@@ -133,7 +135,13 @@ function TimelineRow({
 
       {/* Content + checkbox */}
       <div className="flex-1 min-w-0 flex items-center gap-2 py-3 pl-2">
-        <div className="flex-1 min-w-0">
+        {/* Tapping the content area opens the edit sheet; the checkbox
+            (below) uses stopPropagation so it stays a toggle. */}
+        <button
+          onClick={onEdit}
+          className="flex-1 min-w-0 text-left"
+          aria-label="Edit item"
+        >
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-zinc-500 tabular-nums">{range}</span>
             {recurring && <Repeat size={11} className="text-zinc-600" />}
@@ -166,9 +174,9 @@ function TimelineRow({
           {item.dose && (
             <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{item.dose}</div>
           )}
-        </div>
+        </button>
         <button
-          onClick={onToggle}
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
           aria-label={item.taken ? "Mark not done" : "Mark done"}
           className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
           style={checkboxStyle}
@@ -188,10 +196,12 @@ function UntimedRow({
   item,
   insight,
   onToggle,
+  onEdit,
 }: {
   item: StackItem;
   insight?: StackInsight;
   onToggle: () => void;
+  onEdit?: () => void;
 }) {
   const { Icon, color } = styleFor(item);
   const circleStyle = { background: `${color}22`, border: `1px solid ${color}55` };
@@ -204,7 +214,11 @@ function UntimedRow({
       <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={circleStyle}>
         <Icon size={15} style={{ color }} />
       </div>
-      <div className="flex-1 min-w-0">
+      <button
+        onClick={onEdit}
+        className="flex-1 min-w-0 text-left"
+        aria-label="Edit item"
+      >
         <div className="flex items-center gap-1.5">
           {insight && insight.streak >= 2 && (
             <span className="flex items-center gap-0.5 text-[10px] text-orange-400 tabular-nums">
@@ -220,9 +234,9 @@ function UntimedRow({
           {item.name}
         </div>
         {item.dose && <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{item.dose}</div>}
-      </div>
+      </button>
       <button
-        onClick={onToggle}
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
         aria-label={item.taken ? "Mark not done" : "Mark done"}
         className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
         style={checkboxStyle}
@@ -241,10 +255,12 @@ export default function TimelineSchedule({
   items,
   insights,
   onToggle,
+  onEdit,
 }: {
   items: StackItem[];
   insights?: Record<string, StackInsight>;
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
+  onEdit?: (item: StackItem) => void;
 }) {
   // Split: items with an effective time render on the timeline; items with no
   // time anchor at all render in a flat "Anytime" cluster below.
@@ -285,6 +301,7 @@ export default function TimelineSchedule({
             isFirst={i === 0}
             isLast={i === timed.length - 1}
             onToggle={() => onToggle(item.id, item.taken, item.log_id)}
+            onEdit={onEdit ? () => onEdit(item) : undefined}
           />
         );
       })}
@@ -298,6 +315,7 @@ export default function TimelineSchedule({
               item={item}
               insight={insights?.[item.id]}
               onToggle={() => onToggle(item.id, item.taken, item.log_id)}
+              onEdit={onEdit ? () => onEdit(item) : undefined}
             />
           ))}
         </div>

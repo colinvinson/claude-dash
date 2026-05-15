@@ -129,6 +129,39 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, items]);
 
+  // Edit an existing stack item. Pass a partial — only the fields you provide
+  // get updated. Used by the Schedule sheet's edit mode.
+  const updateItem = useCallback(async (id: string, patch: Partial<CreateItemArgs>) => {
+    if (!userId) return false;
+    // Translate the CreateItemArgs-shaped patch to the actual column shape.
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined)           dbPatch.name           = patch.name.trim();
+    if (patch.dose !== undefined)           dbPatch.dose           = patch.dose?.trim() || null;
+    if (patch.notes !== undefined)          dbPatch.notes          = patch.notes?.trim() || null;
+    if (patch.timing !== undefined)         dbPatch.timing         = patch.timing ?? null;
+    if (patch.category !== undefined)       dbPatch.category       = patch.category ?? "habit";
+    if (patch.scheduled_at !== undefined)   dbPatch.scheduled_at   = patch.scheduled_at || null;
+    if (patch.duration_min !== undefined)   dbPatch.duration_min   = patch.duration_min ?? null;
+    if (patch.days_of_week !== undefined)   dbPatch.days_of_week   = patch.days_of_week ?? null;
+    if (patch.linked_goal_id !== undefined) dbPatch.linked_goal_id = patch.linked_goal_id ?? null;
+    if (Object.keys(dbPatch).length === 0) return true;
+    const { error } = await supabase.from("supplement_stack").update(dbPatch).eq("id", id);
+    if (error) return false;
+    await load();
+    return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Soft-delete: mark inactive instead of removing. Preserves historical logs.
+  const archiveItem = useCallback(async (id: string) => {
+    if (!userId) return false;
+    const { error } = await supabase.from("supplement_stack").update({ is_active: false }).eq("id", id);
+    if (error) return false;
+    await load();
+    return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
   // createItem — the richer add path used by the Schedule "+ Add" sheet.
   // If `category` is omitted, the caller is expected to have already classified
   // the item (via /api/jarvis/classify-item). We don't auto-classify here so
@@ -163,5 +196,5 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, items]);
 
-  return { items, loading, toggle, addToStack, createItem };
+  return { items, loading, toggle, addToStack, createItem, updateItem, archiveItem };
 }

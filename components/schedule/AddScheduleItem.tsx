@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Sparkles } from "lucide-react";
-import type { StackCategory, CreateItemArgs } from "@/hooks/useStack";
+import { X, Sparkles, Trash2 } from "lucide-react";
+import type { StackCategory, CreateItemArgs, StackItem } from "@/hooks/useStack";
 import { useLongTermGoals } from "@/hooks/useLongTermGoals";
 
 type Classification = {
@@ -35,15 +35,27 @@ function recurrenceToDays(r: Recurrence, specific: number[]): number[] | null {
   return specific.length === 0 ? null : [...specific].sort();
 }
 
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (args: CreateItemArgs) => Promise<string | null>;
+  // Edit-mode additions. When `existingItem` is set, the sheet switches from
+  // "Add to Schedule" to "Edit routine item" — fields pre-populate, submit
+  // routes to onUpdate, and an Archive button appears.
+  existingItem?: StackItem | null;
+  onUpdate?: (id: string, patch: Partial<CreateItemArgs>) => Promise<boolean>;
+  onArchive?: (id: string) => Promise<boolean>;
+};
+
 export default function AddScheduleItem({
   open,
   onClose,
   onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreate: (args: CreateItemArgs) => Promise<string | null>;
-}) {
+  existingItem,
+  onUpdate,
+  onArchive,
+}: Props) {
+  const isEdit = !!existingItem;
   const [name, setName]         = useState("");
   const [dose, setDose]         = useState("");
   const [bucket, setBucket]     = useState<string>("");   // "Morning" | "Day" | "Night" | ""
@@ -59,9 +71,38 @@ export default function AddScheduleItem({
   const classifyTimer = useRef<NodeJS.Timeout | null>(null);
   const { goals: allGoals } = useLongTermGoals();
 
-  // Auto-classify ~600ms after the user stops typing the name.
+  // When edit mode opens (or the target item changes), seed every input from
+  // the existing item. Resets on close are handled in the existing flow.
+  useEffect(() => {
+    if (!open) return;
+    if (existingItem) {
+      setName(existingItem.name);
+      setDose(existingItem.dose ?? "");
+      setBucket(existingItem.timing ?? "");
+      setTime(existingItem.scheduled_at ? existingItem.scheduled_at.slice(0, 5) : "");
+      setDuration(existingItem.duration_min != null ? String(existingItem.duration_min) : "");
+      setCategory((existingItem.category as StackCategory) ?? "habit");
+      setLinkedGoalId(existingItem.linked_goal_id ?? "");
+      // Recurrence reverse-mapping
+      const dow = existingItem.days_of_week;
+      if (!dow || dow.length === 0 || dow.length === 7) {
+        setRecurrence("daily"); setSpecificDays([]);
+      } else if (dow.length === 5 && [1,2,3,4,5].every((d) => dow.includes(d))) {
+        setRecurrence("weekdays"); setSpecificDays([]);
+      } else if (dow.length === 2 && [0,6].every((d) => dow.includes(d))) {
+        setRecurrence("weekends"); setSpecificDays([]);
+      } else {
+        setRecurrence("specific"); setSpecificDays([...dow]);
+      }
+      setClassification(null);
+    }
+  }, [open, existingItem]);
+
+  // Auto-classify ~600ms after the user stops typing the name. Skipped in
+  // edit mode — no point re-classifying an item the user already curated.
   useEffect(() => {
     if (classifyTimer.current) clearTimeout(classifyTimer.current);
+    if (isEdit) return;
     if (!name.trim() || name.trim().length < 3) {
       setClassification(null);
       return;
@@ -100,10 +141,10 @@ export default function AddScheduleItem({
     setSubmitting(true);
     const days = recurrenceToDays(recurrence, specificDays);
     const parsedDuration = duration ? parseInt(duration, 10) : null;
-    const id = await onCreate({
+    const payload: CreateItemArgs = {
       name: name.trim(),
       dose: dose.trim(),
-      notes: classification?.notes ?? undefined,
+      notes: isEdit ? undefined : (classification?.notes ?? undefined),
       // Bucket and specific time are INDEPENDENT. Both optional. If both null,
       // the item lands in "Anytime today" on the Schedule timeline.
       timing: bucket || undefined,
@@ -112,15 +153,31 @@ export default function AddScheduleItem({
       duration_min: parsedDuration && !Number.isNaN(parsedDuration) ? parsedDuration : null,
       days_of_week: days,
       linked_goal_id: linkedGoalId || null,
-    });
+    };
+
+    let ok: boolean;
+    if (isEdit && existingItem && onUpdate) {
+      ok = await onUpdate(existingItem.id, payload);
+    } else {
+      ok = !!(await onCreate(payload));
+    }
     setSubmitting(false);
-    if (id) {
+    if (ok) {
       setName(""); setDose(""); setBucket(""); setTime(""); setDuration("");
       setCategory("habit"); setRecurrence("daily"); setSpecificDays([]);
       setLinkedGoalId("");
       setClassification(null);
       onClose();
     }
+  }
+
+  async function archive() {
+    if (!existingItem || !onArchive) return;
+    if (!confirm(`Archive "${existingItem.name}"? It stops appearing on the schedule but historical logs are kept.`)) return;
+    setSubmitting(true);
+    const ok = await onArchive(existingItem.id);
+    setSubmitting(false);
+    if (ok) onClose();
   }
 
   if (!open) return null;
@@ -132,7 +189,7 @@ export default function AddScheduleItem({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-zinc-100">Add to Schedule</h2>
+          <h2 className="text-base font-semibold text-zinc-100">{isEdit ? "Edit routine item" : "Add to Schedule"}</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200"><X size={18} /></button>
         </div>
 
@@ -326,8 +383,19 @@ export default function AddScheduleItem({
           disabled={!name.trim() || submitting}
           className="w-full py-2.5 bg-white text-zinc-900 disabled:opacity-40 rounded-xl text-sm font-semibold transition-opacity"
         >
-          {submitting ? "Adding…" : "Add to Schedule"}
+          {submitting ? (isEdit ? "Saving…" : "Adding…") : (isEdit ? "Save changes" : "Add to Schedule")}
         </button>
+
+        {/* Archive — edit mode only. Keeps historical logs; hides from schedule. */}
+        {isEdit && (
+          <button
+            onClick={archive}
+            disabled={submitting}
+            className="w-full mt-2 py-2 flex items-center justify-center gap-1.5 text-zinc-500 hover:text-red-400 text-xs font-medium transition-colors disabled:opacity-40"
+          >
+            <Trash2 size={12} /> Archive this item
+          </button>
+        )}
       </div>
     </div>
   );
