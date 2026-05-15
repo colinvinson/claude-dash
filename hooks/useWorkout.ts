@@ -361,10 +361,16 @@ export function useWorkout() {
   const activeExercise    = exercises.find((e) => e.id === activeExId) ?? null;
 
   // ── Recovery + strain computation ─────────────────────────────────────
-  const todayHealth = health7d.find((h) => h.date === today) ?? health7d[health7d.length - 1] ?? null;
+  // ONLY use today's row. Previously this fell back to the last record in the
+  // 7-day window, which meant "no Oura data today" silently surfaced yesterday's
+  // recovery as if it were today's — misleading on days the ring hadn't synced.
+  const todayHealth = health7d.find((h) => h.date === today) ?? null;
   const hrv7d = health7d.map((h) => h.hrv).filter((v): v is number => v != null);
   const hrv7dAvg = hrv7d.length > 0 ? hrv7d.reduce((a, b) => a + b, 0) / hrv7d.length : null;
 
+  // computeRecoveryScore returns null when its inputs are all empty, so even
+  // a stale partial-row today (e.g. Oura inserted a row with no scores)
+  // correctly surfaces as "no data" instead of a fabricated 50.
   const recovery: RecoveryResult | null = todayHealth
     ? computeRecoveryScore(todayHealth, hrv7dAvg)
     : null;

@@ -25,9 +25,12 @@ const RESILIENCE_BONUS: Record<string, number> = {
   limited:    -5,
 };
 
-export function computeRecoveryScore(h: HealthSnapshot, hrv7dAvg: number | null): RecoveryResult {
-  // Weighted composite: 50% readiness, 30% HRV deviation, 20% sleep
-  // If readiness is null, fall back to HRV+sleep only (renormalize weights)
+// Returns null when there's no biometric data at all. The previous behavior
+// (a default score of 50, band "compromised") fabricated a recovery number out
+// of nothing — misleading on days Oura hasn't synced. Callers must handle null.
+export function computeRecoveryScore(h: HealthSnapshot, hrv7dAvg: number | null): RecoveryResult | null {
+  // Weighted composite: 50% readiness, 30% HRV deviation, 20% sleep.
+  // Whichever inputs are present get used — weights renormalize via weightTotal.
   const drivers: string[] = [];
 
   const ready = h.readiness_score;
@@ -63,7 +66,10 @@ export function computeRecoveryScore(h: HealthSnapshot, hrv7dAvg: number | null)
     if (h.sleep_hours != null && h.sleep_hours < 7) drivers.push(`Slept ${h.sleep_hours}h`);
   }
 
-  let score = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : 50;
+  // No inputs → no honest answer to give. Callers must handle null.
+  if (weightTotal === 0) return null;
+
+  let score = Math.round(weightedSum / weightTotal);
 
   // Resilience modifier (Oura's own recovery indicator)
   if (h.resilience_level && h.resilience_level in RESILIENCE_BONUS) {
