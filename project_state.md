@@ -130,7 +130,7 @@ rowan-dashboard/
 │   │   └── JournalCard.tsx             # Brain dump textarea + last 5 entries
 │   │
 │   ├── fitness/
-│   │   ├── ProgressiveOverloadCoach.tsx  # Full workout tracking UI with RPE + auto-adjustment + Ready screen
+│   │   ├── ProgressiveOverloadCoach.tsx  # Full workout tracking UI + per-set intensity protocol + warmups + auto-adjustment + Ready screen
 │   │   ├── RecoveryStrainCard.tsx        # Whoop-style recovery dial + strain ring + drivers list
 │   │   └── WeeklyVolumeCard.tsx          # 10 muscle groups vs. MEV–MRV targets + freq/wk
 │   │
@@ -155,7 +155,7 @@ rowan-dashboard/
 │       └── ...                         # other primitives
 │
 ├── hooks/
-│   ├── useWorkout.ts       # Exercises, sets, RPE, weekly volume, coaching verdict
+│   ├── useWorkout.ts       # Exercises, sets, weekly volume, coaching verdict, per-set intensity protocol, warmups
 │   ├── useHealth.ts        # Oura data + auto-poll on mount if !is_final
 │   ├── useGoals.ts         # Daily goals, streak, push-to-tomorrow
 │   ├── useStack.ts         # Supplement stack + adherence
@@ -268,16 +268,19 @@ Runs before every AI call (chat + analyze). 22 parallel Supabase queries. Passes
 Double progression model:
 - Rep ranges by type: Compound 5–10, Secondary 8–12, Isolation 12–20
 - Hit top of range → add weight (2.5kg compound / 1.25kg isolation)
-- RPE-aware: stalling + RPE ≥9 → deload to 80%; stalling + RPE ≤7 → "push harder"
+- Per-set intensity protocol per exercise type + status: which sets are RIR-capped vs to failure vs extended past failure (lengthened partials / drop-sets / rest-pause / myo-reps). Recovery band gates intensity — compromised/low strips the extension techniques and floors RIR at 2.
+- Warmup sets scaled to working weight + exercise type: compounds get a 3-step ramp, secondaries 2, isolations 0–1.
+- RPE input is REMOVED from the coach — the per-set protocol replaces it. `workout_sets.rpe` column kept nullable (no migration), always written null.
 - Weekly volume targets (MEV–MRV) for 10 muscle groups, frequency tracking
 
 **Whoop-style recovery + auto-adjustment (RP-framework grounded):**
 - Recovery composite = 50% Oura readiness + 30% HRV deviation from 7d baseline + 20% sleep score (±5 from Oura resilience level)
 - Bands: exceptional (≥85), primed (≥70), adequate (≥55), compromised (≥40), low (<40)
-- Per-muscle fatigue: fresh (>72h), recovering (48–72h), fatigued (24–48h), deeply-fatigued (<24h + RPE 9+ + ≥6 hard sets)
-- Adjustment matrix (cuts VOLUME first, then RPE cap, then weight at extreme low recovery)
+- Per-muscle fatigue: fresh (>72h), recovering (48–72h), fatigued (24–48h), deeply-fatigued (<24h + ≥6 hard sets)
+- Adjustment matrix (cuts VOLUME first, then strips intensity techniques, then weight at extreme low recovery)
+- Chronic protein deficit (3+ of last 7 days under target) surfaces as a recovery DRIVER (not in score) and hedges the prescription
 - "Force PR Mode" toggle preserves user autonomy
-- Session strain (0–21, log scale) computed from today's sets × RPE multipliers
+- Session strain (0–21, log scale) computed from today's sets
 
 ### Oura Auto-Sync (`hooks/useHealth.ts`)
 On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST /api/oura/poll` silently. No manual trigger needed. Uses PAT stored in `OURA_PAT` env var.
@@ -298,8 +301,8 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Oura ring: auto-syncs on page load via PAT — fetches readiness, sleep, activity, **spo2, stress, resilience, vo2_max, workouts**
 - Whoop-style recovery scoring: 50% readiness + 30% HRV deviation + 20% sleep, banded into exceptional/primed/adequate/compromised/low
 - Protein logger (manual + photo + barcode) with AI vision scoring (0-100 for lean aesthetic muscle suitability); only protein persisted, score is metadata; daily target = weight × 2.0g/kg
-- Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h, RPE memory
-- Auto-adjusted lift prescriptions: weight × reps × sets × RPE cap modified based on recovery + muscle status (evidence-based, RP-style)
+- Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h
+- Auto-adjusted lift prescriptions: weight × reps × sets + per-set RIR/failure/extension protocol modified based on recovery + muscle status (evidence-based, RP-style)
 - **Settings page** at /settings (gear icon in TopHeader) — edit profile, supplements, exercises, gyms, recurring goal templates, sign out
 - **Welcome card** auto-appears on Home when supplements + exercises + weight are all empty
 - **Morning briefing** — Haiku-generated 3-sentence brief, fires once per day on app open, stored in `morning_briefings`
