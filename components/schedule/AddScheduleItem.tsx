@@ -269,10 +269,15 @@ export default function AddScheduleItem({
           </div>
           {/* Bucket pills — set the part of day, do NOT touch specific time. */}
           <div className="flex gap-1.5 mb-2">
-            {["Morning", "Day", "Night"].map((b) => (
+            {["Morning", "Day", "Night", "Anytime"].map((b) => (
               <button
                 key={b}
-                onClick={() => setBucket((prev) => prev === b ? "" : b)}
+                onClick={() => {
+                  setBucket((prev) => prev === b ? "" : b);
+                  // Picking "Anytime" is incompatible with a specific clock
+                  // time — clear it so the item lands cleanly in the Anytime cluster.
+                  if (b === "Anytime") setTime("");
+                }}
                 className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
                   bucket === b ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                 }`}
@@ -304,9 +309,10 @@ export default function AddScheduleItem({
             </label>
           </div>
           <p className="text-[10px] text-zinc-600 mt-1.5">
-            {bucket && !time && `Will render at ${bucket === "Morning" ? "~7am" : bucket === "Day" ? "~1pm" : "~9pm"}. Skip both for "anytime today".`}
+            {bucket === "Anytime"   && `Lands in the "Anytime today" cluster — no clock time.`}
+            {bucket && bucket !== "Anytime" && !time && `Will render at ${bucket === "Morning" ? "~7am" : bucket === "Day" ? "~1pm" : "~9pm"}.`}
             {!bucket && !time && `No clock time set → "Anytime today" cluster below the timeline.`}
-            {time && `At ${time}${bucket ? ` (${bucket})` : ""}.`}
+            {time && `At ${time}${bucket && bucket !== "Anytime" ? ` (${bucket})` : ""}.`}
           </p>
           {/* Jarvis classifier suggestion chip — tap to apply, never auto-fills */}
           {classification && (classification.suggested_time || classification.duration_min != null) && !time && (

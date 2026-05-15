@@ -35,6 +35,7 @@ const TIMING_TO_SECTION: Record<string, Section> = {
   "night":       "night",
   "pre-bed":     "night",
   "bedtime":     "night",
+  "anytime":     "anytime",  // explicit user choice — same destination as the fallback
 };
 
 // HH:MM (24h) → Section by hour. <12 morning, 12-17 day, 18+ night.
