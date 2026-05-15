@@ -46,7 +46,8 @@ export default function AddScheduleItem({
 }) {
   const [name, setName]         = useState("");
   const [dose, setDose]         = useState("");
-  const [time, setTime]         = useState("");           // "HH:MM"
+  const [bucket, setBucket]     = useState<string>("");   // "Morning" | "Day" | "Night" | ""
+  const [time, setTime]         = useState("");           // "HH:MM" — optional, independent of bucket
   const [duration, setDuration] = useState("");
   const [category, setCategory] = useState<StackCategory>("habit");
   const [recurrence, setRecurrence] = useState<Recurrence>("daily");
@@ -76,10 +77,11 @@ export default function AddScheduleItem({
         if (!res.ok) return;
         const c = (await res.json()) as Classification;
         setClassification(c);
-        // Apply CATEGORY suggestion silently (only if still on default).
+        // Apply CATEGORY + BUCKET suggestions silently (only if still unset).
         setCategory((prev) => (prev === "habit" ? c.category : prev));
-        // Time + duration are EXPLICITLY OPTIONAL — Jarvis surfaces a suggestion
-        // chip the user can tap to apply, but never auto-fills the fields.
+        setBucket((prev) => prev || (c.timing_bucket && /^(Morning|Pre-workout|Lunch|Afternoon|Day|Evening|Pre-bed|Night)$/.test(c.timing_bucket) ? c.timing_bucket : prev));
+        // Specific time + duration are NOT auto-filled — they surface as a
+        // tap-to-apply chip below the inputs so Sir keeps explicit control.
       } finally {
         setClassifying(false);
       }
@@ -102,7 +104,9 @@ export default function AddScheduleItem({
       name: name.trim(),
       dose: dose.trim(),
       notes: classification?.notes ?? undefined,
-      timing: time ? (classification?.timing_bucket ?? undefined) : undefined,
+      // Bucket and specific time are INDEPENDENT. Both optional. If both null,
+      // the item lands in "Anytime today" on the Schedule timeline.
+      timing: bucket || undefined,
       category,
       scheduled_at: time || null,
       duration_min: parsedDuration && !Number.isNaN(parsedDuration) ? parsedDuration : null,
@@ -111,7 +115,7 @@ export default function AddScheduleItem({
     });
     setSubmitting(false);
     if (id) {
-      setName(""); setDose(""); setTime(""); setDuration("");
+      setName(""); setDose(""); setBucket(""); setTime(""); setDuration("");
       setCategory("habit"); setRecurrence("daily"); setSpecificDays([]);
       setLinkedGoalId("");
       setClassification(null);
@@ -184,40 +188,41 @@ export default function AddScheduleItem({
           </div>
         </div>
 
-        {/* Time + Duration — BOTH OPTIONAL. Untimed items show in "Anytime". */}
+        {/* When — bucket and specific time are INDEPENDENT, BOTH OPTIONAL.
+              - Tap Morning/Day/Night → item lives in that part of the day
+                (renders on the timeline at a soft fallback time of 07/13/21).
+              - Type a specific clock time → renders at exactly that time.
+              - Set both → specific time wins for placement; bucket is a hint.
+              - Set neither → "Anytime today" section below the timeline. */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500">Time (optional)</span>
-            {time && (
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">When (optional)</span>
+            {(bucket || time) && (
               <button
-                onClick={() => setTime("")}
+                onClick={() => { setBucket(""); setTime(""); }}
                 className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 Clear
               </button>
             )}
           </div>
-          {/* Quick-pick buckets — tap to set canonical clock times. */}
+          {/* Bucket pills — set the part of day, do NOT touch specific time. */}
           <div className="flex gap-1.5 mb-2">
-            {[
-              { label: "Morning", value: "07:00" },
-              { label: "Day",     value: "13:00" },
-              { label: "Night",   value: "21:00" },
-            ].map((b) => (
+            {["Morning", "Day", "Night"].map((b) => (
               <button
-                key={b.label}
-                onClick={() => setTime(b.value)}
+                key={b}
+                onClick={() => setBucket((prev) => prev === b ? "" : b)}
                 className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-                  time === b.value ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                  bucket === b ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                 }`}
               >
-                {b.label}
+                {b}
               </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific time</span>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific time (optional)</span>
               <input
                 type="time"
                 value={time}
@@ -237,6 +242,11 @@ export default function AddScheduleItem({
               />
             </label>
           </div>
+          <p className="text-[10px] text-zinc-600 mt-1.5">
+            {bucket && !time && `Will render at ${bucket === "Morning" ? "~7am" : bucket === "Day" ? "~1pm" : "~9pm"}. Skip both for "anytime today".`}
+            {!bucket && !time && `No clock time set → "Anytime today" cluster below the timeline.`}
+            {time && `At ${time}${bucket ? ` (${bucket})` : ""}.`}
+          </p>
           {/* Jarvis classifier suggestion chip — tap to apply, never auto-fills */}
           {classification && (classification.suggested_time || classification.duration_min != null) && !time && (
             <button
@@ -247,7 +257,7 @@ export default function AddScheduleItem({
               className="mt-2 w-full text-[10px] text-left px-2.5 py-1.5 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors text-zinc-400"
             >
               <Sparkles size={9} className="inline mr-1" />
-              Suggestion: {classification.suggested_time ?? "—"}
+              Suggestion: specific time {classification.suggested_time ?? "—"}
               {classification.duration_min != null && ` · ${classification.duration_min} min`}
               <span className="text-zinc-600"> · tap to apply</span>
             </button>

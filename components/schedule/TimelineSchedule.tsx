@@ -22,16 +22,19 @@ const CATEGORY_STYLE: Record<string, { Icon: LucideIcon; color: string }> = {
 const DEFAULT_STYLE = { Icon: Clock, color: "#a1a1aa" };
 
 // Map fallback bucket strings to canonical clock times so items WITHOUT a
-// specific scheduled_at still sort in a sensible order.
+// specific scheduled_at still sort in a sensible order. Keep both the
+// simple add-sheet labels (Morning / Day / Night) and the granular ones
+// the AI classifier emits (Pre-workout / Lunch / Afternoon / Evening / Pre-bed).
 const BUCKET_FALLBACK_TIME: Record<string, string> = {
   "pre-workout": "06:30",
   "morning":     "07:00",
+  "day":         "13:00",
   "lunch":       "12:00",
   "afternoon":   "15:00",
   "evening":     "19:00",
+  "night":       "21:00",
   "pre-bed":     "22:00",
   "bedtime":     "22:30",
-  "night":       "22:30",
 };
 
 // Returns "HH:MM" when the item has any time anchor (specific clock time OR a
