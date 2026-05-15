@@ -16,6 +16,7 @@ import {
 } from "@/lib/fitness/recovery";
 import { buildSetProtocol, buildWarmupSets, type SetProtocol, type WarmupSet } from "@/lib/fitness/intensity-protocol";
 import { getMesoState, targetForMuscle, type MesocycleRow, type MesoState } from "@/lib/fitness/mesocycle";
+import { buildLifestyleContext, type LifestyleContext, type Driver } from "@/lib/fitness/lifestyle-drivers";
 
 export type WorkoutSet = {
   id: string;
@@ -53,6 +54,10 @@ export type CoachVerdict = {
   // Warmup sets to do BEFORE the working sets. Scaled to target weight by
   // exercise type (compounds get a 3-step ramp; isolations get 0-1 sets).
   warmupSets: WarmupSet[];
+  // Cross-cutting context that affects progress: sleep, alcohol, supplement
+  // adherence, composition phase. The verdict's STATUS comes from training
+  // history, but these drivers explain WHY it landed there.
+  lifestyleDrivers: Driver[];
 };
 
 export type Exercise = {
@@ -136,6 +141,7 @@ function analyze(
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
+      lifestyleDrivers: [],
     };
   }
 
@@ -151,6 +157,7 @@ function analyze(
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
+      lifestyleDrivers: [],
     };
   }
 
@@ -165,6 +172,7 @@ function analyze(
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
+      lifestyleDrivers: [],
     };
   }
 
@@ -183,6 +191,7 @@ function analyze(
         recoveryAdjustment: null,
         setProtocol: [],
         warmupSets: [],
+        lifestyleDrivers: [],
       };
     }
   }
@@ -195,6 +204,7 @@ function analyze(
     recoveryAdjustment: null,
     setProtocol: [],
     warmupSets: [],
+    lifestyleDrivers: [],
   };
 }
 
@@ -225,6 +235,7 @@ export function useWorkout() {
   const [health7d,   setHealth7d]   = useState<HealthDay[]>([]);
   const [proteinDeficit, setProteinDeficit] = useState<ProteinDeficit | null>(null);
   const [mesocycle,     setMesocycle]     = useState<MesocycleRow | null>(null);
+  const [lifestyleCtx,  setLifestyleCtx]  = useState<LifestyleContext | null>(null);
   const [activeGymId,   setActiveGymId]   = useState<string | null>(null);
   const [activeDay,     setActiveDay]     = useState("Push");
   const [activeExId,    setActiveExId]    = useState<string | null>(null);
@@ -321,6 +332,39 @@ export function useWorkout() {
     setProteinDeficit({ daysUnder, targetG, avgG });
   }, [supabase]);
 
+  // Cross-cutting context that flows into the verdict text + REGRESSION gate.
+  // Pulls: 7d alcohol, 7d supplement logs, 21d weight + sets + protein for
+  // composition phase derivation.
+  const fetchLifestyle = useCallback(async (uid: string) => {
+    const day7  = new Date(); day7.setDate(day7.getDate() - 7);
+    const day21 = new Date(); day21.setDate(day21.getDate() - 21);
+    const d7  = day7.toISOString().slice(0, 10);
+    const d21 = day21.toISOString().slice(0, 10);
+
+    const [alcoholRes, suppLogsRes, activeStackRes, weightRes, latestWeightRes, sets21Res, protein21Res, health7Res] = await Promise.all([
+      supabase.from("alcohol_logs").select("log_date, drink_count").eq("user_id", uid).gte("log_date", d7),
+      supabase.from("supplement_logs").select("supplement_id").eq("user_id", uid).gte("log_date", d7),
+      supabase.from("supplement_stack").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("is_active", true),
+      supabase.from("weight_logs").select("weight_kg, logged_at").eq("user_id", uid).gte("logged_at", `${d21}T00:00:00`).order("logged_at", { ascending: true }),
+      supabase.from("weight_logs").select("weight_kg").eq("user_id", uid).order("logged_at", { ascending: false }).limit(1),
+      supabase.from("workout_sets").select("est_1rm, log_date, exercise_id").eq("user_id", uid).gte("log_date", d21),
+      supabase.from("protein_logs").select("protein_g, log_date").eq("user_id", uid).gte("log_date", d21),
+      supabase.from("health_logs").select("sleep_hours, sleep_score").eq("user_id", uid).gte("date", d7).order("date", { ascending: true }),
+    ]);
+
+    const ctx = buildLifestyleContext({
+      health7d:        (health7Res.data ?? []) as Array<{ sleep_hours: number | null; sleep_score: number | null }>,
+      alcohol7d:       (alcoholRes.data ?? []) as Array<{ log_date: string; drink_count: number | null }>,
+      suppLogs7d:      (suppLogsRes.data ?? []) as Array<{ supplement_id: string }>,
+      activeStackCount: activeStackRes.count ?? 0,
+      weight21d:       (weightRes.data ?? []) as Array<{ weight_kg: number; logged_at: string }>,
+      sets21d:         (sets21Res.data ?? []) as Array<{ est_1rm: number; log_date: string; exercise_id: string }>,
+      protein21d:      (protein21Res.data ?? []) as Array<{ protein_g: number; log_date: string }>,
+      latestWeightKg:  (latestWeightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null,
+    });
+    setLifestyleCtx(ctx);
+  }, [supabase]);
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -345,7 +389,7 @@ export function useWorkout() {
         .maybeSingle();
       setMesocycle((mesoRes.data as MesocycleRow | null) ?? null);
 
-      await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id), fetchProtein7d(user.id)]);
+      await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id), fetchProtein7d(user.id), fetchLifestyle(user.id)]);
       setLoading(false);
     }
     load();
@@ -538,6 +582,40 @@ export function useWorkout() {
       setProtocol: buildSetProtocol(exType, verdict.status, verdict.targetSets, recovery?.band ?? null),
       warmupSets:  buildWarmupSets(exType, verdict.targetWeight),
     };
+  }
+
+  // Lifestyle integration. The coach's STATUS comes from training history,
+  // but the verdict's text + REGRESSION trigger should reflect what's
+  // happening AROUND the training (cut phase, sleep debt, alcohol, etc).
+  //   - Cut phase: don't deload Sir for a 5% est-1RM drop when calories
+  //     are intentionally low. Strength regression on a clean cut is the
+  //     program working as designed.
+  //   - Stalling/Grind: when there's a major lifestyle drag (sleep <6.5h
+  //     or heavy alcohol week), the headline lies if it says "push harder."
+  //     Layer the actual drivers in so Sir sees the real bottleneck.
+  if (verdict && lifestyleCtx) {
+    let nextVerdict = { ...verdict, lifestyleDrivers: lifestyleCtx.drivers };
+
+    if (verdict.status === "REGRESSION" && lifestyleCtx.compositionTag === "clean-cut") {
+      // Downgrade to GRIND with cut-appropriate framing.
+      nextVerdict = {
+        ...nextVerdict,
+        status:   "GRIND",
+        headline: `${verdict.targetWeight}kg — strength dip is the cut, not the program`,
+        tip:      `Est. 1RM slipped — expected on a clean cut. Hold the weight, hit reps cleanly. Don't chase PRs in a deficit. ${lifestyleCtx.sleepHrs7dAvg && lifestyleCtx.sleepHrs7dAvg < 7 ? `Sleep ${lifestyleCtx.sleepHrs7dAvg.toFixed(1)}h avg — getting that up matters more than the weight on the bar right now.` : ""}`.trim(),
+      };
+    } else if ((verdict.status === "STALLING" || verdict.status === "GRIND") && lifestyleCtx.hasMajorDrag) {
+      // The PLATEAU has a cause. Surface it instead of "push harder."
+      const drag = lifestyleCtx.sleepHrs7dAvg != null && lifestyleCtx.sleepHrs7dAvg < 6.5
+        ? `Sleep ${lifestyleCtx.sleepHrs7dAvg.toFixed(1)}h avg — that's the plateau cause.`
+        : `${lifestyleCtx.drinks7dTotal} drinks across ${lifestyleCtx.alcoholDays7d} days — recovery is compromised. That's the plateau cause.`;
+      nextVerdict = {
+        ...nextVerdict,
+        tip: `${drag} Push harder in the gym won't fix it; fix the recovery first.`,
+      };
+    }
+
+    verdict = nextVerdict;
   }
 
   const trendData = [...pastSessions].reverse().slice(-10).map((s, i) => ({

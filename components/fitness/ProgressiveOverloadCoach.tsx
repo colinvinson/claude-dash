@@ -146,6 +146,26 @@ export default function ProgressiveOverloadCoach() {
                 {activeExercise.muscle_group} hit {muscleStatus.hoursSince}h ago · {muscleStatus.hardSetsLast48h} hard sets in 48h · {muscleStatus.status.replace("-", " ")}
               </p>
             )}
+
+            {/* Lifestyle drivers — sleep, alcohol, supplement adherence,
+                composition phase. Shown right under the verdict because
+                they're often the actual cause of whatever it landed on. */}
+            {verdict.lifestyleDrivers.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Context</p>
+                {verdict.lifestyleDrivers.map((d, i) => {
+                  const color =
+                    d.severity === "good" ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-200" :
+                    d.severity === "warn" ? "border-amber-500/25  bg-amber-500/5  text-amber-200"  :
+                                            "border-zinc-700      bg-zinc-900/40   text-zinc-300";
+                  return (
+                    <p key={i} className={`text-[11px] leading-relaxed rounded-md px-2.5 py-1.5 border ${color}`}>
+                      {d.text}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
             {isAdjusted && adjustment && (
               <div className="mt-3 p-3 bg-orange-500/5 border border-orange-500/20 rounded-xl">
                 <p className="text-[10px] uppercase tracking-widest text-orange-400 font-bold mb-1">Recovery adjustment</p>
