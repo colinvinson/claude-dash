@@ -65,6 +65,10 @@ const BASELINE: Record<string, Record<CoachStatus, Omit<SetProtocol, "setNum">[]
       { rir: 2, technique: null, label: "RIR 2", note: "Rebuild — log the volume." },
       { rir: 1, technique: null, label: "RIR 1", note: "Last set — feel strong again. No max effort." },
     ],
+    DELOAD: [
+      { rir: 3, technique: null, label: "RIR 3", note: "Deload — pattern only. Save the CNS." },
+      { rir: 3, technique: null, label: "RIR 3", note: "Deload — controlled tempo, easy weight." },
+    ],
   },
   Secondary: {
     NEW: [
@@ -92,6 +96,10 @@ const BASELINE: Record<string, Record<CoachStatus, Omit<SetProtocol, "setNum">[]
       { rir: 2, technique: null, label: "RIR 2", note: "Rebuild." },
       { rir: 1, technique: null, label: "RIR 1", note: "Last set, controlled." },
     ],
+    DELOAD: [
+      { rir: 3, technique: null, label: "RIR 3", note: "Deload — half-effort. Bank recovery." },
+      { rir: 3, technique: null, label: "RIR 3", note: "Deload — clean reps, light weight." },
+    ],
   },
   Isolation: {
     NEW: [
@@ -118,6 +126,10 @@ const BASELINE: Record<string, Record<CoachStatus, Omit<SetProtocol, "setNum">[]
       { rir: 2, technique: null, label: "RIR 2", note: "Rebuild — quality reps." },
       { rir: 1, technique: null, label: "RIR 1", note: "Working set." },
       { rir: 0, technique: null, label: "Failure", note: "Last set — go." },
+    ],
+    DELOAD: [
+      { rir: 3, technique: null, label: "RIR 3", note: "Deload — feel the muscle, no grind." },
+      { rir: 2, technique: null, label: "RIR 2", note: "Deload — one harder set, still well shy of failure." },
     ],
   },
 };

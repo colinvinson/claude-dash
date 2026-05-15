@@ -15,6 +15,7 @@ import {
   type ProteinDeficit,
 } from "@/lib/fitness/recovery";
 import { buildSetProtocol, buildWarmupSets, type SetProtocol, type WarmupSet } from "@/lib/fitness/intensity-protocol";
+import { getMesoState, targetForMuscle, type MesocycleRow, type MesoState } from "@/lib/fitness/mesocycle";
 
 export type WorkoutSet = {
   id: string;
@@ -34,7 +35,7 @@ export type Session = {
   topEst1rm: number;
 };
 
-export type CoachStatus = "NEW" | "PROGRESS" | "GRIND" | "STALLING" | "REGRESSION";
+export type CoachStatus = "NEW" | "PROGRESS" | "GRIND" | "STALLING" | "REGRESSION" | "DELOAD";
 
 export type CoachVerdict = {
   status: CoachStatus;
@@ -70,8 +71,11 @@ export type MuscleVolume = {
   muscle: string;
   sets: number;
   frequency: number;
-  target: { min: number; max: number };
-  status: "under" | "optimal" | "over";
+  target: { min: number; max: number };   // MEV-MRV envelope (static science-based)
+  weekTarget: number;                       // THIS week's specific set target (mesocycle-aware)
+  status: "under" | "optimal" | "over";   // legacy band vs MEV-MRV envelope
+  weekStatus: "below" | "near" | "at-or-over"; // vs weekTarget
+  priority: "normal" | "specialize" | "maintenance";
 };
 
 // Rep ranges by exercise type — hypertrophy science
@@ -220,6 +224,7 @@ export function useWorkout() {
   const [weeklyRaw,  setWeeklyRaw]  = useState<WeeklySet[]>([]);
   const [health7d,   setHealth7d]   = useState<HealthDay[]>([]);
   const [proteinDeficit, setProteinDeficit] = useState<ProteinDeficit | null>(null);
+  const [mesocycle,     setMesocycle]     = useState<MesocycleRow | null>(null);
   const [activeGymId,   setActiveGymId]   = useState<string | null>(null);
   const [activeDay,     setActiveDay]     = useState("Push");
   const [activeExId,    setActiveExId]    = useState<string | null>(null);
@@ -329,10 +334,41 @@ export function useWorkout() {
       setGyms(gymList);
       setExercises((exRes.data ?? []) as Exercise[]);
       if (gymList.length > 0) setActiveGymId(gymList[0].id);
+      // Active mesocycle (single row or none).
+      const mesoRes = await supabase
+        .from("mesocycles")
+        .select("id, user_id, start_date, planned_weeks, muscle_priorities, notes, ended_at, created_at")
+        .eq("user_id", user.id)
+        .is("ended_at", null)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setMesocycle((mesoRes.data as MesocycleRow | null) ?? null);
+
       await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id), fetchProtein7d(user.id)]);
       setLoading(false);
     }
     load();
+
+    // Realtime subscription so a freshly started/ended meso flips the
+    // coach + weekly-volume targets without a page refresh.
+    const mesoChannel = supabase
+      .channel(`workout-meso-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mesocycles" }, async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const r = await supabase
+          .from("mesocycles")
+          .select("id, user_id, start_date, planned_weeks, muscle_priorities, notes, ended_at, created_at")
+          .eq("user_id", user.id)
+          .is("ended_at", null)
+          .order("start_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setMesocycle((r.data as MesocycleRow | null) ?? null);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(mesoChannel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -458,9 +494,43 @@ export function useWorkout() {
     };
   }
 
+  // Mesocycle state for THIS day. Drives deload override + dynamic volume
+  // targets below.
+  const todayStr2 = new Date().toISOString().slice(0, 10);
+  const mesoState: MesoState | null = mesocycle ? getMesoState(mesocycle, todayStr2) : null;
+
+  // Deload override: when the active mesocycle is in its deload week, force a
+  // half-volume / RIR-3 prescription regardless of what analyze() said. This
+  // is the scheduled fatigue dump that keeps the program working long-term.
+  if (verdict && mesoState?.isDeloadWeek) {
+    const original = {
+      targetWeight: verdict.targetWeight,
+      targetReps:   verdict.targetReps,
+      targetSets:   verdict.targetSets,
+      rpeCap:       verdict.rpeCap,
+    };
+    const adjustedSets = Math.max(2, Math.floor(verdict.targetSets * 0.5));
+    const deloadAdj: Adjustment = {
+      applied: true,
+      reason: `Deload week ${mesoState.currentWeek}/${mesocycle!.planned_weeks} — half volume, RIR 3, save the CNS`,
+      original,
+      adjusted: { ...original, targetSets: adjustedSets, rpeCap: 7 },
+    };
+    verdict = {
+      ...verdict,
+      status:        "DELOAD",
+      targetSets:    adjustedSets,
+      rpeCap:        7,
+      headline:      `Deload week — half volume, easy weights`,
+      tip:           `Week ${mesoState.currentWeek}/${mesocycle!.planned_weeks}. Cut volume, no PRs, no failure. Bank recovery so next block starts fresh.`,
+      // Stack on top of any prior recovery adjustment.
+      recoveryAdjustment: verdict.recoveryAdjustment ?? deloadAdj,
+    };
+  }
+
   // Attach per-set RIR + technique protocol AND warm-up scheme to the final
-  // verdict. Both are computed after recovery adjustment so they pick up the
-  // adjusted set count + adjusted working weight respectively.
+  // verdict. Both are computed after recovery + deload adjustment so they pick
+  // up the adjusted set count + adjusted working weight respectively.
   if (verdict && activeExercise) {
     const exType = activeExercise.exercise_type ?? "Secondary";
     verdict = {
@@ -474,14 +544,31 @@ export function useWorkout() {
     session: i + 1, est1rm: s.topEst1rm, weight: s.bestSet.weight_kg,
   }));
 
-  // Compute weekly volume + frequency per muscle group
+  // Weekly volume + frequency per muscle. `weekTarget` is mesocycle-aware:
+  //   - With active meso: ramped target this week (or MEV×0.5 if deload week,
+  //     or MRV if muscle is marked "specialize", or MEV if "maintenance").
+  //   - No meso: fall back to MEV as the week target.
+  // The static MEV-MRV envelope is still surfaced as `target` for UI.
   const weeklyVolume: MuscleVolume[] = Object.entries(VOLUME_TARGETS).map(([muscle, target]) => {
     const rows = weeklyRaw.filter((r) => r.muscle_group === muscle);
     const sets = rows.length;
     const frequency = new Set(rows.map((r) => r.log_date)).size;
     const status: MuscleVolume["status"] =
       sets < target.min ? "under" : sets > target.max ? "over" : "optimal";
-    return { muscle, sets, frequency, target, status };
+
+    const weekTarget = mesoState && mesocycle
+      ? targetForMuscle(muscle, target.min, target.max, mesoState, mesocycle.muscle_priorities, mesocycle.planned_weeks)
+      : target.min;
+    const weekStatus: MuscleVolume["weekStatus"] =
+      sets >= weekTarget       ? "at-or-over" :
+      sets >= weekTarget - 1   ? "near" :
+                                 "below";
+    const priority: MuscleVolume["priority"] =
+      mesocycle?.muscle_priorities?.[muscle] === "specialize"  ? "specialize"  :
+      mesocycle?.muscle_priorities?.[muscle] === "maintenance" ? "maintenance" :
+                                                                 "normal";
+
+    return { muscle, sets, frequency, target, weekTarget, status, weekStatus, priority };
   });
 
   return {
@@ -492,5 +579,6 @@ export function useWorkout() {
     activeExId,  setActiveExId,
     activeExercise, verdict, logSet, deleteSet,
     recovery, sessionStrain, muscleStatus,
+    mesocycle, mesoState,
   };
 }

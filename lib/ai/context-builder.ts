@@ -6,6 +6,7 @@ import { buildDailySnapshot } from "@/lib/ai/snapshot-builder";
 import {
   collapseToDaily, computeProteinAdherence, computeStrengthDeltaPct, deriveRecompVerdict,
 } from "@/lib/fitness/composition";
+import { getMesoState, type MesocycleRow } from "@/lib/fitness/mesocycle";
 
 function getLogDate() {
   const now = new Date();
@@ -56,6 +57,7 @@ export async function buildContext(userId: string) {
     alcoholTodayRes, meditationTodayRes,
     recentArtifactsRes, recentMessagesRes,
     weight21dRes, protein21dRes,
+    activeMesoRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -98,6 +100,9 @@ export async function buildContext(userId: string) {
     // they feed the recomp verdict (gaining muscle vs fat, etc.).
     supabase.from("weight_logs").select("weight_kg, logged_at").eq("user_id", userId).gte("logged_at", `${dateDaysAgo(21)}T00:00:00`).order("logged_at", { ascending: true }),
     supabase.from("protein_logs").select("protein_g, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
+    // Active mesocycle — drives whether Sir should be pushing for PRs or
+    // deloading this week.
+    supabase.from("mesocycles").select("id, user_id, start_date, planned_weeks, muscle_priorities, notes, ended_at, created_at").eq("user_id", userId).is("ended_at", null).order("start_date", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -571,6 +576,22 @@ export async function buildContext(userId: string) {
   );
   const compositionVerdict = deriveRecompVerdict(weightPoints, compStrengthDelta, compProteinAdherence);
 
+  // Mesocycle state: which week, what phase, deload due? Drives Jarvis's
+  // training advice (push hard vs deload vs start a new block).
+  const meso = activeMesoRes.data as MesocycleRow | null;
+  const mesoBlock = meso ? (() => {
+    const s = getMesoState(meso, today);
+    return {
+      week:          s.currentWeek,
+      plannedWeeks:  meso.planned_weeks,
+      phase:         s.phase,            // accumulate | deload | complete
+      isDeloadWeek:  s.isDeloadWeek,
+      startDate:     meso.start_date,
+      daysIntoWeek:  s.daysIntoWeek,
+      priorities:    meso.muscle_priorities ?? {},
+    };
+  })() : null;
+
   const dailyScore = computeDailyScore({
     goalsComplete,
     goalsTotal: goals.length,
@@ -595,6 +616,7 @@ export async function buildContext(userId: string) {
       streak:   streakRes.data?.current_streak ?? 0,
     },
     biometrics,
+    mesocycle: mesoBlock,
     composition: {
       currentWeightKg: latestWeightKg,
       weightRateKgWk:   Number(compositionVerdict.weightRateKgWk.toFixed(3)),

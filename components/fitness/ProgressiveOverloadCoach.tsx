@@ -16,6 +16,7 @@ const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: s
   GRIND:      { pill: "bg-blue-500/15 text-blue-400 border border-blue-500/40",    border: "border-blue-500/30",    glow: "shadow-blue-500/10 shadow-lg",  label: "GRIND"      },
   STALLING:   { pill: "bg-amber-500/15 text-amber-400 border border-amber-500/40", border: "border-amber-500/30",   glow: "shadow-amber-500/10 shadow-lg", label: "STALLING"   },
   REGRESSION: { pill: "bg-red-500/15 text-red-400 border border-red-500/40",       border: "border-red-500/30",     glow: "shadow-red-500/10 shadow-lg",   label: "REGRESSION" },
+  DELOAD:     { pill: "bg-sky-500/15 text-sky-400 border border-sky-500/40",       border: "border-sky-500/30",     glow: "shadow-sky-500/10 shadow-lg",   label: "DELOAD"     },
 };
 
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
