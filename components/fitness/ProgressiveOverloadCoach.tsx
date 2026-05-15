@@ -204,9 +204,28 @@ export default function ProgressiveOverloadCoach() {
           </div>
 
           {/* Per-set intensity protocol — when to push, when to hold back, when to extend past failure */}
-          {verdict.setProtocol.length > 0 && (
+          {(verdict.setProtocol.length > 0 || verdict.warmupSets.length > 0) && (
             <Card>
               <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-3">— Plan for today</span>
+
+              {/* Warm-up rows render above working sets — visually distinct,
+                  no RIR (warmups aren't effort-graded). */}
+              {verdict.warmupSets.length > 0 && (
+                <div className="space-y-1 mb-3 pb-3 border-b border-[#1f1f1f]">
+                  {verdict.warmupSets.map((w, i) => (
+                    <div key={i} className="flex items-center gap-3 py-1 px-3 rounded-lg opacity-70">
+                      <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-16">Warm-up {i + 1}</span>
+                      <span className="text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border bg-zinc-800 text-zinc-400 border-zinc-700">
+                        Easy
+                      </span>
+                      <span className="text-xs text-zinc-400 tabular-nums">
+                        {w.weight}<span className="text-zinc-600">kg</span> × {w.reps}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 {verdict.setProtocol.map((p) => {
                   const done = todaySets.length >= p.setNum;

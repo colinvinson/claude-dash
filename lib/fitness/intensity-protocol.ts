@@ -122,6 +122,47 @@ const BASELINE: Record<string, Record<CoachStatus, Omit<SetProtocol, "setNum">[]
   },
 };
 
+// ────────────────────────────────────────────────────────────────────────
+// Warm-up sets — scaled to working weight by exercise type
+// ────────────────────────────────────────────────────────────────────────
+
+export type WarmupSet = { weight: number; reps: number };
+
+// % of working weight × reps. Compounds need the most ramp (neural priming
+// matters for heavy compounds); isolations need almost none.
+const WARMUP_SCHEMES: Record<string, Array<{ pct: number; reps: number }>> = {
+  Compound:  [{ pct: 0.40, reps: 5 }, { pct: 0.60, reps: 3 }, { pct: 0.80, reps: 2 }],
+  Secondary: [{ pct: 0.50, reps: 5 }, { pct: 0.75, reps: 3 }],
+  Isolation: [{ pct: 0.60, reps: 8 }],
+};
+
+function roundTo(value: number, step: number): number {
+  return Math.max(step, Math.round(value / step) * step);
+}
+
+export function buildWarmupSets(exerciseType: string, workingWeight: number): WarmupSet[] {
+  if (workingWeight <= 0) return [];
+  const scheme = WARMUP_SCHEMES[exerciseType] ?? WARMUP_SCHEMES.Secondary;
+  const step = exerciseType === "Compound" ? 2.5 : 1.25;
+
+  // Very light working weights → one activation set, not a full ramp.
+  const lightThreshold = exerciseType === "Compound" ? 30 : exerciseType === "Isolation" ? 10 : 15;
+  if (workingWeight < lightThreshold) {
+    return [{ weight: roundTo(workingWeight * 0.5, step), reps: 8 }];
+  }
+
+  // Moderate weights → 1-2 warmups; heavy weights → full ramp.
+  const moderateThreshold = exerciseType === "Compound" ? 60 : 40;
+  const limit = workingWeight < moderateThreshold ? Math.min(2, scheme.length) : scheme.length;
+
+  return scheme.slice(0, limit).map((w) => ({
+    weight: roundTo(workingWeight * w.pct, step),
+    reps:   w.reps,
+  }));
+}
+
+// ────────────────────────────────────────────────────────────────────────
+
 function recoveryGated(p: Omit<SetProtocol, "setNum">, band: RecoveryBand | null): Omit<SetProtocol, "setNum"> {
   if (band !== "compromised" && band !== "low") return p;
   // Compromised recovery: cap RIR at 2 minimum, strip intensity techniques.

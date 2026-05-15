@@ -14,7 +14,7 @@ import {
   type MuscleSetRow,
   type ProteinDeficit,
 } from "@/lib/fitness/recovery";
-import { buildSetProtocol, type SetProtocol } from "@/lib/fitness/intensity-protocol";
+import { buildSetProtocol, buildWarmupSets, type SetProtocol, type WarmupSet } from "@/lib/fitness/intensity-protocol";
 
 export type WorkoutSet = {
   id: string;
@@ -50,6 +50,9 @@ export type CoachVerdict = {
   // Per-set RIR + technique guidance, derived from exerciseType + status +
   // recovery. Populated by useWorkout after computePrescription returns.
   setProtocol: SetProtocol[];
+  // Warmup sets to do BEFORE the working sets. Scaled to target weight by
+  // exercise type (compounds get a 3-step ramp; isolations get 0-1 sets).
+  warmupSets: WarmupSet[];
 };
 
 export type Exercise = {
@@ -130,6 +133,7 @@ function analyze(
       rpeContext: null,
       recoveryAdjustment: null,
       setProtocol: [],
+      warmupSets: [],
     };
   }
 
@@ -154,6 +158,7 @@ function analyze(
       rpeContext,
       recoveryAdjustment: null,
       setProtocol: [],
+      warmupSets: [],
     };
   }
 
@@ -171,6 +176,7 @@ function analyze(
       rpeContext,
       recoveryAdjustment: null,
       setProtocol: [],
+      warmupSets: [],
     };
   }
 
@@ -196,6 +202,7 @@ function analyze(
         rpeContext,
         recoveryAdjustment: null,
         setProtocol: [],
+        warmupSets: [],
       };
     }
   }
@@ -211,6 +218,7 @@ function analyze(
     rpeContext,
     recoveryAdjustment: null,
     setProtocol: [],
+    warmupSets: [],
   };
 }
 
@@ -478,18 +486,15 @@ export function useWorkout() {
     };
   }
 
-  // Attach per-set RIR + technique protocol to the final verdict (after
-  // recovery adjustment so target set count is correct + recovery gating
-  // applies to the intensity rules).
+  // Attach per-set RIR + technique protocol AND warm-up scheme to the final
+  // verdict. Both are computed after recovery adjustment so they pick up the
+  // adjusted set count + adjusted working weight respectively.
   if (verdict && activeExercise) {
+    const exType = activeExercise.exercise_type ?? "Secondary";
     verdict = {
       ...verdict,
-      setProtocol: buildSetProtocol(
-        activeExercise.exercise_type ?? "Secondary",
-        verdict.status,
-        verdict.targetSets,
-        recovery?.band ?? null,
-      ),
+      setProtocol: buildSetProtocol(exType, verdict.status, verdict.targetSets, recovery?.band ?? null),
+      warmupSets:  buildWarmupSets(exType, verdict.targetWeight),
     };
   }
 
