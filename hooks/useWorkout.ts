@@ -13,6 +13,7 @@ import {
   type Prescription,
   type MuscleSetRow,
 } from "@/lib/fitness/recovery";
+import { buildSetProtocol, type SetProtocol } from "@/lib/fitness/intensity-protocol";
 
 export type WorkoutSet = {
   id: string;
@@ -45,6 +46,9 @@ export type CoachVerdict = {
   tip: string;
   rpeContext: string | null;
   recoveryAdjustment: Adjustment | null;
+  // Per-set RIR + technique guidance, derived from exerciseType + status +
+  // recovery. Populated by useWorkout after computePrescription returns.
+  setProtocol: SetProtocol[];
 };
 
 export type Exercise = {
@@ -124,6 +128,7 @@ function analyze(
       tip: `${isCompound ? "Compounds build the foundation. " : isIsolation ? "Focus on the squeeze, not the weight. " : ""}Nail form before adding load. Hit ${repRange.min}–${repRange.max} reps clean.`,
       rpeContext: null,
       recoveryAdjustment: null,
+      setProtocol: [],
     };
   }
 
@@ -147,6 +152,7 @@ function analyze(
       tip: "Est. 1RM fell >5%. Return to last good weight and rebuild. Check sleep quality, caloric intake, and weekly volume — you may be overreaching.",
       rpeContext,
       recoveryAdjustment: null,
+      setProtocol: [],
     };
   }
 
@@ -163,6 +169,7 @@ function analyze(
       tip: `You hit ${last.reps} reps at ${last.weight_kg}kg${rpeNote} Add ${increment}kg and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
       rpeContext,
       recoveryAdjustment: null,
+      setProtocol: [],
     };
   }
 
@@ -187,6 +194,7 @@ function analyze(
         tip,
         rpeContext,
         recoveryAdjustment: null,
+        setProtocol: [],
       };
     }
   }
@@ -201,6 +209,7 @@ function analyze(
     tip: `Last best: ${last.reps} reps. You need ${repRange.max} to unlock the next weight.${rpeNote} ${isIsolation ? "Slow 3-second eccentric — time under tension drives growth." : isCompound ? "Control the descent, explode up." : ""}`,
     rpeContext,
     recoveryAdjustment: null,
+    setProtocol: [],
   };
 }
 
@@ -414,6 +423,21 @@ export function useWorkout() {
       targetSets:   adjustment.adjusted.targetSets,
       rpeCap:       adjustment.adjusted.rpeCap,
       recoveryAdjustment: adjustment,
+    };
+  }
+
+  // Attach per-set RIR + technique protocol to the final verdict (after
+  // recovery adjustment so target set count is correct + recovery gating
+  // applies to the intensity rules).
+  if (verdict && activeExercise) {
+    verdict = {
+      ...verdict,
+      setProtocol: buildSetProtocol(
+        activeExercise.exercise_type ?? "Secondary",
+        verdict.status,
+        verdict.targetSets,
+        recovery?.band ?? null,
+      ),
     };
   }
 

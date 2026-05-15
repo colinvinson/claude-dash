@@ -203,6 +203,50 @@ export default function ProgressiveOverloadCoach() {
             </div>
           </div>
 
+          {/* Per-set intensity protocol — when to push, when to hold back, when to extend past failure */}
+          {verdict.setProtocol.length > 0 && (
+            <Card>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-3">— Plan for today</span>
+              <div className="space-y-1.5">
+                {verdict.setProtocol.map((p) => {
+                  const done = todaySets.length >= p.setNum;
+                  const upNext = todaySets.length + 1 === p.setNum;
+                  const isFailure = p.rir === 0 || p.rir === null;
+                  const badgeColor = p.technique
+                    ? "bg-orange-500/15 text-orange-300 border-orange-500/30"
+                    : isFailure
+                      ? "bg-red-500/15 text-red-300 border-red-500/30"
+                      : "bg-zinc-800 text-zinc-400 border-zinc-700";
+                  return (
+                    <div
+                      key={p.setNum}
+                      className={`flex items-start gap-3 py-2 px-3 rounded-xl border transition-opacity ${
+                        upNext ? "bg-white/5 border-white/15"
+                              : done ? "opacity-40 border-transparent"
+                              : "border-transparent"
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-10 pt-0.5">
+                        {done ? "✓" : `Set ${p.setNum}`}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${badgeColor}`}>
+                            {p.label}
+                          </span>
+                          {upNext && (
+                            <span className="text-[9px] uppercase tracking-widest text-zinc-500">Up next</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-snug">{p.note}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* Today's Sets */}
           {todaySets.length > 0 && (
             <Card>
