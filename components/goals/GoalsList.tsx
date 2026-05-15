@@ -9,7 +9,7 @@ import GoalWidget from "./GoalWidget";
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
-  const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary } = useLongTermGoals(bucket);
+  const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan } = useLongTermGoals(bucket);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Form state for adding a new goal in this bucket.
@@ -70,6 +70,7 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
           onArchive={archiveGoal}
           onLinkItem={linkItem}
           onRefreshSummary={refreshAiSummary}
+          onSuggestPlan={suggestPlan}
         />
       ))}
 

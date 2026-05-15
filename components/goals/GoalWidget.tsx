@@ -16,6 +16,7 @@ type Props = {
   onArchive: (id: string) => Promise<void>;
   onLinkItem: (itemId: string, goalId: string | null) => Promise<void>;
   onRefreshSummary: (id: string, force?: boolean) => Promise<string | null>;
+  onSuggestPlan: (id: string) => Promise<string | null>;
 };
 
 function timeSince(iso: string): string {
@@ -29,7 +30,7 @@ function timeSince(iso: string): string {
 }
 
 export default function GoalWidget({
-  goal, isExpanded, onToggleExpand, onUpdate, onArchive, onLinkItem, onRefreshSummary,
+  goal, isExpanded, onToggleExpand, onUpdate, onArchive, onLinkItem, onRefreshSummary, onSuggestPlan,
 }: Props) {
   const { items, toggle } = useStack();
   const { insights } = useStackInsights(items);
@@ -43,8 +44,18 @@ export default function GoalWidget({
 
   const [editingState, setEditingState]   = useState(goal.current_state ?? "");
   const [editingNext, setEditingNext]     = useState(goal.next_steps ?? "");
+  const [editingPlan,  setEditingPlan]    = useState(goal.ai_action_plan ?? "");
   const [linkerOpen, setLinkerOpen]       = useState(false);
   const [refreshing, setRefreshing]       = useState(false);
+  const [suggestingPlan, setSuggestingPlan] = useState(false);
+
+  async function handleSuggestPlan() {
+    if (suggestingPlan) return;
+    setSuggestingPlan(true);
+    const suggestion = await onSuggestPlan(goal.id);
+    if (suggestion) setEditingPlan(suggestion);
+    setSuggestingPlan(false);
+  }
 
   const summaryAge = goal.ai_summary_updated_at
     ? Date.now() - new Date(goal.ai_summary_updated_at).getTime()
@@ -219,13 +230,29 @@ export default function GoalWidget({
             )}
           </div>
 
-          {/* Original action plan (collapsed) */}
-          {goal.ai_action_plan && (
-            <details className="text-xs">
-              <summary className="text-[10px] uppercase tracking-widest text-zinc-500 cursor-pointer">Original plan</summary>
-              <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-line mt-1.5">{goal.ai_action_plan}</p>
-            </details>
-          )}
+          {/* My plan — fully manual. What Sir's doing / taking to hit the goal.
+              The "Suggest with Jarvis" button is opt-in; never auto-fills. */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500">My plan</span>
+              <button
+                onClick={handleSuggestPlan}
+                disabled={suggestingPlan}
+                className="text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center gap-1 disabled:opacity-40"
+              >
+                <Sparkles size={10} />
+                {suggestingPlan ? "Drafting…" : (editingPlan.trim() ? "Replace with Jarvis draft" : "Suggest with Jarvis")}
+              </button>
+            </div>
+            <textarea
+              value={editingPlan}
+              onChange={(e) => setEditingPlan(e.target.value)}
+              onBlur={() => editingPlan !== (goal.ai_action_plan ?? "") && onUpdate(goal.id, { ai_action_plan: editingPlan })}
+              placeholder="What specifically you're doing / taking to get there. Substances, training, habits, milestones."
+              rows={4}
+              className="w-full bg-zinc-900 text-zinc-100 rounded-lg px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700 resize-y whitespace-pre-wrap"
+            />
+          </div>
 
           {/* Footer actions */}
           <div className="flex items-center justify-between pt-2 border-t border-zinc-900">

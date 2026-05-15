@@ -71,24 +71,38 @@ export function useLongTermGoals(bucket?: GoalBucket) {
       .single();
     if (error || !data) return null;
     await load();
-    // Fire one-shot action plan generation. Don't await — UI shouldn't block.
-    void fetch("/api/jarvis/action-plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goalId: data.id, title: data.title, category: data.category }),
-    }).catch(() => {});
+    // No auto-AI plan. Sir writes his own plan; opt-in suggestion via
+    // `suggestPlan(id)` if he wants Jarvis to draft something.
     return data as LongTermGoal;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, load]);
 
   const updateGoal = useCallback(async (
     id: string,
-    patch: Partial<Pick<LongTermGoal, "title" | "bucket" | "category" | "target_date" | "current_state" | "next_steps" | "metrics" | "sort_order">>,
+    patch: Partial<Pick<LongTermGoal, "title" | "bucket" | "category" | "target_date" | "current_state" | "next_steps" | "metrics" | "sort_order" | "ai_action_plan">>,
   ) => {
     await supabase.from("long_term_goals").update(patch).eq("id", id);
     await load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
+
+  // Opt-in: ask Jarvis to draft a plan. Same Haiku call we used to fire on
+  // goal creation, just no longer automatic. The drafted text writes
+  // straight into ai_action_plan; Sir can then edit it like any plan.
+  const suggestPlan = useCallback(async (id: string): Promise<string | null> => {
+    const goal = goals.find((g) => g.id === id);
+    if (!goal) return null;
+    const res = await fetch("/api/jarvis/action-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goalId: id, title: goal.title, category: goal.category }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { plan?: string };
+    await load();
+    return json.plan ?? null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals, load]);
 
   const archiveGoal = useCallback(async (id: string) => {
     await supabase.from("long_term_goals").update({ is_active: false }).eq("id", id);
@@ -118,5 +132,5 @@ export function useLongTermGoals(bucket?: GoalBucket) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
-  return { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary };
+  return { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan };
 }
