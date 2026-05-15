@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, Plus } from "lucide-react";
 import { useHealth } from "@/hooks/useHealth";
 import { val } from "@/lib/fmt";
+import LogSheet from "@/components/layout/LogSheet";
 
 export default function TopHeader() {
   const { health } = useHealth();
+  const [logOpen, setLogOpen] = useState(false);
 
   const date = new Date();
   const dayStr = date.toLocaleDateString("en-US", {
@@ -44,6 +47,13 @@ export default function TopHeader() {
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
             <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Live</span>
           </div>
+          <button
+            onClick={() => setLogOpen(true)}
+            aria-label="Log something"
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-zinc-900 hover:opacity-90 transition-opacity"
+          >
+            <Plus size={14} strokeWidth={3} />
+          </button>
           <Link href="/settings" className="text-zinc-500 hover:text-zinc-200 transition-colors">
             <SettingsIcon size={14} />
           </Link>
@@ -67,6 +77,8 @@ export default function TopHeader() {
           </>
         )}
       </div>
+
+      <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
   );
 }
