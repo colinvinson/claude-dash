@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { StackItem } from "@/hooks/useStack";
 import type { StackInsight } from "@/hooks/useStackInsights";
 import { AlertTriangle, X, Check } from "lucide-react";
+import { resolveItemStyle } from "@/lib/schedule/icons";
 
 // Schedule timeline — visual style matches the mockup:
 //   - Section header per bucket with emoji + clock range
@@ -74,6 +75,10 @@ function ItemRow({
 }) {
   const isSupply = SUPPLY_CATEGORIES.has(item.category);
   const canShowRunningLow = isSupply && onToggleRunningLow;
+  // Per-item icon + color (pill, syringe, sun, dumbbell, etc.) so each row
+  // is glanceable. When the item is taken, the circle flips to solid green
+  // with a check; otherwise it shows the item's own icon over a color tint.
+  const { Icon, color } = resolveItemStyle(item);
 
   return (
     <div
@@ -83,18 +88,20 @@ function ItemRow({
           : "bg-zinc-900/40 border-zinc-800/60"
       }`}
     >
-      {/* Big check-circle */}
+      {/* Big circle — item icon when undone, green check when done */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         aria-label={item.taken ? "Mark not done" : "Mark done"}
-        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all"
         style={
           item.taken
             ? { background: "#10b981", border: "2px solid #10b981" }
-            : { background: "transparent", border: "2px solid #3f3f46" }
+            : { background: `${color}1a`, border: `2px solid ${color}66` }
         }
       >
-        {item.taken && <Check size={16} strokeWidth={3} className="text-white" />}
+        {item.taken
+          ? <Check size={16} strokeWidth={3} className="text-white" />
+          : <Icon size={16} style={{ color }} />}
       </button>
 
       {/* Title + subtitle (tap to edit) */}
