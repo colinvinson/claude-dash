@@ -618,8 +618,8 @@ export async function buildContext(userId: string) {
     biometrics,
     mesocycle: mesoBlock,
     composition: {
-      currentWeightKg: latestWeightKg,
-      weightRateKgWk:   Number(compositionVerdict.weightRateKgWk.toFixed(3)),
+      currentWeightLb: latestWeightKg != null ? Number((latestWeightKg * 2.20462).toFixed(1)) : null,
+      weightRateLbWk:   Number(compositionVerdict.weightRateLbWk.toFixed(3)),
       strengthDeltaPct: Number(compositionVerdict.strengthDeltaPct.toFixed(1)),
       proteinAdherence: Number(compositionVerdict.proteinAdherence.toFixed(2)),
       daysOfWeightData: compositionVerdict.daysOfData,

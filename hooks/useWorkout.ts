@@ -17,6 +17,7 @@ import {
 import { buildSetProtocol, buildWarmupSets, type SetProtocol, type WarmupSet } from "@/lib/fitness/intensity-protocol";
 import { getMesoState, targetForMuscle, type MesocycleRow, type MesoState } from "@/lib/fitness/mesocycle";
 import { buildLifestyleContext, type LifestyleContext, type Driver } from "@/lib/fitness/lifestyle-drivers";
+import { kgToLb } from "@/lib/units";
 
 export type WorkoutSet = {
   id: string;
@@ -136,7 +137,7 @@ function analyze(
     const startWeight = isCompound ? 40 : isIsolation ? 10 : 20;
     return {
       status: "NEW", targetWeight: startWeight, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
-      headline: `First session — start at ${startWeight}kg`,
+      headline: `First session — start at ${kgToLb(startWeight).toFixed(0)} lb`,
       tip: `${isCompound ? "Compounds build the foundation. " : isIsolation ? "Focus on the squeeze, not the weight. " : ""}Nail form before adding load. Hit ${repRange.min}–${repRange.max} reps clean.`,
       recoveryAdjustment: null,
       setProtocol: [],
@@ -152,7 +153,7 @@ function analyze(
   if (prev && last.est_1rm < prev.est_1rm * 0.95) {
     return {
       status: "REGRESSION", targetWeight: prev.weight_kg, targetReps: repRange.min, targetSets: 3, rpeCap: 8, repRange,
-      headline: `Step back to ${prev.weight_kg}kg — strength dropped`,
+      headline: `Step back to ${kgToLb(prev.weight_kg).toFixed(0)} lb — strength dropped`,
       tip: "Est. 1RM fell >5%. Return to last good weight and rebuild. Check sleep quality, caloric intake, and weekly volume — you may be overreaching.",
       recoveryAdjustment: null,
       setProtocol: [],
@@ -167,8 +168,8 @@ function analyze(
     const next = Math.round((last.weight_kg + increment) * 100) / 100;
     return {
       status: "PROGRESS", targetWeight: next, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
-      headline: `Load up — ${next}kg, aim for ${repRange.min} reps`,
-      tip: `You hit ${last.reps} reps at ${last.weight_kg}kg. Add ${increment}kg and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
+      headline: `Load up — ${kgToLb(next).toFixed(0)} lb, aim for ${repRange.min} reps`,
+      tip: `You hit ${last.reps} reps at ${kgToLb(last.weight_kg).toFixed(0)} lb. Add ${kgToLb(increment).toFixed(1)} lb and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
@@ -186,8 +187,8 @@ function analyze(
     if (stalled) {
       return {
         status: "STALLING", targetWeight: last.weight_kg, targetReps: last.reps, targetSets: 3, rpeCap: null, repRange,
-        headline: `Plateau at ${last.weight_kg}kg — push harder`,
-        tip: `3 sessions at ${last.weight_kg}kg with no rep gain. Try drop-sets: after your top set, strip ${Math.round(last.weight_kg * 0.15)}kg and hit a full AMRAP with no rest. Metabolic overload breaks plateaus.`,
+        headline: `Plateau at ${kgToLb(last.weight_kg).toFixed(0)} lb — push harder`,
+        tip: `3 sessions at ${kgToLb(last.weight_kg).toFixed(0)} lb with no rep gain. Try drop-sets: after your top set, strip ${Math.round(kgToLb(last.weight_kg) * 0.15)} lb and hit a full AMRAP with no rest. Metabolic overload breaks plateaus.`,
         recoveryAdjustment: null,
         setProtocol: [],
         warmupSets: [],
@@ -199,7 +200,7 @@ function analyze(
   // Grind: in range, push for more reps
   return {
     status: "GRIND", targetWeight: last.weight_kg, targetReps: Math.min(last.reps + 1, repRange.max), targetSets: 3, rpeCap: null, repRange,
-    headline: `${last.weight_kg}kg — push for ${Math.min(last.reps + 1, repRange.max)}+ reps`,
+    headline: `${kgToLb(last.weight_kg).toFixed(0)} lb — push for ${Math.min(last.reps + 1, repRange.max)}+ reps`,
     tip: `Last best: ${last.reps} reps. You need ${repRange.max} to unlock the next weight. ${isIsolation ? "Slow 3-second eccentric — time under tension drives growth." : isCompound ? "Control the descent, explode up." : ""}`,
     recoveryAdjustment: null,
     setProtocol: [],
@@ -601,7 +602,7 @@ export function useWorkout() {
       nextVerdict = {
         ...nextVerdict,
         status:   "GRIND",
-        headline: `${verdict.targetWeight}kg — strength dip is the cut, not the program`,
+        headline: `${kgToLb(verdict.targetWeight).toFixed(0)} lb — strength dip is the cut, not the program`,
         tip:      `Est. 1RM slipped — expected on a clean cut. Hold the weight, hit reps cleanly. Don't chase PRs in a deficit. ${lifestyleCtx.sleepHrs7dAvg && lifestyleCtx.sleepHrs7dAvg < 7 ? `Sleep ${lifestyleCtx.sleepHrs7dAvg.toFixed(1)}h avg — getting that up matters more than the weight on the bar right now.` : ""}`.trim(),
       };
     } else if ((verdict.status === "STALLING" || verdict.status === "GRIND") && lifestyleCtx.hasMajorDrag) {

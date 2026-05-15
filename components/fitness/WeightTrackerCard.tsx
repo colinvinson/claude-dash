@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useWeight } from "@/hooks/useWeight";
 import Card from "@/components/ui/Card";
 import { TrendingUp, TrendingDown, Minus, Scale } from "lucide-react";
+import { kgToLb, lbToKg } from "@/lib/units";
 
 // Color per verdict tag — green for clear positives (lean-bulk, recomp,
 // clean-cut), amber for "watch out", red for clear negatives, zinc neutral.
@@ -45,25 +46,31 @@ export default function WeightTrackerCard() {
   const [submitting, setSubmitting] = useState(false);
 
   async function handleLog() {
-    const n = parseFloat(draft);
-    if (!isFinite(n) || n <= 0) return;
+    // User types pounds; stored as kg in DB.
+    const lb = parseFloat(draft);
+    if (!isFinite(lb) || lb <= 0) return;
     setSubmitting(true);
-    await logWeight(n);
+    await logWeight(lbToKg(lb));
     setDraft("");
     setSubmitting(false);
   }
 
+  // Convert the kg-stored signals to lb for display. Thresholds adjusted
+  // (~0.22 lb is the equivalent of the old 0.1 kg trend tolerance).
+  const currentLb = currentKg != null ? kgToLb(currentKg) : null;
+  const delta7Lb  = delta7    != null ? kgToLb(delta7)    : null;
+
   const tagColor = verdict ? TAG_COLOR[verdict.tag] ?? "#a1a1aa" : "#a1a1aa";
   const TrendIcon =
-    delta7 == null ? Minus :
-    delta7 >  0.1  ? TrendingUp :
-    delta7 < -0.1  ? TrendingDown :
-                     Minus;
+    delta7Lb == null ? Minus :
+    delta7Lb >  0.25 ? TrendingUp :
+    delta7Lb < -0.25 ? TrendingDown :
+                       Minus;
   const deltaColor =
-    delta7 == null ? "text-zinc-500" :
-    delta7 >  0.1  ? "text-orange-400" :
-    delta7 < -0.1  ? "text-sky-400" :
-                     "text-zinc-400";
+    delta7Lb == null ? "text-zinc-500" :
+    delta7Lb >  0.25 ? "text-orange-400" :
+    delta7Lb < -0.25 ? "text-sky-400" :
+                       "text-zinc-400";
 
   return (
     <Card>
@@ -74,20 +81,20 @@ export default function WeightTrackerCard() {
 
       <div className="flex items-baseline gap-3 mb-3">
         <span className="text-4xl font-bold tabular-nums text-zinc-100">
-          {currentKg != null ? currentKg.toFixed(1) : "—"}
+          {currentLb != null ? currentLb.toFixed(1) : "—"}
         </span>
-        <span className="text-base text-zinc-500">kg</span>
-        {delta7 != null && (
+        <span className="text-base text-zinc-500">lb</span>
+        {delta7Lb != null && (
           <span className={`flex items-center gap-1 text-xs tabular-nums ${deltaColor}`}>
             <TrendIcon size={12} />
-            {delta7 >= 0 ? "+" : ""}{delta7.toFixed(2)} 7d
+            {delta7Lb >= 0 ? "+" : ""}{delta7Lb.toFixed(1)} 7d
           </span>
         )}
       </div>
 
       {points.length >= 2 && (
         <div className="mb-3">
-          <Sparkline values={points.map((p) => p.weight_kg)} color={tagColor} />
+          <Sparkline values={points.map((p) => kgToLb(p.weight_kg))} color={tagColor} />
         </div>
       )}
 
@@ -103,7 +110,7 @@ export default function WeightTrackerCard() {
             onChange={(e) => setDraft(e.target.value)}
             className="bg-transparent text-sm text-zinc-100 placeholder:text-zinc-600 flex-1 outline-none tabular-nums"
           />
-          <span className="text-xs text-zinc-500">kg</span>
+          <span className="text-xs text-zinc-500">lb</span>
         </div>
         <button
           onClick={handleLog}
@@ -122,7 +129,7 @@ export default function WeightTrackerCard() {
             </span>
             {verdict.tag !== "insufficient" && (
               <span className="text-[10px] text-zinc-500 tabular-nums">
-                {verdict.weightRateKgWk >= 0 ? "+" : ""}{verdict.weightRateKgWk.toFixed(2)} kg/wk
+                {verdict.weightRateLbWk >= 0 ? "+" : ""}{verdict.weightRateLbWk.toFixed(2)} lb/wk
                 {" · "}
                 1RM {verdict.strengthDeltaPct >= 0 ? "+" : ""}{verdict.strengthDeltaPct.toFixed(1)}%
                 {" · "}

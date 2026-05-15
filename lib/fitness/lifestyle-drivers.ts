@@ -108,7 +108,7 @@ export function buildLifestyleContext(inputs: LifestyleInputs): LifestyleContext
 
   if (compositionTag === "lean-bulk") {
     drivers.push({
-      text: `Composition phase: lean bulk (${recomp.weightRateKgWk >= 0 ? "+" : ""}${recomp.weightRateKgWk.toFixed(2)} kg/wk, ${recomp.strengthDeltaPct >= 0 ? "+" : ""}${recomp.strengthDeltaPct.toFixed(1)}% strength). Surplus is landing as muscle — push for PRs.`,
+      text: `Composition phase: lean bulk (${recomp.weightRateLbWk >= 0 ? "+" : ""}${recomp.weightRateLbWk.toFixed(2)} lb/wk, ${recomp.strengthDeltaPct >= 0 ? "+" : ""}${recomp.strengthDeltaPct.toFixed(1)}% strength). Surplus is landing as muscle — push for PRs.`,
       severity: "good",
     });
   } else if (compositionTag === "recomp") {

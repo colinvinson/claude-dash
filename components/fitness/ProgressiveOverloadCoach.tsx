@@ -9,6 +9,7 @@ import WeeklyVolumeCard from "@/components/fitness/WeeklyVolumeCard";
 import RecoveryStrainCard from "@/components/fitness/RecoveryStrainCard";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 import { X, Zap } from "lucide-react";
+import { kgToLb, lbToKg, roundToPlate } from "@/lib/units";
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -37,7 +38,10 @@ export default function ProgressiveOverloadCoach() {
     muscleStatus,
   } = useWorkout();
 
-  const [weight,    setWeight]    = useState(20);
+  // weight is in POUNDS for input + display. Convert to kg only at logSet time.
+  // The verdict.targetWeight comes from useWorkout in kg, so we kg→lb on
+  // initialization and round to a 2.5lb plate increment.
+  const [weight,    setWeight]    = useState(45);
   const [reps,      setReps]      = useState(8);
   const [logging,   setLogging]   = useState(false);
   const [flash,     setFlash]     = useState<string | null>(null);
@@ -51,10 +55,10 @@ export default function ProgressiveOverloadCoach() {
       const src = useOriginal && verdict.recoveryAdjustment
         ? verdict.recoveryAdjustment.original
         : { targetWeight: verdict.targetWeight, targetReps: verdict.targetReps };
-      setWeight(src.targetWeight);
+      setWeight(roundToPlate(kgToLb(src.targetWeight), 2.5));
       setReps(src.targetReps);
     } else {
-      setWeight(20);
+      setWeight(45);
       setReps(8);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +66,8 @@ export default function ProgressiveOverloadCoach() {
 
   async function handleLog() {
     setLogging(true);
-    await logSet(weight, reps);
+    // Store in DB as kg.
+    await logSet(lbToKg(weight), reps);
     setLogging(false);
     setFlash(`Set ${todaySets.length + 1} logged`);
     setTimeout(() => setFlash(null), 2500);
@@ -172,9 +177,9 @@ export default function ProgressiveOverloadCoach() {
                 <p className="text-xs text-zinc-300 leading-relaxed mb-2">{adjustment.reason}</p>
                 {!forcePR && (
                   <p className="text-[10px] text-zinc-500">
-                    Original: {adjustment.original.targetWeight}kg × {adjustment.original.targetReps} · {adjustment.original.targetSets} sets
+                    Original: {kgToLb(adjustment.original.targetWeight).toFixed(0)}lb × {adjustment.original.targetReps} · {adjustment.original.targetSets} sets
                     {" → "}
-                    Now: {adjustment.adjusted.targetWeight}kg × {adjustment.adjusted.targetReps} · {adjustment.adjusted.targetSets} sets
+                    Now: {kgToLb(adjustment.adjusted.targetWeight).toFixed(0)}lb × {adjustment.adjusted.targetReps} · {adjustment.adjusted.targetSets} sets
                   </p>
                 )}
                 <button
@@ -192,7 +197,7 @@ export default function ProgressiveOverloadCoach() {
             <div className="flex items-center gap-4 pt-3 mt-3 border-t border-[#1f1f1f]">
               <div className="text-center">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Target</p>
-                <p className="text-lg font-bold text-white">{weight}<span className="text-xs text-zinc-500 font-normal ml-0.5">kg</span></p>
+                <p className="text-lg font-bold text-white">{weight}<span className="text-xs text-zinc-500 font-normal ml-0.5">lb</span></p>
               </div>
               <div className="w-px h-8 bg-[#1f1f1f]" />
               <div className="text-center">
@@ -209,7 +214,7 @@ export default function ProgressiveOverloadCoach() {
                   <div className="w-px h-8 bg-[#1f1f1f]" />
                   <div className="text-center">
                     <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Est. 1RM</p>
-                    <p className="text-lg font-bold text-white">{pastSessions[0].topEst1rm}<span className="text-xs text-zinc-500 font-normal ml-0.5">kg</span></p>
+                    <p className="text-lg font-bold text-white">{kgToLb(pastSessions[0].topEst1rm).toFixed(0)}<span className="text-xs text-zinc-500 font-normal ml-0.5">lb</span></p>
                   </div>
                 </>
               )}
@@ -232,7 +237,7 @@ export default function ProgressiveOverloadCoach() {
                         Easy
                       </span>
                       <span className="text-xs text-zinc-400 tabular-nums">
-                        {w.weight}<span className="text-zinc-600">kg</span> × {w.reps}
+                        {kgToLb(w.weight).toFixed(0)}<span className="text-zinc-600">lb</span> × {w.reps}
                       </span>
                     </div>
                   ))}
@@ -288,10 +293,10 @@ export default function ProgressiveOverloadCoach() {
                   <div key={s.id} className="flex items-center justify-between py-2 px-3 bg-zinc-800/50 rounded-xl">
                     <span className="text-[10px] text-zinc-600 uppercase tracking-widest w-10">Set {i + 1}</span>
                     <span className="text-sm font-semibold text-zinc-100 flex-1 text-center">
-                      {s.weight_kg}kg × {s.reps}
+                      {kgToLb(s.weight_kg).toFixed(0)}lb × {s.reps}
                     </span>
                     <span className="text-[10px] text-zinc-600 w-16 text-right">
-                      {`${s.est_1rm}kg 1RM`}
+                      {`${kgToLb(s.est_1rm).toFixed(0)}lb 1RM`}
                     </span>
                     <button
                       onClick={() => deleteSet(s.id)}
@@ -306,7 +311,7 @@ export default function ProgressiveOverloadCoach() {
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-zinc-600">Volume</p>
                   <p className="text-sm font-semibold text-zinc-300">
-                    {todaySets.reduce((sum, s) => sum + s.weight_kg * s.reps, 0).toLocaleString()}kg
+                    {kgToLb(todaySets.reduce((sum, s) => sum + s.weight_kg * s.reps, 0)).toFixed(0).toLocaleString()}lb
                   </p>
                 </div>
                 <div>
@@ -316,7 +321,7 @@ export default function ProgressiveOverloadCoach() {
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-zinc-600">Best 1RM</p>
                   <p className="text-sm font-semibold text-zinc-300">
-                    {Math.max(...todaySets.map((s) => s.est_1rm))}kg
+                    {kgToLb(Math.max(...todaySets.map((s) => s.est_1rm))).toFixed(0)}lb
                   </p>
                 </div>
               </div>
@@ -329,22 +334,40 @@ export default function ProgressiveOverloadCoach() {
               — {todaySets.length > 0 ? `Log Set ${todaySets.length + 1}` : "Log First Set"}
             </span>
 
-            {/* Weight */}
+            {/* Weight — input + display in pounds. Increments match US gym plate
+                conventions: 5 lb (a single 5 plate per side) and 2.5 lb (a single
+                2.5 per side). Stored as kg via lbToKg() at logSet time. */}
             <div className="mb-4">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-2">Weight (kg)</span>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-2">Weight (lb)</span>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setWeight((w) => Math.max(0, Math.round((w - 2.5) * 10) / 10))}
+                  onClick={() => setWeight((w) => Math.max(0, Math.round((w - 5) * 10) / 10))}
                   className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xl flex items-center justify-center transition-colors"
+                  aria-label="Subtract 5 lb"
                 >
                   −
                 </button>
                 <span className="text-5xl font-bold text-white flex-1 text-center tabular-nums">{weight}</span>
                 <button
-                  onClick={() => setWeight((w) => Math.round((w + 2.5) * 10) / 10)}
+                  onClick={() => setWeight((w) => Math.round((w + 5) * 10) / 10)}
                   className="w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-xl flex items-center justify-center transition-colors"
+                  aria-label="Add 5 lb"
                 >
                   +
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  onClick={() => setWeight((w) => Math.max(0, Math.round((w - 2.5) * 10) / 10))}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 hover:border-zinc-700"
+                >
+                  −2.5
+                </button>
+                <button
+                  onClick={() => setWeight((w) => Math.round((w + 2.5) * 10) / 10)}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 hover:border-zinc-700"
+                >
+                  +2.5
                 </button>
               </div>
             </div>
@@ -379,10 +402,10 @@ export default function ProgressiveOverloadCoach() {
             </div>
 
 
-            {/* est 1RM preview */}
+            {/* est 1RM preview — Epley formula on the lb input. */}
             <div className="mb-4">
               <span className="text-[10px] text-zinc-600">
-                est. 1RM: <span className="text-zinc-400 font-semibold">{Math.round(weight * (1 + reps / 30))}kg</span>
+                est. 1RM: <span className="text-zinc-400 font-semibold">{Math.round(weight * (1 + reps / 30))} lb</span>
                 {inRange && <span className="text-zinc-600 ml-1">· in target range</span>}
               </span>
             </div>
@@ -416,7 +439,7 @@ export default function ProgressiveOverloadCoach() {
                       content={({ active, payload }) =>
                         active && payload?.length ? (
                           <div className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200">
-                            {`Session ${payload[0].payload.session}: ${payload[0].value}kg`}
+                            {`Session ${payload[0].payload.session}: ${kgToLb(payload[0].value as number).toFixed(0)} lb`}
                           </div>
                         ) : null
                       }
@@ -441,11 +464,11 @@ export default function ProgressiveOverloadCoach() {
                       {new Date(sess.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </span>
                     <span className="text-sm font-semibold text-zinc-200 flex-1 text-center">
-                      {sess.bestSet.weight_kg}kg × {sess.bestSet.reps}
+                      {kgToLb(sess.bestSet.weight_kg).toFixed(0)}lb × {sess.bestSet.reps}
                     </span>
                     <div className="text-right">
-                      <p className="text-[10px] text-zinc-600">{sess.topEst1rm}kg 1RM</p>
-                      <p className="text-[10px] text-zinc-700">{sess.volume.toLocaleString()}kg vol</p>
+                      <p className="text-[10px] text-zinc-600">{kgToLb(sess.topEst1rm).toFixed(0)}lb 1RM</p>
+                      <p className="text-[10px] text-zinc-700">{kgToLb(sess.volume).toFixed(0).toLocaleString()}lb vol</p>
                     </div>
                   </div>
                 ))}

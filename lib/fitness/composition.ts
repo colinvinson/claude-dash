@@ -4,6 +4,11 @@
 //
 // Used by both the client hook (useWeight) and the AI context-builder so the
 // dashboard verdict and the verdict Jarvis sees stay in lockstep.
+//
+// Internal storage stays in kg (matches DB). User-facing strings render in
+// pounds because that's what Sir uses.
+
+import { kgToLb } from "@/lib/units";
 
 export type WeightPoint = { date: string; weight_kg: number };
 
@@ -21,7 +26,8 @@ export type RecompVerdict = {
   headline: string;
   detail: string;
   tag: RecompTag;
-  weightRateKgWk: number;
+  // Slope of weight over time, in lb/wk. Positive = gaining.
+  weightRateLbWk: number;
   strengthDeltaPct: number;
   proteinAdherence: number;
   daysOfData: number;
@@ -52,6 +58,14 @@ function slope(xs: number[], ys: number[]): number {
   return (n * sumXY - sumX * sumY) / denom;
 }
 
+// Gain/loss thresholds, originally tuned for kg/wk:
+//   0.1 kg/wk = ~0.22 lb/wk (slow gain band start)
+//   0.5 kg/wk = ~1.10 lb/wk (fast cut threshold)
+// Same algorithm — we just compare in lb after converting.
+const GAIN_RATE_THRESHOLD_LB = kgToLb(RECOMP_CONSTANTS.GAIN_RATE_THRESHOLD);
+const LOSS_RATE_THRESHOLD_LB = kgToLb(RECOMP_CONSTANTS.LOSS_RATE_THRESHOLD);
+const FAST_CUT_THRESHOLD_LB  = kgToLb(RECOMP_CONSTANTS.FAST_CUT_THRESHOLD);
+
 export function deriveRecompVerdict(
   points: WeightPoint[],
   strengthDeltaPct: number,
@@ -65,7 +79,7 @@ export function deriveRecompVerdict(
       headline: "Logging in — keep going",
       detail: `Need ${C.MIN_DAYS_FOR_VERDICT - daysOfData} more days of weight logs before a verdict locks in. Aim for daily morning weigh-ins.`,
       tag: "insufficient",
-      weightRateKgWk: 0,
+      weightRateLbWk: 0,
       strengthDeltaPct,
       proteinAdherence,
       daysOfData,
@@ -76,6 +90,7 @@ export function deriveRecompVerdict(
   const xs = points.map((p) => (new Date(p.date).getTime() - firstTs) / 86400000);
   const ys = points.map((p) => p.weight_kg);
   const weightRateKgWk = slope(xs, ys) * 7;
+  const weightRateLbWk = kgToLb(weightRateKgWk);
 
   const proteinOk    = proteinAdherence >= C.PROTEIN_ADHERENCE_OK;
   const strengthUp   = strengthDeltaPct >  C.STRENGTH_UP_PCT;
@@ -89,71 +104,71 @@ export function deriveRecompVerdict(
     strengthDown ? `strength down ${Math.abs(strengthDeltaPct).toFixed(1)}%` :
                    `strength flat (${strengthDeltaPct >= 0 ? "+" : ""}${strengthDeltaPct.toFixed(1)}%)`;
 
-  if (weightRateKgWk > C.GAIN_RATE_THRESHOLD) {
+  if (weightRateLbWk > GAIN_RATE_THRESHOLD_LB) {
     if (strengthUp && proteinOk) {
       return {
-        headline: `Lean bulk — gaining muscle (+${weightRateKgWk.toFixed(2)} kg/wk)`,
+        headline: `Lean bulk — gaining muscle (+${weightRateLbWk.toFixed(2)} lb/wk)`,
         detail: `Weight up at a lean-bulk pace and ${strengthNote}, ${proteinNote}. Most of this gain is muscle. Hold the line.`,
         tag: "lean-bulk",
-        weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+        weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
       };
     }
     if (strengthUp && !proteinOk) {
       return {
         headline: `Adding mostly fat — protein too low`,
-        detail: `Weight up +${weightRateKgWk.toFixed(2)} kg/wk and ${strengthNote}, but ${proteinNote}. Strength gains likely come with more fat than necessary. Hit protein consistently to shift the ratio.`,
+        detail: `Weight up +${weightRateLbWk.toFixed(2)} lb/wk and ${strengthNote}, but ${proteinNote}. Strength gains likely come with more fat than necessary. Hit protein consistently to shift the ratio.`,
         tag: "fat-gain",
-        weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+        weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
       };
     }
     if (strengthDown) {
       return {
         headline: `Fat gain + overreaching`,
-        detail: `Weight climbing +${weightRateKgWk.toFixed(2)} kg/wk while ${strengthNote}. Recovery or volume mismatch — cut the surplus and reassess.`,
+        detail: `Weight climbing +${weightRateLbWk.toFixed(2)} lb/wk while ${strengthNote}. Recovery or volume mismatch — cut the surplus and reassess.`,
         tag: "regression",
-        weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+        weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
       };
     }
     return {
       headline: `Adding mostly fat`,
-      detail: `Weight up +${weightRateKgWk.toFixed(2)} kg/wk but ${strengthNote} — gain isn't translating into strength. Slow the bulk or push harder in the gym.`,
+      detail: `Weight up +${weightRateLbWk.toFixed(2)} lb/wk but ${strengthNote} — gain isn't translating into strength. Slow the bulk or push harder in the gym.`,
       tag: "fat-gain",
-      weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+      weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
     };
   }
 
-  if (weightRateKgWk < C.LOSS_RATE_THRESHOLD) {
-    const lossRate = Math.abs(weightRateKgWk);
-    if (weightRateKgWk < C.FAST_CUT_THRESHOLD && strengthDown) {
+  if (weightRateLbWk < LOSS_RATE_THRESHOLD_LB) {
+    const lossRate = Math.abs(weightRateLbWk);
+    if (weightRateLbWk < FAST_CUT_THRESHOLD_LB && strengthDown) {
       return {
         headline: `Cutting too fast — losing muscle`,
-        detail: `Down ${lossRate.toFixed(2)} kg/wk and ${strengthNote}. The deficit is too aggressive. Slow the cut, push protein.`,
+        detail: `Down ${lossRate.toFixed(2)} lb/wk and ${strengthNote}. The deficit is too aggressive. Slow the cut, push protein.`,
         tag: "lossy-cut",
-        weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+        weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
       };
     }
     if (strengthDown) {
       return {
         headline: `Losing muscle in the cut`,
-        detail: `Down ${lossRate.toFixed(2)} kg/wk and ${strengthNote}, ${proteinNote}. Slow the deficit and lock protein in.`,
+        detail: `Down ${lossRate.toFixed(2)} lb/wk and ${strengthNote}, ${proteinNote}. Slow the deficit and lock protein in.`,
         tag: "lossy-cut",
-        weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+        weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
       };
     }
     return {
       headline: `Clean cut — losing fat, holding strength`,
-      detail: `Down ${lossRate.toFixed(2)} kg/wk and ${strengthNote}, ${proteinNote}. The cut is working. Keep going.`,
+      detail: `Down ${lossRate.toFixed(2)} lb/wk and ${strengthNote}, ${proteinNote}. The cut is working. Keep going.`,
       tag: "clean-cut",
-      weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+      weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
     };
   }
 
   if (strengthUp) {
     return {
       headline: `Recomp — gaining muscle, losing fat`,
-      detail: `Weight stable (${weightRateKgWk >= 0 ? "+" : ""}${weightRateKgWk.toFixed(2)} kg/wk) and ${strengthNote}. Classic recomp signal. ${proteinNote}.`,
+      detail: `Weight stable (${weightRateLbWk >= 0 ? "+" : ""}${weightRateLbWk.toFixed(2)} lb/wk) and ${strengthNote}. Classic recomp signal. ${proteinNote}.`,
       tag: "recomp",
-      weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+      weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
     };
   }
   if (strengthDown) {
@@ -161,14 +176,14 @@ export function deriveRecompVerdict(
       headline: `Strength regressing on stable weight`,
       detail: `Weight flat but ${strengthNote}. Recovery, sleep, or volume issue — not a composition problem.`,
       tag: "regression",
-      weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+      weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
     };
   }
   return {
     headline: `Maintaining`,
     detail: `Weight flat and ${strengthNote}. ${proteinNote}. If recomp is the goal, push harder in the gym or tighten protein.`,
     tag: "maintain",
-    weightRateKgWk, strengthDeltaPct, proteinAdherence, daysOfData,
+    weightRateLbWk, strengthDeltaPct, proteinAdherence, daysOfData,
   };
 }
 
