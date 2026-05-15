@@ -25,8 +25,6 @@ const TYPE_BADGE: Record<string, { label: string; color: string }> = {
 };
 
 const REPS = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20];
-const RPE_OPTIONS = [6, 7, 8, 9, 10];
-const RPE_LABEL: Record<number, string> = { 6: "Easy", 7: "Moderate", 8: "Hard", 9: "Very Hard", 10: "Max" };
 
 export default function ProgressiveOverloadCoach() {
   const {
@@ -40,7 +38,6 @@ export default function ProgressiveOverloadCoach() {
 
   const [weight,    setWeight]    = useState(20);
   const [reps,      setReps]      = useState(8);
-  const [rpe,       setRpe]       = useState<number | null>(null);
   const [logging,   setLogging]   = useState(false);
   const [flash,     setFlash]     = useState<string | null>(null);
   const [forcePR,   setForcePR]   = useState(false);
@@ -59,13 +56,12 @@ export default function ProgressiveOverloadCoach() {
       setWeight(20);
       setReps(8);
     }
-    setRpe(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExId, forcePR, verdict?.recoveryAdjustment?.applied]);
 
   async function handleLog() {
     setLogging(true);
-    await logSet(weight, reps, rpe ?? undefined);
+    await logSet(weight, reps);
     setLogging(false);
     setFlash(`Set ${todaySets.length + 1} logged`);
     setTimeout(() => setFlash(null), 2500);
@@ -144,9 +140,6 @@ export default function ProgressiveOverloadCoach() {
             </div>
             <p className="text-xl font-bold text-white leading-snug mb-2">{verdict.headline}</p>
             <p className="text-xs text-zinc-500 leading-relaxed mb-2">{verdict.tip}</p>
-            {verdict.rpeContext && (
-              <p className="text-[10px] text-zinc-600 italic mb-2">{verdict.rpeContext}</p>
-            )}
             {muscleStatus && muscleStatus.hoursSince != null && muscleStatus.hoursSince < 72 && (
               <p className="text-[10px] text-zinc-600 mb-2">
                 {activeExercise.muscle_group} hit {muscleStatus.hoursSince}h ago · {muscleStatus.hardSetsLast48h} hard sets in 48h · {muscleStatus.status.replace("-", " ")}
@@ -161,7 +154,6 @@ export default function ProgressiveOverloadCoach() {
                     Original: {adjustment.original.targetWeight}kg × {adjustment.original.targetReps} · {adjustment.original.targetSets} sets
                     {" → "}
                     Now: {adjustment.adjusted.targetWeight}kg × {adjustment.adjusted.targetReps} · {adjustment.adjusted.targetSets} sets
-                    {adjustment.adjusted.rpeCap && ` · RPE ${adjustment.adjusted.rpeCap} cap`}
                   </p>
                 )}
                 <button
@@ -278,7 +270,7 @@ export default function ProgressiveOverloadCoach() {
                       {s.weight_kg}kg × {s.reps}
                     </span>
                     <span className="text-[10px] text-zinc-600 w-16 text-right">
-                      {s.rpe ? `RPE ${s.rpe}` : `${s.est_1rm}kg 1RM`}
+                      {`${s.est_1rm}kg 1RM`}
                     </span>
                     <button
                       onClick={() => deleteSet(s.id)}
@@ -365,38 +357,6 @@ export default function ProgressiveOverloadCoach() {
               </div>
             </div>
 
-            {/* RPE */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-500">RPE — How Hard?</span>
-                {rpe && <span className="text-[10px] text-zinc-500">{RPE_LABEL[rpe]}</span>}
-              </div>
-              <div className="flex gap-2">
-                {RPE_OPTIONS.map((r) => {
-                  const isTarget = r >= 8;
-                  return (
-                    <button
-                      key={r}
-                      onClick={() => setRpe(rpe === r ? null : r)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
-                        rpe === r
-                          ? isTarget
-                            ? "bg-emerald-500/30 text-emerald-300 border border-emerald-500/50"
-                            : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                          : isTarget
-                          ? "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-emerald-700 hover:text-zinc-200"
-                          : "bg-zinc-800 text-zinc-600 hover:bg-zinc-700 hover:text-zinc-400"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-zinc-700 mt-1.5">
-                6–7 = too easy · <span className="text-emerald-800">8–10 = hypertrophy zone</span>
-              </p>
-            </div>
 
             {/* est 1RM preview */}
             <div className="mb-4">
@@ -461,9 +421,6 @@ export default function ProgressiveOverloadCoach() {
                     </span>
                     <span className="text-sm font-semibold text-zinc-200 flex-1 text-center">
                       {sess.bestSet.weight_kg}kg × {sess.bestSet.reps}
-                      {sess.bestSet.rpe && (
-                        <span className="text-zinc-600 text-[10px] ml-1">RPE {sess.bestSet.rpe}</span>
-                      )}
                     </span>
                     <div className="text-right">
                       <p className="text-[10px] text-zinc-600">{sess.topEst1rm}kg 1RM</p>

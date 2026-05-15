@@ -45,7 +45,6 @@ export type CoachVerdict = {
   repRange: { min: number; max: number };
   headline: string;
   tip: string;
-  rpeContext: string | null;
   recoveryAdjustment: Adjustment | null;
   // Per-set RIR + technique guidance, derived from exerciseType + status +
   // recovery. Populated by useWorkout after computePrescription returns.
@@ -130,7 +129,6 @@ function analyze(
       status: "NEW", targetWeight: startWeight, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
       headline: `First session — start at ${startWeight}kg`,
       tip: `${isCompound ? "Compounds build the foundation. " : isIsolation ? "Focus on the squeeze, not the weight. " : ""}Nail form before adding load. Hit ${repRange.min}–${repRange.max} reps clean.`,
-      rpeContext: null,
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
@@ -139,15 +137,6 @@ function analyze(
 
   const last = pastSessions[0].bestSet;
   const prev = pastSessions[1]?.bestSet ?? null;
-  const lastRPE = last.rpe;
-
-  // Build RPE context string
-  let rpeContext: string | null = null;
-  if (lastRPE) {
-    if (lastRPE >= 9)    rpeContext = `Last session RPE ${lastRPE}/10 — working at max, make sure recovery matches`;
-    else if (lastRPE === 8) rpeContext = `Last session RPE 8/10 — perfect hypertrophy intensity`;
-    else if (lastRPE <= 7) rpeContext = `Last session RPE ${lastRPE}/10 — too easy. Hypertrophy requires RPE 8–10 (0–2 reps left in the tank)`;
-  }
 
   // Regression: est_1RM down >5% vs previous session
   if (prev && last.est_1rm < prev.est_1rm * 0.95) {
@@ -155,7 +144,6 @@ function analyze(
       status: "REGRESSION", targetWeight: prev.weight_kg, targetReps: repRange.min, targetSets: 3, rpeCap: 8, repRange,
       headline: `Step back to ${prev.weight_kg}kg — strength dropped`,
       tip: "Est. 1RM fell >5%. Return to last good weight and rebuild. Check sleep quality, caloric intake, and weekly volume — you may be overreaching.",
-      rpeContext,
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
@@ -166,14 +154,10 @@ function analyze(
   if (last.reps >= repRange.max) {
     const increment = isCompound ? 2.5 : 1.25;
     const next = Math.round((last.weight_kg + increment) * 100) / 100;
-    const rpeNote = lastRPE && lastRPE >= 9
-      ? " — even though it felt maximal, the reps prove you're ready."
-      : ".";
     return {
       status: "PROGRESS", targetWeight: next, targetReps: repRange.min, targetSets: 3, rpeCap: null, repRange,
       headline: `Load up — ${next}kg, aim for ${repRange.min} reps`,
-      tip: `You hit ${last.reps} reps at ${last.weight_kg}kg${rpeNote} Add ${increment}kg and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
-      rpeContext,
+      tip: `You hit ${last.reps} reps at ${last.weight_kg}kg. Add ${increment}kg and grind back up to ${repRange.max}. ${isIsolation ? "Keep tension on the muscle throughout." : isCompound ? "Same technique, new weight." : ""}`,
       recoveryAdjustment: null,
       setProtocol: [],
       warmupSets: [],
@@ -188,18 +172,10 @@ function analyze(
       recent[0].reps <= recent[2].reps;
 
     if (stalled) {
-      const highRPE = recent.some((s) => s.rpe && s.rpe >= 9);
-      const lowRPE  = recent.every((s) => s.rpe && s.rpe <= 7);
-      const tip = highRPE
-        ? `Training near max effort with no progress = recovery/volume issue. Take a deload: drop to ${Math.round(last.weight_kg * 0.8)}kg for one session, then come back fresh. Check sleep and calories.`
-        : lowRPE
-        ? `You're not pushing hard enough. Same weight 3 sessions but RPE is low. On your last set, leave nothing in the tank — rep it to near-failure.`
-        : `3 sessions at ${last.weight_kg}kg. Try drop-sets: after your top set, strip ${Math.round(last.weight_kg * 0.15)}kg and hit a full AMRAP with no rest. Metabolic overload breaks plateaus.`;
       return {
         status: "STALLING", targetWeight: last.weight_kg, targetReps: last.reps, targetSets: 3, rpeCap: null, repRange,
-        headline: `Plateau at ${last.weight_kg}kg — ${highRPE ? "deload needed" : "push harder"}`,
-        tip,
-        rpeContext,
+        headline: `Plateau at ${last.weight_kg}kg — push harder`,
+        tip: `3 sessions at ${last.weight_kg}kg with no rep gain. Try drop-sets: after your top set, strip ${Math.round(last.weight_kg * 0.15)}kg and hit a full AMRAP with no rest. Metabolic overload breaks plateaus.`,
         recoveryAdjustment: null,
         setProtocol: [],
         warmupSets: [],
@@ -208,14 +184,10 @@ function analyze(
   }
 
   // Grind: in range, push for more reps
-  const rpeNote = lastRPE && lastRPE <= 7
-    ? ` Your RPE was only ${lastRPE} — you have more capacity. Push harder on working sets.`
-    : "";
   return {
     status: "GRIND", targetWeight: last.weight_kg, targetReps: Math.min(last.reps + 1, repRange.max), targetSets: 3, rpeCap: null, repRange,
     headline: `${last.weight_kg}kg — push for ${Math.min(last.reps + 1, repRange.max)}+ reps`,
-    tip: `Last best: ${last.reps} reps. You need ${repRange.max} to unlock the next weight.${rpeNote} ${isIsolation ? "Slow 3-second eccentric — time under tension drives growth." : isCompound ? "Control the descent, explode up." : ""}`,
-    rpeContext,
+    tip: `Last best: ${last.reps} reps. You need ${repRange.max} to unlock the next weight. ${isIsolation ? "Slow 3-second eccentric — time under tension drives growth." : isCompound ? "Control the descent, explode up." : ""}`,
     recoveryAdjustment: null,
     setProtocol: [],
     warmupSets: [],
