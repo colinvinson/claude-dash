@@ -59,6 +59,7 @@ export default function AddScheduleItem({
   const isEdit = !!existingItem;
   const [name, setName]         = useState("");
   const [dose, setDose]         = useState("");
+  const [notes, setNotes]       = useState("");
   const [bucket, setBucket]     = useState<string>("");   // "Morning" | "Day" | "Night" | ""
   const [time, setTime]         = useState("");           // "HH:MM" — optional, independent of bucket
   const [duration, setDuration] = useState("");
@@ -79,6 +80,7 @@ export default function AddScheduleItem({
     if (existingItem) {
       setName(existingItem.name);
       setDose(existingItem.dose ?? "");
+      setNotes(existingItem.notes ?? "");
       setBucket(existingItem.timing ?? "");
       setTime(existingItem.scheduled_at ? existingItem.scheduled_at.slice(0, 5) : "");
       setDuration(existingItem.duration_min != null ? String(existingItem.duration_min) : "");
@@ -145,7 +147,10 @@ export default function AddScheduleItem({
     const payload: CreateItemArgs = {
       name: name.trim(),
       dose: dose.trim(),
-      notes: isEdit ? undefined : (classification?.notes ?? undefined),
+      // Notes are now manual — only what Sir typed. The classifier's note
+      // suggestion is offered as a tap-to-apply chip but never silently
+      // overrides the field.
+      notes: notes.trim() || undefined,
       // Bucket and specific time are INDEPENDENT. Both optional. If both null,
       // the item lands in "Anytime today" on the Schedule timeline.
       timing: bucket || undefined,
@@ -167,7 +172,7 @@ export default function AddScheduleItem({
     }
     setSubmitting(false);
     if (ok) {
-      setName(""); setDose(""); setBucket(""); setTime(""); setDuration("");
+      setName(""); setDose(""); setNotes(""); setBucket(""); setTime(""); setDuration("");
       setCategory("habit"); setRecurrence("daily"); setSpecificDays([]);
       setLinkedGoalId("");
       setClassification(null);
@@ -215,7 +220,6 @@ export default function AddScheduleItem({
           {classification && !classifying && (
             <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
               <Sparkles size={10} /> Recognized as <span className="text-zinc-300 capitalize">{classification.category}</span>
-              {classification.notes && <span className="text-zinc-600">· {classification.notes}</span>}
             </p>
           )}
         </label>
@@ -230,6 +234,30 @@ export default function AddScheduleItem({
             className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
           />
         </label>
+
+        {/* Notes — fully manual. The classifier's suggestion appears as a
+            tap-to-apply chip below; it never auto-fills this field. */}
+        <label className="block mb-1">
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Notes (optional)</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="empty stomach, 10 min before food, only on lift days…"
+            rows={2}
+            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700 resize-y"
+          />
+        </label>
+        {classification?.notes && classification.notes.trim() !== notes.trim() && !classifying && (
+          <button
+            onClick={() => setNotes(classification.notes!)}
+            className="mb-3 w-full text-[10px] text-left px-2.5 py-1.5 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors text-zinc-400"
+          >
+            <Sparkles size={9} className="inline mr-1" />
+            Suggestion: {classification.notes}
+            <span className="text-zinc-600"> · tap to use</span>
+          </button>
+        )}
+        {!classification?.notes && <div className="mb-3" />}
 
         {/* Category */}
         <div className="mb-3">
