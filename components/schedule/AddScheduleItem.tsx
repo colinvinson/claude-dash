@@ -11,6 +11,7 @@ type Classification = {
   timing_bucket: string;
   suggested_time: string | null;
   notes: string | null;
+  icon: string | null;     // lucide name from the curated set; resolveItemStyle uses this directly
 };
 
 const CATEGORIES: { id: StackCategory; label: string }[] = [
@@ -153,6 +154,9 @@ export default function AddScheduleItem({
       duration_min: parsedDuration && !Number.isNaN(parsedDuration) ? parsedDuration : null,
       days_of_week: days,
       linked_goal_id: linkedGoalId || null,
+      // Icon: only set on creation (classifier suggestion). Edits don't
+      // re-classify, so existing icon is preserved.
+      icon: isEdit ? undefined : (classification?.icon ?? undefined),
     };
 
     let ok: boolean;

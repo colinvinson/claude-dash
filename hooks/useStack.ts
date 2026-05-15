@@ -52,6 +52,7 @@ export type CreateItemArgs = {
   duration_min?: number | null;
   days_of_week?: number[] | null;
   linked_goal_id?: string | null;
+  icon?: string | null;           // lucide name from the curated set; resolveItemStyle uses this directly
 };
 
 export function useStack() {
@@ -144,6 +145,7 @@ export function useStack() {
     if (patch.duration_min !== undefined)   dbPatch.duration_min   = patch.duration_min ?? null;
     if (patch.days_of_week !== undefined)   dbPatch.days_of_week   = patch.days_of_week ?? null;
     if (patch.linked_goal_id !== undefined) dbPatch.linked_goal_id = patch.linked_goal_id ?? null;
+    if (patch.icon !== undefined)           dbPatch.icon           = patch.icon ?? null;
     if (Object.keys(dbPatch).length === 0) return true;
     const { error } = await supabase.from("supplement_stack").update(dbPatch).eq("id", id);
     if (error) return false;
@@ -182,6 +184,7 @@ export function useStack() {
       duration_min:   args.duration_min ?? null,
       days_of_week:   args.days_of_week ?? null,
       linked_goal_id: args.linked_goal_id ?? null,
+      icon:           args.icon ?? null,
       sort_order:     maxOrder + 1,
       is_active:      true,
     };

@@ -15,6 +15,7 @@ type Classification = {
   timing_bucket: "Morning" | "Pre-workout" | "Lunch" | "Afternoon" | "Evening" | "Pre-bed";
   suggested_time: string | null;     // "HH:MM" or null
   notes: string | null;              // a short useful note, e.g. "10 min before food"
+  icon: string | null;               // lucide icon name from the curated set, e.g. "bike", "flower2", "syringe"
 };
 
 const SYSTEM = `You classify single-line routine items in a personal performance app into one of seven categories. Be decisive and concise.
@@ -34,17 +35,30 @@ Return STRICT JSON:
   "duration_min": <integer or null>,        // typical realistic duration; null for instant items like pills
   "timing_bucket": "Morning"|"Pre-workout"|"Lunch"|"Afternoon"|"Evening"|"Pre-bed",
   "suggested_time": "HH:MM" or null,         // optional clock time if obvious
-  "notes": "<short, useful, optional>" or null
+  "notes": "<short, useful, optional>" or null,
+  "icon": "<lucide name from list below, or null>"
 }
 
+ALLOWED icon names (pick the most semantically specific match for the item; null if nothing fits):
+  pill, beaker, syringe, flask-conical, test-tube,
+  sparkles, shower-head, bath, droplet,
+  sun, moon, sunrise, sunset, mountain, tree-pine, leaf,
+  activity, dumbbell, bike, footprints,
+  utensils, coffee, apple, beef, salad, cookie, egg-fried,
+  brain, book-open, flower2, wind,
+  glasses, eye, cross, heart, heart-pulse, bed,
+  music, smartphone, camera, clock
+
 Examples (illustrative — do NOT assume the user is on any of these):
-- "Creatine monohydrate"           → category: supplement, duration_min: null, timing_bucket: Morning, suggested_time: "08:00", notes: "5g daily, timing doesn't matter much"
-- "Levothyroxine"                  → category: medication, duration_min: null, timing_bucket: Morning, suggested_time: "06:30", notes: "empty stomach, 30 min before food"
-- "Morning sunlight"               → category: habit, duration_min: 10, timing_bucket: Morning, suggested_time: "07:15", notes: "within 30 min of waking"
-- "Yoga"                           → category: exercise, duration_min: 30, timing_bucket: Morning, suggested_time: "08:15", notes: null
-- "Blue light glasses"             → category: habit, duration_min: 60, timing_bucket: Pre-bed, suggested_time: "21:30", notes: "1h before bed"
-- "Retinol"                        → category: skincare, duration_min: null, timing_bucket: Pre-bed, suggested_time: null, notes: null
-- "Breakfast"                      → category: meal, duration_min: 15, timing_bucket: Morning, suggested_time: "08:00", notes: null
+- "Creatine monohydrate"           → category: supplement, duration_min: null, timing_bucket: Morning, suggested_time: "08:00", notes: "5g daily, timing doesn't matter much", icon: "pill"
+- "Levothyroxine"                  → category: medication, duration_min: null, timing_bucket: Morning, suggested_time: "06:30", notes: "empty stomach, 30 min before food", icon: "beaker"
+- "Morning sunlight"               → category: habit, duration_min: 10, timing_bucket: Morning, suggested_time: "07:15", notes: "within 30 min of waking", icon: "sun"
+- "Yoga"                           → category: exercise, duration_min: 30, timing_bucket: Morning, suggested_time: "08:15", notes: null, icon: "activity"
+- "Blue light glasses"             → category: habit, duration_min: 60, timing_bucket: Pre-bed, suggested_time: "21:30", notes: "1h before bed", icon: "glasses"
+- "Retinol"                        → category: skincare, duration_min: null, timing_bucket: Pre-bed, suggested_time: null, notes: null, icon: "sparkles"
+- "Breakfast"                      → category: meal, duration_min: 15, timing_bucket: Morning, suggested_time: "08:00", notes: null, icon: "egg-fried"
+- "Bike to work"                   → category: exercise, duration_min: 20, timing_bucket: Morning, suggested_time: "08:30", notes: null, icon: "bike"
+- "Meditation"                     → category: habit, duration_min: 10, timing_bucket: Morning, suggested_time: "07:30", notes: null, icon: "flower2"
 
 NO prose. JSON only.`;
 

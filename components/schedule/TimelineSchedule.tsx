@@ -3,10 +3,8 @@
 import { useMemo } from "react";
 import type { StackItem } from "@/hooks/useStack";
 import type { StackInsight } from "@/hooks/useStackInsights";
-import {
-  Pill, Beaker, Syringe, Sparkles, Sun, Activity, Utensils, Clock, Repeat, Flame,
-  type LucideIcon,
-} from "lucide-react";
+import { Repeat, Flame } from "lucide-react";
+import { resolveItemStyle } from "@/lib/schedule/icons";
 
 // Section grouping (Morning / Day / Night / Anytime) drives the visual
 // structure. Each item lands in a section based on:
@@ -17,26 +15,6 @@ import {
 // Rows display the SPECIFIC clock time only when scheduled_at is set. A row
 // in (e.g.) the Morning section with no scheduled_at just shows the item name
 // — no fake 7am label.
-
-// ────────────────────────────────────────────────────────────────────────
-// Visual config
-// ────────────────────────────────────────────────────────────────────────
-
-const CATEGORY_STYLE: Record<string, { Icon: LucideIcon; color: string }> = {
-  supplement: { Icon: Pill,     color: "#fb923c" },
-  medication: { Icon: Beaker,   color: "#60a5fa" },
-  injection:  { Icon: Syringe,  color: "#a78bfa" },
-  skincare:   { Icon: Sparkles, color: "#f472b6" },
-  habit:      { Icon: Sun,      color: "#818cf8" },
-  exercise:   { Icon: Activity, color: "#f87171" },
-  meal:       { Icon: Utensils, color: "#4ade80" },
-};
-const DEFAULT_STYLE = { Icon: Clock, color: "#a1a1aa" };
-
-function styleFor(item: StackItem) {
-  const fromCategory = CATEGORY_STYLE[item.category as string] ?? DEFAULT_STYLE;
-  return { Icon: fromCategory.Icon, color: item.color ?? fromCategory.color };
-}
 
 // ────────────────────────────────────────────────────────────────────────
 // Time + bucket helpers
@@ -110,7 +88,7 @@ function ItemRow({
   onToggle: () => void;
   onEdit?: () => void;
 }) {
-  const { Icon, color } = styleFor(item);
+  const { Icon, color } = resolveItemStyle(item);
   const circleStyle = {
     background: `${color}22`,
     border: `1px solid ${color}55`,
