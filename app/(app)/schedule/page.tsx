@@ -27,6 +27,9 @@ export default function SchedulePage() {
     items, toggle, createItem, updateItem, archiveItem, toggleRunningLow,
   } = useStack();
   const [editingItem, setEditingItem] = useState<StackItem | null>(null);
+  // Separate "add new" sheet flag so opening the rich add path doesn't
+  // collide with edit-existing logic.
+  const [addOpen,     setAddOpen]     = useState(false);
 
   // Inline add form state.
   const [draftName, setDraftName] = useState("");
@@ -123,16 +126,36 @@ export default function SchedulePage() {
                 {adding ? "…" : "+ Add"}
               </button>
             </div>
-            <p className="text-[10px] text-zinc-600 mt-2">Tap an item above for full edit (icon, schedule, link to goal).</p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-[10px] text-zinc-600">Tap an item above for full edit.</p>
+              <button
+                onClick={() => setAddOpen(true)}
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
+              >
+                More options →
+              </button>
+            </div>
           </div>
         </Card>
       </div>
 
+      {/* Edit existing — opens when a row is tapped. */}
       <AddScheduleItem
         open={!!editingItem}
         onClose={() => setEditingItem(null)}
         onCreate={createItem}
         existingItem={editingItem}
+        onUpdate={updateItem}
+        onArchive={archiveItem}
+      />
+
+      {/* Rich add — same sheet, no existingItem. Reaches the full option set
+          (icon, scheduled_at, duration, recurrence, link to goal, category). */}
+      <AddScheduleItem
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreate={createItem}
+        existingItem={null}
         onUpdate={updateItem}
         onArchive={archiveItem}
       />

@@ -72,15 +72,30 @@ export function useStack() {
     setUserId(user.id);
     const today = getLogDate();
 
+    // SELECT * so a not-yet-applied migration (e.g. is_running_low) doesn't
+    // crash the whole query and hide every item. New columns gracefully
+    // default to false/null at the merge step below.
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week, linked_goal_id, is_running_low").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("*").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
     const logs = logsRes.data ?? [];
-    const merged = (stackRes.data ?? []).map((s) => {
-      const log = logs.find((l) => l.supplement_id === s.id);
-      return { ...s, taken: !!log, log_id: log?.id ?? null };
+    const merged = (stackRes.data ?? []).map((s: Record<string, unknown>) => {
+      const log = logs.find((l) => l.supplement_id === (s.id as string));
+      return {
+        ...s,
+        // Defaults for columns that may not exist in the user's DB yet.
+        is_running_low: (s.is_running_low as boolean | undefined) ?? false,
+        linked_goal_id: (s.linked_goal_id as string | null | undefined) ?? null,
+        icon:           (s.icon as string | null | undefined) ?? null,
+        color:          (s.color as string | null | undefined) ?? null,
+        days_of_week:   (s.days_of_week as number[] | null | undefined) ?? null,
+        scheduled_at:   (s.scheduled_at as string | null | undefined) ?? null,
+        duration_min:   (s.duration_min as number | null | undefined) ?? null,
+        taken:          !!log,
+        log_id:         log?.id ?? null,
+      } as StackItem;
     });
     setItems(merged);
     setLoading(false);
