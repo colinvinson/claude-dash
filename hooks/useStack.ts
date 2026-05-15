@@ -40,6 +40,10 @@ export type StackItem = {
   // Optional FK linking this routine to a long-term goal so the Goals tab can
   // compute per-goal adherence. null = unlinked (counts toward nothing).
   linked_goal_id: string | null;
+  // User-toggled flag — drives the "running low" badge on the Schedule row.
+  // Reset manually after reordering. Only meaningful for supplies (supplement,
+  // medication, injection, skincare); ignored on habits / exercise.
+  is_running_low: boolean;
 };
 
 export type CreateItemArgs = {
@@ -69,7 +73,7 @@ export function useStack() {
     const today = getLogDate();
 
     const [stackRes, logsRes] = await Promise.all([
-      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week, linked_goal_id").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
+      supabase.from("supplement_stack").select("id, name, dose, notes, timing, sort_order, category, scheduled_at, duration_min, icon, color, days_of_week, linked_goal_id, is_running_low").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
@@ -164,6 +168,18 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // Toggle the "running low" badge. Optimistic — the realtime channel will
+  // sync if anything else updates it concurrently.
+  const toggleRunningLow = useCallback(async (id: string) => {
+    if (!userId) return;
+    const current = items.find((i) => i.id === id);
+    if (!current) return;
+    const next = !current.is_running_low;
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, is_running_low: next } : i)));
+    await supabase.from("supplement_stack").update({ is_running_low: next }).eq("id", id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, items]);
+
   // createItem — the richer add path used by the Schedule "+ Add" sheet.
   // If `category` is omitted, the caller is expected to have already classified
   // the item (via /api/jarvis/classify-item). We don't auto-classify here so
@@ -199,5 +215,5 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, items]);
 
-  return { items, loading, toggle, addToStack, createItem, updateItem, archiveItem };
+  return { items, loading, toggle, addToStack, createItem, updateItem, archiveItem, toggleRunningLow };
 }

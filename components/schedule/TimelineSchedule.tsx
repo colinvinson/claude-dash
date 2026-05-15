@@ -3,28 +3,17 @@
 import { useMemo } from "react";
 import type { StackItem } from "@/hooks/useStack";
 import type { StackInsight } from "@/hooks/useStackInsights";
-import { Repeat, Flame } from "lucide-react";
-import { resolveItemStyle } from "@/lib/schedule/icons";
+import { AlertTriangle, X, Check } from "lucide-react";
 
-// Section grouping (Morning / Day / Night / Anytime) drives the visual
-// structure. Each item lands in a section based on:
-//   1. its scheduled_at clock time, if set; otherwise
-//   2. its `timing` bucket string, if recognized; otherwise
-//   3. Anytime.
-//
-// Rows display the SPECIFIC clock time only when scheduled_at is set. A row
-// in (e.g.) the Morning section with no scheduled_at just shows the item name
-// — no fake 7am label.
-
-// ────────────────────────────────────────────────────────────────────────
-// Time + bucket helpers
-// ────────────────────────────────────────────────────────────────────────
+// Schedule timeline — visual style matches the mockup:
+//   - Section header per bucket with emoji + clock range
+//   - Each row in a soft rounded panel with a big check-circle on the left
+//   - Per-row "Running low" pill + "×" archive button on the right
+//   - Items with no scheduled clock time fall into the matching bucket via
+//     their `timing` string, or into Anytime if unrecognized
 
 type Section = "morning" | "day" | "night" | "anytime";
 
-// Maps a `timing` string (free-form, from the classifier or stack editor) to
-// the Morning / Day / Night sections. Anything unrecognized → null (caller
-// falls back to Anytime).
 const TIMING_TO_SECTION: Record<string, Section> = {
   "pre-workout": "morning",
   "morning":     "morning",
@@ -35,10 +24,9 @@ const TIMING_TO_SECTION: Record<string, Section> = {
   "night":       "night",
   "pre-bed":     "night",
   "bedtime":     "night",
-  "anytime":     "anytime",  // explicit user choice — same destination as the fallback
+  "anytime":     "anytime",
 };
 
-// HH:MM (24h) → Section by hour. <12 morning, 12-17 day, 18+ night.
 function sectionFromTime(hhmm: string): Section {
   const h = parseInt(hhmm.split(":")[0], 10);
   if (isNaN(h)) return "anytime";
@@ -53,141 +41,128 @@ function sectionFor(item: StackItem): Section {
   return TIMING_TO_SECTION[key] ?? "anytime";
 }
 
-// Sort key WITHIN a section. Items with a specific clock time sort earliest
-// to latest by clock; bucket-only items sort last (by sort_order).
 function sortKey(item: StackItem): string {
   if (item.scheduled_at) return `0_${item.scheduled_at}`;
   return `1_${String(item.sort_order).padStart(6, "0")}`;
 }
 
-function formatTimeRange(start: string, durationMin: number | null): string {
-  const [h, m] = start.split(":").map(Number);
-  const startTotal = h * 60 + m;
-  const fmt = (mins: number) => {
-    const hh = Math.floor(mins / 60) % 24;
-    const mm = mins % 60;
-    const period = hh >= 12 ? "PM" : "AM";
-    const hh12 = hh % 12 === 0 ? 12 : hh % 12;
-    return `${hh12}:${String(mm).padStart(2, "0")} ${period}`;
-  };
-  if (!durationMin || durationMin <= 0) return fmt(startTotal);
-  return `${fmt(startTotal).replace(/ (AM|PM)$/, "")} – ${fmt(startTotal + durationMin)} (${durationMin} min)`;
-}
+// Categories where "Running low" makes sense — supplies, basically.
+const SUPPLY_CATEGORIES = new Set(["supplement", "medication", "injection", "skincare"]);
 
-// ────────────────────────────────────────────────────────────────────────
-// Row component (shared across all sections)
-// ────────────────────────────────────────────────────────────────────────
+// Sections + emoji + time hint shown in the header. Strings match the
+// reference mockup; underlying bucketing is whatever sectionFor returns.
+const SECTION_META: Array<{ key: Section; label: string; emoji: string; range: string }> = [
+  { key: "morning", label: "Morning", emoji: "🌅", range: "5–11 AM" },
+  { key: "day",     label: "Day",     emoji: "☀️", range: "12–5 PM" },
+  { key: "night",   label: "Night",   emoji: "🌙", range: "6 PM+"   },
+  { key: "anytime", label: "Anytime", emoji: "✨", range: ""        },
+];
 
 function ItemRow({
   item,
-  insight,
   onToggle,
   onEdit,
+  onToggleRunningLow,
+  onArchive,
 }: {
   item: StackItem;
   insight?: StackInsight;
   onToggle: () => void;
   onEdit?: () => void;
+  onToggleRunningLow?: (id: string) => void;
+  onArchive?: (id: string) => void;
 }) {
-  const { Icon, color } = resolveItemStyle(item);
-  const circleStyle = {
-    background: `${color}22`,
-    border: `1px solid ${color}55`,
-  };
-  const checkboxStyle = item.taken
-    ? { background: color, borderColor: color }
-    : { borderColor: color };
-
-  // Only render a time/range if the user actually set a specific clock time.
-  // Bucket-only items have no clock display — section header carries the context.
-  const timeLabel = item.scheduled_at
-    ? formatTimeRange(item.scheduled_at.slice(0, 5), item.duration_min)
-    : null;
+  const isSupply = SUPPLY_CATEGORIES.has(item.category);
+  const canShowRunningLow = isSupply && onToggleRunningLow;
 
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-[#1f1f1f]/60 last:border-0 group">
-      <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={circleStyle}>
-        <Icon size={16} style={{ color }} />
-      </div>
-
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left" aria-label="Edit item">
-        {/* meta line: only renders when there's something to show */}
-        {(timeLabel || (insight && insight.streak >= 2) || (insight && insight.expected7d > 0)) && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {timeLabel && (
-              <>
-                <span className="text-[11px] text-zinc-500 tabular-nums">{timeLabel}</span>
-                <Repeat size={11} className="text-zinc-600" />
-              </>
-            )}
-            {insight && insight.streak >= 2 && (
-              <span
-                className={`flex items-center gap-0.5 text-[10px] tabular-nums ${
-                  insight.streak >= insight.longestStreak && insight.streak >= 7
-                    ? "text-amber-300"
-                    : "text-orange-400"
-                }`}
-                title={insight.longestStreak > insight.streak
-                  ? `Best ever: ${insight.longestStreak}d · logged ${insight.totalLogged}× since ${insight.firstLoggedDate ?? "?"}`
-                  : `All-time best · logged ${insight.totalLogged}× since ${insight.firstLoggedDate ?? "?"}`}
-              >
-                <Flame size={10} /> {insight.streak}
-                {insight.longestStreak > insight.streak && <span className="text-zinc-600"> / {insight.longestStreak}</span>}
-              </span>
-            )}
-            {insight && insight.expected7d > 0 && (
-              <span className="text-[10px] text-zinc-600 tabular-nums">{insight.done7d}/{insight.expected7d} this wk</span>
-            )}
-          </div>
-        )}
-        <div className={`text-sm font-semibold mt-0.5 truncate ${item.taken ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
-          {item.name}
-        </div>
-        {item.dose && <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{item.dose}</div>}
-      </button>
-
+    <div
+      className={`flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${
+        item.taken
+          ? "bg-emerald-500/5 border-emerald-500/15"
+          : "bg-zinc-900/40 border-zinc-800/60"
+      }`}
+    >
+      {/* Big check-circle */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         aria-label={item.taken ? "Mark not done" : "Mark done"}
-        className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
-        style={checkboxStyle}
+        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+        style={
+          item.taken
+            ? { background: "#10b981", border: "2px solid #10b981" }
+            : { background: "transparent", border: "2px solid #3f3f46" }
+        }
       >
-        {item.taken && (
-          <svg viewBox="0 0 10 8" className="w-3 h-2.5" fill="none" stroke="white" strokeWidth="2">
-            <path d="M1 4l2.5 2.5L9 1" />
-          </svg>
+        {item.taken && <Check size={16} strokeWidth={3} className="text-white" />}
+      </button>
+
+      {/* Title + subtitle (tap to edit) */}
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left" aria-label="Edit item">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold truncate ${item.taken ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
+            {item.name}
+          </span>
+          {item.is_running_low && (
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-px">
+              not ordered
+            </span>
+          )}
+        </div>
+        {(item.dose || item.notes) && (
+          <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
+            {[item.dose, item.notes].filter(Boolean).join(" · ")}
+          </div>
         )}
       </button>
+
+      {/* Running low pill (supplies only) */}
+      {canShowRunningLow && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleRunningLow!(item.id); }}
+          className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+            item.is_running_low
+              ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
+              : "bg-transparent border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+          }`}
+          aria-label={item.is_running_low ? "Clear running-low" : "Mark running low"}
+        >
+          <AlertTriangle size={10} />
+          <span>Running low</span>
+        </button>
+      )}
+
+      {/* Archive */}
+      {onArchive && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onArchive(item.id); }}
+          aria-label="Remove from stack"
+          className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   );
 }
-
-// ────────────────────────────────────────────────────────────────────────
-// Top-level component
-// ────────────────────────────────────────────────────────────────────────
-
-const SECTION_META: Array<{ key: Section; label: string }> = [
-  { key: "morning", label: "Morning" },
-  { key: "day",     label: "Day" },
-  { key: "night",   label: "Night" },
-  { key: "anytime", label: "Anytime" },
-];
 
 export default function TimelineSchedule({
   items,
   insights,
   onToggle,
   onEdit,
+  onToggleRunningLow,
+  onArchive,
 }: {
   items: StackItem[];
   insights?: Record<string, StackInsight>;
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
   onEdit?: (item: StackItem) => void;
+  onToggleRunningLow?: (id: string) => void;
+  onArchive?: (id: string) => void;
 }) {
   const grouped = useMemo(() => {
-    const buckets: Record<Section, StackItem[]> = {
-      morning: [], day: [], night: [], anytime: [],
-    };
+    const buckets: Record<Section, StackItem[]> = { morning: [], day: [], night: [], anytime: [] };
     for (const item of items) buckets[sectionFor(item)].push(item);
     for (const k of Object.keys(buckets) as Section[]) {
       buckets[k].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
@@ -198,34 +173,36 @@ export default function TimelineSchedule({
   if (items.length === 0) {
     return (
       <p className="text-xs text-zinc-500 py-6 text-center">
-        No items yet. Tap + Add to start.
+        No items yet. Add one below to start building your stack.
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col">
-      {SECTION_META.map(({ key, label }, sectionIdx) => {
+    <div className="flex flex-col gap-5">
+      {SECTION_META.map(({ key, label, emoji, range }) => {
         const sectionItems = grouped[key];
         if (sectionItems.length === 0) return null;
-        const doneInSection = sectionItems.filter((i) => i.taken).length;
         return (
-          <div key={key} className={sectionIdx > 0 ? "mt-5" : ""}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500">— {label}</span>
-              <span className="text-[10px] text-zinc-600 tabular-nums">
-                {doneInSection}/{sectionItems.length}
-              </span>
+          <div key={key}>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="text-base">{emoji}</span>
+              <span className="text-sm font-semibold text-zinc-200">{label}</span>
+              {range && <span className="text-[11px] text-zinc-500">{range}</span>}
             </div>
-            {sectionItems.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                insight={insights?.[item.id]}
-                onToggle={() => onToggle(item.id, item.taken, item.log_id)}
-                onEdit={onEdit ? () => onEdit(item) : undefined}
-              />
-            ))}
+            <div className="flex flex-col gap-2">
+              {sectionItems.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  insight={insights?.[item.id]}
+                  onToggle={() => onToggle(item.id, item.taken, item.log_id)}
+                  onEdit={onEdit ? () => onEdit(item) : undefined}
+                  onToggleRunningLow={onToggleRunningLow}
+                  onArchive={onArchive}
+                />
+              ))}
+            </div>
           </div>
         );
       })}
