@@ -3,6 +3,9 @@ import { computeDailyScore } from "@/lib/scoring";
 import { computeBaselines, formatBaselineDelta } from "@/lib/jarvis/baselines";
 import { computeRecoveryScore, computeSessionStrain } from "@/lib/fitness/recovery";
 import { buildDailySnapshot } from "@/lib/ai/snapshot-builder";
+import {
+  collapseToDaily, computeProteinAdherence, computeStrengthDeltaPct, deriveRecompVerdict,
+} from "@/lib/fitness/composition";
 
 function getLogDate() {
   const now = new Date();
@@ -52,6 +55,7 @@ export async function buildContext(userId: string) {
     proteinTodayRes, latestWeightRes,
     alcoholTodayRes, meditationTodayRes,
     recentArtifactsRes, recentMessagesRes,
+    weight21dRes, protein21dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -76,7 +80,7 @@ export async function buildContext(userId: string) {
     supabase.from("goals").select("title, is_complete, goal_date").eq("user_id", userId).gte("goal_date", dateDaysAgo(7)),
     supabase.from("workout_sets").select("weight_kg, reps, rpe, logged_at").eq("user_id", userId).eq("log_date", today),
     // Performance correlation data
-    supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
+    supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, exercise_id, exercises(name, muscle_group)").eq("user_id", userId).gte("log_date", dateDaysAgo(21)).order("log_date", { ascending: true }),
     supabase.from("medication_logs").select("medication_type, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
     supabase.from("jarvis_insights").select("body, severity, triggered_at").eq("user_id", userId).order("triggered_at", { ascending: false }).limit(5),
     supabase.from("protein_logs").select("protein_g, ai_score").eq("user_id", userId).eq("log_date", today),
@@ -90,6 +94,10 @@ export async function buildContext(userId: string) {
     // pick up the thread from a prior conversation without needing the user
     // to repeat themselves.
     supabase.from("jarvis_messages").select("role, content, created_at").eq("user_id", userId).gte("created_at", new Date(Date.now() - 48 * 3600 * 1000).toISOString()).order("created_at", { ascending: false }).limit(30),
+    // Body-composition signal: 21d of weight + protein. Combined with sets21dRes
+    // they feed the recomp verdict (gaining muscle vs fat, etc.).
+    supabase.from("weight_logs").select("weight_kg, logged_at").eq("user_id", userId).gte("logged_at", `${dateDaysAgo(21)}T00:00:00`).order("logged_at", { ascending: true }),
+    supabase.from("protein_logs").select("protein_g, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(21)),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -544,6 +552,25 @@ export async function buildContext(userId: string) {
   const latestWeightKg = (latestWeightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null;
   const proteinTargetG = latestWeightKg ? Math.round(latestWeightKg * 2.0) : 150;
 
+  // Body-composition read: weight trajectory + strength trajectory + protein
+  // adherence → "lean bulk", "recomp", "fat gain", etc. Same logic as the
+  // WeightTrackerCard so what Jarvis sees matches the dashboard.
+  const weightPoints = collapseToDaily(
+    (weight21dRes.data ?? []) as Array<{ weight_kg: number; logged_at: string }>,
+  );
+  const compStrengthDelta = computeStrengthDeltaPct(
+    ((sets21dRes.data ?? []) as Array<{ est_1rm: number; log_date: string; exercise_id?: string; exercises: unknown }>)
+      .map((s) => ({ est_1rm: s.est_1rm, log_date: s.log_date, exercise_id: s.exercise_id ?? "" }))
+      .filter((s) => s.exercise_id),
+    21,
+  );
+  const compProteinAdherence = computeProteinAdherence(
+    (protein21dRes.data ?? []) as Array<{ protein_g: number; log_date: string }>,
+    latestWeightKg,
+    21,
+  );
+  const compositionVerdict = deriveRecompVerdict(weightPoints, compStrengthDelta, compProteinAdherence);
+
   const dailyScore = computeDailyScore({
     goalsComplete,
     goalsTotal: goals.length,
@@ -568,6 +595,16 @@ export async function buildContext(userId: string) {
       streak:   streakRes.data?.current_streak ?? 0,
     },
     biometrics,
+    composition: {
+      currentWeightKg: latestWeightKg,
+      weightRateKgWk:   Number(compositionVerdict.weightRateKgWk.toFixed(3)),
+      strengthDeltaPct: Number(compositionVerdict.strengthDeltaPct.toFixed(1)),
+      proteinAdherence: Number(compositionVerdict.proteinAdherence.toFixed(2)),
+      daysOfWeightData: compositionVerdict.daysOfData,
+      verdict:  compositionVerdict.tag,
+      headline: compositionVerdict.headline,
+      detail:   compositionVerdict.detail,
+    },
     behavioralContext,
     recentWorkoutToday: sets.slice(0, 3).map((s) => {
       const ex = s.exercises as unknown as { name: string; split_day: string } | null;

@@ -301,6 +301,7 @@ On mount: loads today's health_log. If `!data || !data.is_final` → fires `POST
 - Oura ring: auto-syncs on page load via PAT — fetches readiness, sleep, activity, **spo2, stress, resilience, vo2_max, workouts**
 - Whoop-style recovery scoring: 50% readiness + 30% HRV deviation + 20% sleep, banded into exceptional/primed/adequate/compromised/low
 - Protein logger (manual + photo + barcode) with AI vision scoring (0-100 for lean aesthetic muscle suitability); only protein persisted, score is metadata; daily target = weight × 2.0g/kg
+- **Weight tracker + recomp read** on Gym tab — quick log + 30d sparkline + verdict: combines 21d weight slope (linear regression, kg/wk), avg %change in top est_1rm per exercise, and 21d protein adherence to call lean-bulk / fat-gain / recomp / clean-cut / lossy-cut / regression / maintain. Verdict flows into `context.composition` so Jarvis chat sees the same read as the dashboard.
 - Per-muscle local fatigue tracking — hours since last hit, hard sets last 48h
 - Auto-adjusted lift prescriptions: weight × reps × sets + per-set RIR/failure/extension protocol modified based on recovery + muscle status (evidence-based, RP-style)
 - **Settings page** at /settings (gear icon in TopHeader) — edit profile, supplements, exercises, gyms, recurring goal templates, sign out

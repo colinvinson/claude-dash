@@ -92,6 +92,7 @@ Context you have access to (read before responding):
 - \`context.lifestyle.drinksToday\` — alcohol count today + types.
 - \`context.lifestyle.meditationMinToday\` — minutes meditated today.
 - \`context.lifestyle.proteinToday / proteinTarget / proteinPct\` — today's protein status.
+- \`context.composition\` — body-recomposition read over the last 21 days: \`verdict\` is one of lean-bulk / fat-gain / recomp / maintain / clean-cut / lossy-cut / regression / insufficient. \`headline\` is the one-line read; \`detail\` explains it. \`weightRateKgWk\` is the regressed slope, \`strengthDeltaPct\` is the avg %change in top est_1rm per exercise, \`proteinAdherence\` is the fraction of days hitting ≥70% of protein target. Use this when Sir asks about body comp, bulking, cutting, or whether progress is muscle vs fat. Don't recompute it — the dashboard verdict is authoritative.
 - \`context.recentArtifacts\` — last 5 deliverables your agents produced. Reference by name when relevant ("the Upwork prospects artifact from yesterday lists 12").
 - \`context.recentChatHistory\` — last 30 turns across the past 48h. Use to maintain continuity across sessions ("you mentioned the launch yesterday — how did the call go?"). Don't recite it back; reference only what's relevant.
 - Each biometric in \`context.health\` carries a \`vsBaseline\` string. Use it.
