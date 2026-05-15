@@ -12,6 +12,7 @@ import {
   type Adjustment,
   type Prescription,
   type MuscleSetRow,
+  type ProteinDeficit,
 } from "@/lib/fitness/recovery";
 import { buildSetProtocol, type SetProtocol } from "@/lib/fitness/intensity-protocol";
 
@@ -238,6 +239,7 @@ export function useWorkout() {
   const [history,    setHistory]    = useState<WorkoutSet[]>([]);
   const [weeklyRaw,  setWeeklyRaw]  = useState<WeeklySet[]>([]);
   const [health7d,   setHealth7d]   = useState<HealthDay[]>([]);
+  const [proteinDeficit, setProteinDeficit] = useState<ProteinDeficit | null>(null);
   const [activeGymId,   setActiveGymId]   = useState<string | null>(null);
   const [activeDay,     setActiveDay]     = useState("Push");
   const [activeExId,    setActiveExId]    = useState<string | null>(null);
@@ -296,6 +298,44 @@ export function useWorkout() {
     setHealth7d((data ?? []) as HealthDay[]);
   }, [supabase]);
 
+  // 7-day protein deficit: # of days under 70% of target. Target = latest
+  // logged bodyweight × 2 g/kg (matches useProtein default).
+  const fetchProtein7d = useCallback(async (uid: string) => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+
+    const [logsRes, weightRes] = await Promise.all([
+      supabase.from("protein_logs").select("protein_g, log_date").eq("user_id", uid).gte("log_date", cutoffStr),
+      supabase.from("weight_logs").select("weight_kg").eq("user_id", uid).order("logged_at", { ascending: false }).limit(1),
+    ]);
+
+    const latestWeight = (weightRes.data as Array<{ weight_kg: number }> | null)?.[0]?.weight_kg ?? null;
+    const targetG = latestWeight ? Math.round(latestWeight * 2.0) : 150;
+    const threshold = targetG * 0.7;
+
+    // Sum per-day grams across the last 7 calendar days.
+    const byDate = new Map<string, number>();
+    for (const row of (logsRes.data ?? []) as Array<{ protein_g: number; log_date: string }>) {
+      byDate.set(row.log_date, (byDate.get(row.log_date) ?? 0) + Number(row.protein_g));
+    }
+
+    let daysUnder = 0;
+    let totalG = 0;
+    let daysCounted = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split("T")[0];
+      const grams = byDate.get(key) ?? 0;
+      totalG += grams;
+      daysCounted += 1;
+      if (grams < threshold) daysUnder += 1;
+    }
+    const avgG = daysCounted > 0 ? totalG / daysCounted : 0;
+    setProteinDeficit({ daysUnder, targetG, avgG });
+  }, [supabase]);
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -309,7 +349,7 @@ export function useWorkout() {
       setGyms(gymList);
       setExercises((exRes.data ?? []) as Exercise[]);
       if (gymList.length > 0) setActiveGymId(gymList[0].id);
-      await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id)]);
+      await Promise.all([fetchWeeklyVolume(user.id), fetchHealth7d(user.id), fetchProtein7d(user.id)]);
       setLoading(false);
     }
     load();
@@ -380,9 +420,21 @@ export function useWorkout() {
   // computeRecoveryScore returns null when its inputs are all empty, so even
   // a stale partial-row today (e.g. Oura inserted a row with no scores)
   // correctly surfaces as "no data" instead of a fabricated 50.
-  const recovery: RecoveryResult | null = todayHealth
+  const rawRecovery: RecoveryResult | null = todayHealth
     ? computeRecoveryScore(todayHealth, hrv7dAvg)
     : null;
+
+  // Layer chronic-protein-deficit driver onto recovery.drivers (visible in
+  // the Recovery card + Jarvis context) without changing the autonomic score.
+  const recovery: RecoveryResult | null = rawRecovery && proteinDeficit && proteinDeficit.daysUnder >= 3
+    ? {
+        ...rawRecovery,
+        drivers: [
+          ...rawRecovery.drivers,
+          `Protein ${proteinDeficit.daysUnder}/7 days under-target (avg ${Math.round(proteinDeficit.avgG)}g vs ${proteinDeficit.targetG}g)`,
+        ],
+      }
+    : rawRecovery;
 
   const sessionStrain = computeSessionStrain(todaySets.map((s) => ({
     weight_kg: s.weight_kg, reps: s.reps, rpe: s.rpe,
@@ -415,7 +467,7 @@ export function useWorkout() {
       targetSets:   baseVerdict.targetSets,
       rpeCap:       baseVerdict.rpeCap,
     };
-    const adjustment = adjustForRecovery(base, recovery, muscleStatus);
+    const adjustment = adjustForRecovery(base, recovery, muscleStatus, proteinDeficit);
     verdict = {
       ...baseVerdict,
       targetWeight: adjustment.adjusted.targetWeight,

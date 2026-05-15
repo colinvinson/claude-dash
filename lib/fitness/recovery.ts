@@ -192,10 +192,17 @@ export type Adjustment = {
   adjusted: Prescription;
 };
 
+export type ProteinDeficit = {
+  daysUnder:       number;  // # days in last 7 below 70% of target
+  targetG:         number;  // current daily target (bodyweight × 2)
+  avgG:            number;  // avg daily intake over last 7
+};
+
 export function adjustForRecovery(
   base: Prescription,
   recovery: RecoveryResult,
   muscle: MuscleFatigueResult,
+  proteinDeficit?: ProteinDeficit | null,
 ): Adjustment {
   const original = { ...base };
   const adjusted: Prescription = { ...base };
@@ -234,6 +241,22 @@ export function adjustForRecovery(
     adjusted.targetSets   = Math.max(Math.floor(base.targetSets * 0.7), 2);
     adjusted.rpeCap       = 7;
     notes.push(`Recovery ${score} — cutting volume 30%, weight -10%, RPE 7 cap`);
+  }
+
+  // Chronic protein deficit gate — layers on top. Trained-while-underfed
+  // recovers slower than the autonomic metrics suggest. Only hedge when the
+  // band isn't already heavily adjusting (compromised/low already cut load).
+  if (proteinDeficit && proteinDeficit.daysUnder >= 3) {
+    const pct = Math.round((proteinDeficit.avgG / proteinDeficit.targetG) * 100);
+    notes.push(`Protein ${proteinDeficit.daysUnder}/7 days under-target (avg ${Math.round(proteinDeficit.avgG)}g vs ${proteinDeficit.targetG}g, ${pct}%) — recovery will lag`);
+    if (band === "exceptional" || band === "primed" || band === "adequate") {
+      // Hedge — don't push for PRs on under-fed days.
+      adjusted.rpeCap = Math.min(adjusted.rpeCap ?? 8, 8);
+      if (band !== "primed" && band !== "exceptional") {
+        adjusted.targetSets = Math.max(adjusted.targetSets - 1, 2);
+      }
+    }
+    // compromised / low: already cut. Don't double-discount.
   }
 
   const applied =
