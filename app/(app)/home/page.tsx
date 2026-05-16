@@ -26,6 +26,7 @@ import PushSubscriber from "@/components/home/PushSubscriber";
 import LongTermGoalsCard from "@/components/home/LongTermGoalsCard";
 import DailyInsightStrip from "@/components/home/DailyInsightStrip";
 import MonthlyRetroCard from "@/components/home/MonthlyRetroCard";
+import DimensionsCard from "@/components/home/DimensionsCard";
 
 // Home tab — consolidated cohesion pass.
 //
@@ -139,6 +140,11 @@ export default function HomePage() {
             Surfaces star-flagged "focus" goals (up to 3) so they're
             visible from Home, not buried in /goals. */}
         <div className="col-span-2 anim-fade-up stagger-1"><LongTermGoalsCard /></div>
+
+        {/* Beyond the body — the 9 dimensions (focus, cardio, social,
+            libido, aesthetic, sun, caffeine, learning, money). Gives the
+            tracked data visible presence instead of dying inside LogSheet. */}
+        <div className="col-span-2 anim-fade-up stagger-2"><DimensionsCard /></div>
 
         {/* Primary CTA — full width */}
         <div className="col-span-2 anim-fade-up stagger-2"><RightNowCard /></div>
