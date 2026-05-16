@@ -54,7 +54,7 @@ export default function OptimizationCard() {
       {recommendations.length === 0 ? (
         <p className="text-xs text-zinc-500 leading-relaxed">
           {hasTrainingHistory
-            ? "All clear. No clear-upgrade swaps flagged for Sir's current setup. Coach will speak up if it finds one."
+            ? "All clear. No upgrade swaps flagged for your current setup. Coach will speak up if it finds one."
             : "Log a workout to start tracking. Coach stays quiet until there's real data — no recommendations from zero history."}
         </p>
       ) : (
@@ -146,7 +146,7 @@ export default function OptimizationCard() {
       {equipmentOpen && (
         <div className="mt-3 space-y-3">
           <p className="text-[10px] text-zinc-600">
-            Coach only suggests swaps Sir can actually do. More equipment marked → more potential upgrades surfaced.
+            Coach only suggests swaps you can actually do. More equipment marked → more potential upgrades surfaced.
           </p>
           {EQUIPMENT_GROUPS.map((g) => (
             <div key={g.category}>

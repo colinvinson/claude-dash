@@ -6,6 +6,7 @@ import type { StackCategory, CreateItemArgs, StackItem } from "@/hooks/useStack"
 import { useLongTermGoals } from "@/hooks/useLongTermGoals";
 import { FormInput, FormTextarea, FormSelect } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
+import { ICON } from "@/lib/design-tokens";
 
 type Classification = {
   category: StackCategory;
@@ -201,7 +202,7 @@ export default function AddScheduleItem({
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-zinc-100">{isEdit ? "Edit routine item" : "Add to Schedule"}</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-zinc-200 -m-2 p-2"><X size={ICON.md} /></button>
         </div>
 
         {/* Name */}

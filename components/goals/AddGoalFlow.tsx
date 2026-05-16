@@ -7,7 +7,7 @@ import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
 import { useStack } from "@/hooks/useStack";
 import type { GoalBucket, LongTermGoal, GoalType } from "@/hooks/useLongTermGoals";
-import { PALETTE, TINT, BORDER, TYPE } from "@/lib/design-tokens";
+import { PALETTE, TINT, BORDER, TYPE, ICON } from "@/lib/design-tokens";
 
 type Suggestion = {
   name: string;
@@ -244,7 +244,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
               <div className="flex items-center justify-between mb-1">
                 <FormLabel className="mb-0">Target date</FormLabel>
                 {date && (
-                  <button onClick={() => setDate("")} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                  <button onClick={() => setDate("")} className="text-[10px] text-zinc-500 hover:text-zinc-300 -m-2 p-2">Clear</button>
                 )}
               </div>
               <FormInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -273,7 +273,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
             </button>
           </div>
           <p className="text-[10px] text-zinc-600 text-center">
-            &ldquo;Help me build one&rdquo; → Jarvis drafts a plan + suggested supplements / habits ranked by effect size. Sir reviews before anything saves.
+            &ldquo;Help me build one&rdquo; → Jarvis drafts a plan + suggested supplements / habits ranked by effect size. You review before anything saves.
           </p>
         </div>
       </Card>
@@ -285,7 +285,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
       <Card>
         <div className="flex items-center justify-center gap-2 py-6 text-zinc-400 text-sm">
           <Sparkles size={14} className="animate-pulse" />
-          Jarvis is drafting Sir&apos;s protocol…
+          Jarvis is drafting your protocol…
         </div>
         <p className="text-[10px] text-zinc-600 text-center mt-1">Goal: {title}</p>
       </Card>
@@ -301,7 +301,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
           <span className={`${TYPE.label} font-bold flex items-center gap-1`} style={{ color: PALETTE.celebration }}>
             <Sparkles size={11} /> Jarvis&apos;s protocol for &ldquo;{title}&rdquo;
           </span>
-          <button onClick={reset} className="text-zinc-500 hover:text-zinc-200" aria-label="Cancel"><X size={14} /></button>
+          <button onClick={reset} className="text-zinc-500 hover:text-zinc-200 -m-2 p-2" aria-label="Cancel"><X size={ICON.sm} /></button>
         </div>
 
         {/* Plan — editable */}

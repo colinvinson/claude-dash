@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useStack } from "@/hooks/useStack";
+import { ICON } from "@/lib/design-tokens";
 
 // Sheet that lists every active stack item NOT already linked to a goal.
 // Tapping a row links it to the goal, closes the sheet.
@@ -30,7 +31,7 @@ export default function LinkRoutinePicker({
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-zinc-100">Link a routine item</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-zinc-200 -m-2 p-2"><X size={ICON.md} /></button>
         </div>
         {candidates.length === 0 ? (
           <p className="text-xs text-zinc-500 py-4">No unlinked routine items. Add some from the Schedule tab.</p>

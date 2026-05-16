@@ -60,7 +60,7 @@ export default function SettingsPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-zinc-100">Rowan</div>
-            <div className={TYPE.label}>v{pkg.version} · Sir&apos;s personal performance dashboard</div>
+            <div className={TYPE.label}>v{pkg.version} · personal performance dashboard</div>
           </div>
         </div>
       </Card>

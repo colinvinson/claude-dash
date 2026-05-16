@@ -178,7 +178,8 @@ export default function WhatMattersCard() {
                 </div>
                 <button
                   onClick={() => setSkipped((prev) => new Set(prev).add(rightNowAction.item.id))}
-                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 -m-2 p-2"
+                  aria-label="Skip this item"
                 >
                   Skip
                 </button>
@@ -242,8 +243,8 @@ export default function WhatMattersCard() {
             </div>
             <button
               onClick={dismissInsight}
-              className="text-zinc-700 hover:text-zinc-400 text-[10px]"
-              aria-label="Dismiss"
+              className="text-zinc-700 hover:text-zinc-400 text-[10px] -m-2 p-2"
+              aria-label="Dismiss insight"
             >
               ✕
             </button>

@@ -25,7 +25,7 @@ export default function MesocycleCard() {
           <span className="text-[10px] text-zinc-600">auto-starts on first lift</span>
         </div>
         <div className="text-sm text-zinc-400">
-          A 5-week block will start the moment Sir logs his first working set. Volume ramps weekly, with a forced deload in week 5.
+          A 5-week block starts the moment you log your first working set. Volume ramps weekly, with a forced deload in week 5.
         </div>
       </Card>
     );

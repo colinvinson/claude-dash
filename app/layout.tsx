@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   // Title template — sub-routes set their own; this composes them as
   // "Schedule · Rowan", "Gym · Rowan", etc. Root defaults to just "Rowan".
   title:    { default: "Rowan", template: "%s · Rowan" },
-  description: "Sir's personal performance dashboard — schedule, training, goals, and Jarvis.",
+  description: "Personal performance dashboard — schedule, training, goals, and Jarvis.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Rowan" },
   // Open Graph / share-card metadata for when the dashboard URL is pasted

@@ -163,7 +163,7 @@ export default function TodayWrap() {
                            PALETTE.dim;
 
   const wrapHeadline = useMemo(() => {
-    if (allClosed) return "All three rings closed. Sir owned the day.";
+    if (allClosed) return "All three rings closed. Day owned.";
     return headline;
   }, [allClosed, headline]);
 

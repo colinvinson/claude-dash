@@ -13,7 +13,7 @@ export default function NotFound() {
         <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2">— 404</div>
         <h1 className="text-2xl font-bold text-zinc-100 mb-2">Nothing here.</h1>
         <p className="text-sm text-zinc-500 leading-relaxed mb-8">
-          That URL doesn&apos;t map to a surface in the app. Either it moved or Sir wandered off.
+          That URL doesn&apos;t map to a surface in the app. Either it moved or you wandered off.
         </p>
         <div className="flex flex-col gap-2">
           <Link

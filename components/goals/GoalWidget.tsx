@@ -11,7 +11,7 @@ import { useStackInsights } from "@/hooks/useStackInsights";
 import { useGoalMilestones } from "@/hooks/useGoalMilestones";
 import { useGoalMetrics } from "@/hooks/useGoalMetrics";
 import type { LongTermGoal, GoalType } from "@/hooks/useLongTermGoals";
-import { PALETTE, TYPE } from "@/lib/design-tokens";
+import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import LinkRoutinePicker from "./LinkRoutinePicker";
 
 type Props = {
@@ -562,8 +562,8 @@ function MetricsEditor({
             <FormInput value={r.v} onChange={(e) => update(i, "v", e.target.value)} onBlur={save} placeholder="$0" className="flex-1" />
           </div>
         ))}
-        <button onClick={addRow} className="text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
-          <Plus size={10} /> Add metric
+        <button onClick={addRow} className="text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center gap-1 py-2 -my-1">
+          <Plus size={ICON.xs} /> Add metric
         </button>
       </div>
     </div>
