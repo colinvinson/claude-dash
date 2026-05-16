@@ -25,6 +25,7 @@ import StreakCelebration from "@/components/home/StreakCelebration";
 import PushSubscriber from "@/components/home/PushSubscriber";
 import LongTermGoalsCard from "@/components/home/LongTermGoalsCard";
 import DailyInsightStrip from "@/components/home/DailyInsightStrip";
+import MonthlyRetroCard from "@/components/home/MonthlyRetroCard";
 
 // Home tab — consolidated cohesion pass.
 //
@@ -119,10 +120,16 @@ export default function HomePage() {
         {/* Morning ritual */}
         <div className="col-span-2 anim-fade-up"><DayBrief /></div>
 
+        {/* Monthly retrospective — fires once at the start of each new
+            month (first 7 days). Quiets after dismiss or once outside
+            the window. */}
+        <div className="col-span-2 anim-fade-up"><MonthlyRetroCard /></div>
+
         {/* Jarvis insights — proactive observations Sir didn't have to ask
             about. Surfaces 1-3 fresh observations per day across
-            performance / recovery / goal categories. Quiet when there's
-            nothing flagged. */}
+            performance / recovery / goal categories, plus weekly
+            cross-dimension correlations. Quiet when there's nothing
+            flagged. */}
         <div className="col-span-2 anim-fade-up stagger-1"><DailyInsightStrip /></div>
 
         {/* HERO — score + 3 rings + recap */}
