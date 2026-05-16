@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { pushToUser } from "@/lib/jarvis/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,6 +129,16 @@ export async function POST() {
     })
     .select("id, body")
     .single();
+
+  // Push to subscribed devices. Silent fail if VAPID not configured.
+  try {
+    await pushToUser(uid, {
+      title: "Personal best",
+      body,
+      tag:   `pb-${new Date().toISOString().slice(0, 10)}`,
+      url:   "/home",
+    });
+  } catch {}
 
   return NextResponse.json({ insight: inserted });
 }

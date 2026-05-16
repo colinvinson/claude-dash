@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { buildContext } from "@/lib/ai/context-builder";
+import { pushToUser } from "@/lib/jarvis/push";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -105,6 +106,17 @@ export async function POST() {
       lowlights:  parsed.lowlights ?? null,
       next_focus: parsed.next_focus ?? null,
     }).select().single();
+    // Push a single notification for the new retro — once per month is
+    // not spammy and is high-signal (Sir wants to read this).
+    try {
+      await pushToUser(uid, {
+        title: `${monthName} retrospective`,
+        body:  parsed.summary,
+        tag:   `monthly-retro-${priorYear}-${priorMonth}`,
+        url:   "/home",
+      });
+    } catch {}
+
     return NextResponse.json({ added: true, retro: inserted });
   } catch {
     return NextResponse.json({ error: "drafter returned unparseable JSON", raw: text.slice(0, 300) }, { status: 502 });

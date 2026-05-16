@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { pushToUser } from "@/lib/jarvis/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -189,7 +190,33 @@ export async function POST() {
     await service.from("jarvis_insights").insert(
       toInsert.map((i) => ({ user_id: uid, kind: i.kind, severity: i.severity, body: i.body }))
     );
+
+    // Push to subscribed devices. One push per insight (different `tag`s
+    // so they don't replace each other in the notification tray). If
+    // push isn't configured, swallow the error — insights still get
+    // surfaced in-app via the strip.
+    try {
+      for (const i of toInsert) {
+        await pushToUser(uid, {
+          title: kindToPushTitle(i.kind),
+          body:  i.body,
+          tag:   `daily-${i.kind}-${new Date().toISOString().slice(0, 10)}`,
+          url:   "/home",
+        });
+      }
+    } catch {
+      // Push not configured (no VAPID env vars) — silent fail.
+    }
   }
 
   return NextResponse.json({ added: toInsert.length, insights: toInsert });
+}
+
+function kindToPushTitle(kind: string): string {
+  switch (kind) {
+    case "performance": return "Performance check-in";
+    case "recovery":    return "Recovery signal";
+    case "goal":        return "Goal trajectory";
+    default:            return "Jarvis insight";
+  }
 }

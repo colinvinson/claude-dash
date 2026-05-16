@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { buildDailySnapshot } from "@/lib/ai/snapshot-builder";
+import { pushToUser } from "@/lib/jarvis/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -163,6 +164,17 @@ export async function POST() {
 
   if (toInsert.length > 0) {
     await service.from("jarvis_insights").insert(toInsert);
+
+    // Push the top correlation as a single notification — weekly cadence
+    // means we don't risk spam.
+    try {
+      await pushToUser(uid, {
+        title: "Weekly pattern",
+        body:  toInsert[0].body,
+        tag:   `correlation-${new Date().toISOString().slice(0, 10)}`,
+        url:   "/home",
+      });
+    } catch {}
   }
 
   return NextResponse.json({ added: toInsert.length, scanned: columnList.length, top });
