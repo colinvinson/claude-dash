@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Card from "@/components/ui/Card";
-import { Activity, Sparkles, Target, Heart, AlertTriangle } from "lucide-react";
+import { Activity, Sparkles, Target, Heart, AlertTriangle, GitBranch } from "lucide-react";
 import { PALETTE, TYPE, TINT, BORDER } from "@/lib/design-tokens";
 
 type Insight = { id: string; kind: string; severity: string | null; body: string; triggered_at: string };
@@ -16,11 +16,12 @@ type Insight = { id: string; kind: string; severity: string | null; body: string
 // unified intelligence that surfaces patterns, not a passive log.
 
 const KIND_META: Record<string, { label: string; icon: typeof Activity; color: string }> = {
-  performance: { label: "Performance", icon: Activity,        color: PALETTE.success },
-  recovery:    { label: "Recovery",    icon: Heart,           color: PALETTE.info },
-  goal:        { label: "Goal",        icon: Target,          color: PALETTE.celebration },
-  pb:          { label: "Personal best", icon: Sparkles,      color: PALETTE.celebration },
-  general:     { label: "Insight",     icon: Sparkles,        color: PALETTE.dim },
+  performance: { label: "Performance",   icon: Activity,  color: PALETTE.success },
+  recovery:    { label: "Recovery",      icon: Heart,     color: PALETTE.info },
+  goal:        { label: "Goal",          icon: Target,    color: PALETTE.celebration },
+  pb:          { label: "Personal best", icon: Sparkles,  color: PALETTE.celebration },
+  correlation: { label: "Pattern",       icon: GitBranch, color: PALETTE.info },
+  general:     { label: "Insight",       icon: Sparkles,  color: PALETTE.dim },
 };
 
 export default function DailyInsightStrip() {
@@ -31,22 +32,41 @@ export default function DailyInsightStrip() {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      // Fire the detector (no-op if today's already populated).
-      await fetch("/api/jarvis/daily-insights", { method: "POST" }).catch(() => {});
+      // Fire both detectors. Both gate themselves server-side
+      // (daily-insights once per kind per day, correlations once per week)
+      // so refreshing the page is safe — no duplicate work or spam.
+      await Promise.all([
+        fetch("/api/jarvis/daily-insights", { method: "POST" }).catch(() => {}),
+        fetch("/api/jarvis/correlations",    { method: "POST" }).catch(() => {}),
+      ]);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { if (!cancelled) setLoading(false); return; }
+      // Show today's daily-insights + this-week's correlations (which
+      // persist for ~7 days until the next pass).
       const today = new Date().toISOString().slice(0, 10);
-      const { data } = await supabase
-        .from("jarvis_insights")
-        .select("id, kind, severity, body, triggered_at")
-        .eq("user_id", user.id)
-        .in("kind", ["performance", "recovery", "goal", "pb"])
-        .gte("triggered_at", `${today}T00:00:00`)
-        .is("dismissed_at", null)
-        .order("triggered_at", { ascending: true })
-        .limit(4);
+      const wkAgo = new Date(); wkAgo.setDate(wkAgo.getDate() - 7);
+      const [todayKindsRes, weekCorrelationsRes] = await Promise.all([
+        supabase
+          .from("jarvis_insights")
+          .select("id, kind, severity, body, triggered_at")
+          .eq("user_id", user.id)
+          .in("kind", ["performance", "recovery", "goal", "pb"])
+          .gte("triggered_at", `${today}T00:00:00`)
+          .is("dismissed_at", null),
+        supabase
+          .from("jarvis_insights")
+          .select("id, kind, severity, body, triggered_at")
+          .eq("user_id", user.id)
+          .eq("kind", "correlation")
+          .gte("triggered_at", wkAgo.toISOString())
+          .is("dismissed_at", null),
+      ]);
+      const merged = [
+        ...((todayKindsRes.data ?? []) as Insight[]),
+        ...((weekCorrelationsRes.data ?? []) as Insight[]),
+      ].sort((a, b) => a.triggered_at.localeCompare(b.triggered_at));
       if (!cancelled) {
-        setInsights((data ?? []) as Insight[]);
+        setInsights(merged.slice(0, 5));
         setLoading(false);
       }
     }
