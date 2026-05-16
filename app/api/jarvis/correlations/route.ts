@@ -55,7 +55,22 @@ const LABEL: Record<string, string> = {
   bible_min:         "bible time",
 };
 
-function pretty(col: string): string { return LABEL[col] ?? col.replace(/_/g, " "); }
+// Strip dynamic-indexer prefixes (supp_, med_, stack_) so the user reads
+// "bluelight glasses" not "supp bluelight glasses". The prefix is an
+// internal snapshot detail, not insight-worthy copy.
+function pretty(col: string): string {
+  if (LABEL[col]) return LABEL[col];
+  const stripped = col.replace(/^(supp|med|stack)_/, "");
+  return stripped.replace(/_/g, " ");
+}
+
+// Dynamic stack columns are binary indicators (1 if logged that day, 0 if
+// not). When two routine items are always logged on the same days they
+// correlate trivially at r≈1 — that's co-routine, not signal. Detect &
+// drop both-stack pairs.
+function isStackCol(c: string): boolean {
+  return /^(supp|med|stack)_/.test(c);
+}
 
 // Pearson correlation. Returns 0 when there's <5 paired points or variance
 // is zero on either side (avoids spurious correlations on sparse data).
@@ -128,8 +143,15 @@ export async function POST() {
           xs.push(va); ys.push(vb);
         }
       }
+      // Drop trivial co-occurrence: two binary stack indicators logged on
+      // the same days will hit r≈1 mechanically, not because one drives
+      // the other. Insight surface should never see these.
+      if (isStackCol(a) && isStackCol(b)) continue;
       const r = pearson(xs, ys);
-      if (Math.abs(r) >= 0.5 && xs.length >= 7) {
+      // Lower bound 0.5 keeps things meaningful; upper bound 0.95 kills
+      // tautological-perfect pairs (binary indicators that happen to
+      // co-occur every day, near-duplicate columns).
+      if (Math.abs(r) >= 0.5 && Math.abs(r) < 0.95 && xs.length >= 7) {
         pairs.push({ a, b, r, n: xs.length });
       }
     }

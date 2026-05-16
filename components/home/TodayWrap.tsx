@@ -35,16 +35,16 @@ function Ring({ radius, pct, color, stroke = 9 }: { radius: number; pct: number;
   const dash = C * Math.max(0, Math.min(1, pct));
   return (
     <g>
-      <circle cx={70} cy={70} r={radius} fill="none" stroke={`${color}22`} strokeWidth={stroke} />
+      <circle cx={90} cy={90} r={radius} fill="none" stroke={`${color}22`} strokeWidth={stroke} />
       <circle
-        cx={70} cy={70} r={radius}
+        cx={90} cy={90} r={radius}
         fill="none"
         stroke={color}
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={`${dash} ${C - dash}`}
         strokeDashoffset={C / 4}
-        transform="rotate(-90 70 70)"
+        transform="rotate(-90 90 90)"
         style={{ transition: "stroke-dasharray 900ms cubic-bezier(0.22, 1, 0.36, 1)" }}
       />
     </g>
