@@ -465,7 +465,15 @@ export function useWorkout() {
 
   const today        = new Date().toISOString().split("T")[0];
   const sessions     = groupIntoSessions(history);
-  const todaySets    = history.filter((s) => s.log_date === today);
+  // history is fetched logged_at DESC for the chart's "newest first" use.
+  // For today's display we want CHRONOLOGICAL order so "Set 1" labels the
+  // first set Sir logged today and "Set 3" labels the most recent. The
+  // protocol index → set-number mapping (in handleLog + setProtocol display)
+  // also assumes ascending order.
+  const todaySets    = history
+    .filter((s) => s.log_date === today)
+    .slice()
+    .sort((a, b) => a.logged_at.localeCompare(b.logged_at));
   const pastSessions = sessions.filter((s) => s.date !== today);
   const filteredExercises = exercises.filter((e) => e.split_day === activeDay);
   const activeExercise    = exercises.find((e) => e.id === activeExId) ?? null;
