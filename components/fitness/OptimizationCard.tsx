@@ -16,7 +16,7 @@ import { Sparkles, ChevronDown, ChevronUp, X, Check, Settings } from "lucide-rea
 
 export default function OptimizationCard() {
   const {
-    loading, recommendations, availableEquipment, activeGymName,
+    loading, recommendations, availableEquipment, activeGymName, hasTrainingHistory,
     setEquipment, dismissRec, applySwap,
   } = useOptimization();
 
@@ -53,7 +53,9 @@ export default function OptimizationCard() {
 
       {recommendations.length === 0 ? (
         <p className="text-xs text-zinc-500 leading-relaxed">
-          All clear. No clear-upgrade swaps flagged for Sir&apos;s current setup. Coach will speak up if it finds one.
+          {hasTrainingHistory
+            ? "All clear. No clear-upgrade swaps flagged for Sir's current setup. Coach will speak up if it finds one."
+            : "Log a workout to start tracking. Coach stays quiet until there's real data — no recommendations from zero history."}
         </p>
       ) : (
         <div className="space-y-2.5 mb-3">

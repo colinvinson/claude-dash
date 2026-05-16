@@ -61,6 +61,14 @@ export function useOptimization() {
     return { freqByMuscle, setsByMuscle, splitDays };
   }, [weeklyVolume, exercises]);
 
+  // True iff Sir has logged ANY set in the last 7 days. The engine itself
+  // also gates on this; surfacing it lets the UI distinguish "all clear"
+  // (nothing to flag) from "no history yet" (don't even try yet).
+  const hasTrainingHistory = useMemo(
+    () => Object.values(splitStats.setsByMuscle).reduce((s, n) => s + n, 0) > 0,
+    [splitStats],
+  );
+
   const recommendations = useMemo<Recommendation[]>(() => {
     if (loading) return [];
     return evaluateOptimizations({
@@ -102,6 +110,7 @@ export function useOptimization() {
     activeGymId,
     activeGymName,
     splitStats,
+    hasTrainingHistory,
     volumeTargets: VOLUME_TARGETS,
     setEquipment,
     dismissRec,

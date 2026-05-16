@@ -37,6 +37,13 @@ export function evaluateOptimizations({ exercises, availableEquipment, splitStat
   const recs: Recommendation[] = [];
   const dismissed = dismissedRecIds ?? new Set<string>();
 
+  // Gate everything on "has Sir actually trained in the last 7 days." Without
+  // this, split rules like "back volume < 6 sets/wk" fire on a fresh account
+  // (0 < 6 is always true), spamming bogus recommendations before he's ever
+  // logged a single set. Coach should be silent until there's real signal.
+  const totalWeeklySets = Object.values(splitStats.setsByMuscle).reduce((s, n) => s + n, 0);
+  if (totalWeeklySets === 0) return [];
+
   // Per-exercise swaps. We match the FIRST rule that fires for each
   // exercise so we don't stack multiple swap suggestions on one entry.
   for (const ex of exercises) {
