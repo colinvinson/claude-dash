@@ -1,5 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#09090b"/>
-  <path d="M256 80 L290 222 L432 256 L290 290 L256 432 L222 290 L80 256 L222 222 Z"
-        fill="#fafafa"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0a0a0c"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded-square background, matches iOS app-icon corner radius -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+
+  <!-- Wordmark "R" — geometric, centered, app-y -->
+  <text
+    x="50%" y="58%"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    fill="#fafafa"
+    font-family="Helvetica Neue, Arial, sans-serif"
+    font-weight="700"
+    font-size="280"
+    letter-spacing="-0.04em"
+  >R</text>
+
+  <!-- Rowan-berry accent dot (top-right) — small brand cue tying the
+       name to the tree it shares -->
+  <circle cx="358" cy="142" r="14" fill="#fbbf24"/>
 </svg>

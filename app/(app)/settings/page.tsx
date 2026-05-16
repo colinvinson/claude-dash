@@ -9,7 +9,8 @@ import ExerciseLibraryEditor from "@/components/settings/ExerciseLibraryEditor";
 import GymEditor from "@/components/settings/GymEditor";
 import GoalTemplatesEditor from "@/components/settings/GoalTemplatesEditor";
 import { LogOut } from "lucide-react";
-import { PALETTE, TINT, BORDER } from "@/lib/design-tokens";
+import { PALETTE, TINT, BORDER, TYPE } from "@/lib/design-tokens";
+import pkg from "@/package.json";
 
 // Settings — grouped into 4 sections separated by SectionLabel so the page
 // has visual rhythm rather than reading as 5 stacked editors. Each editor
@@ -45,6 +46,19 @@ export default function SettingsPage() {
         <p className="text-[10px] text-zinc-600 text-center mt-2">
           You&apos;ll need to enter your 4-digit passcode again.
         </p>
+      </Card>
+
+      <div className="pt-4"><SectionLabel>About</SectionLabel></div>
+      <Card>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-zinc-900 border border-zinc-800">
+            <span className="text-lg font-bold text-zinc-100" style={{ letterSpacing: "-0.04em" }}>R</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-zinc-100">Rowan</div>
+            <div className={TYPE.label}>v{pkg.version} · Sir&apos;s personal performance dashboard</div>
+          </div>
+        </div>
       </Card>
     </div>
   );
