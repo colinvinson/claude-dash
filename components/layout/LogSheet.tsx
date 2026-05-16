@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { useLog } from "@/hooks/useLog";
 import { useJournal } from "@/hooks/useJournal";
+import { useDimensionLogs } from "@/hooks/useDimensionLogs";
 import ProteinTile from "@/components/protein/ProteinTile";
 import { useToast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptic";
@@ -14,11 +15,34 @@ const MED_DURATIONS = [5, 10, 15, 20, 30];
 const DUMP_CATEGORIES = ["personal", "business", "other"] as const;
 type DumpCategory = typeof DUMP_CATEGORIES[number];
 
+const CARDIO_KINDS  = ["zone2", "hiit", "walk", "run", "bike", "row"];
+const SOCIAL_KINDS  = ["in-person", "call", "text", "event"];
+const LEARN_KINDS   = ["reading", "course", "podcast", "video", "practice"];
+const MONEY_KINDS   = ["income", "expense", "savings", "business_revenue"] as const;
+const AESTHETIC_ANGLES = ["front", "back", "side", "flex", "face"];
+const CAFFEINE_PRESETS = [
+  { label: "Espresso",   mg: 64, source: "espresso" },
+  { label: "Coffee",     mg: 95, source: "coffee" },
+  { label: "Tea",        mg: 47, source: "tea" },
+  { label: "Pre-workout",mg: 200, source: "preworkout" },
+];
+
 export default function LogSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, addWater, logMeditation, logAlcohol, updateFaith, logMood, logWeight } = useLog();
   const { addEntry } = useJournal();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  // The 9 new dimensions — one hook per table, today's rows only.
+  const focus     = useDimensionLogs("focus_sessions");
+  const cardio    = useDimensionLogs("cardio_logs");
+  const social    = useDimensionLogs("social_logs");
+  const libido    = useDimensionLogs("libido_logs");
+  const aesthetic = useDimensionLogs("aesthetic_logs");
+  const caffeine  = useDimensionLogs("caffeine_logs");
+  const sun       = useDimensionLogs("sun_logs");
+  const learning  = useDimensionLogs("learning_logs");
+  const money     = useDimensionLogs("money_logs");
 
   // Local input state
   const [drinkType, setDrinkType] = useState("Beer");
@@ -29,6 +53,40 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
   const [dumpCat, setDumpCat] = useState<DumpCategory>("personal");
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+
+  // New-dimension input state
+  const [focusDuration,    setFocusDuration]    = useState("");
+  const [focusProject,     setFocusProject]     = useState("");
+  const [cardioKind,       setCardioKind]       = useState("zone2");
+  const [cardioDuration,   setCardioDuration]   = useState("");
+  const [socialKind,       setSocialKind]       = useState("in-person");
+  const [socialContact,    setSocialContact]    = useState("");
+  const [libidoRating,     setLibidoRating]     = useState<number | null>(null);
+  const [aestheticAngle,   setAestheticAngle]   = useState("front");
+  const [aestheticRating,  setAestheticRating]  = useState<number | null>(null);
+  const [aestheticNotes,   setAestheticNotes]   = useState("");
+  const [sunDuration,      setSunDuration]      = useState("");
+  const [sunSunscreen,     setSunSunscreen]     = useState(false);
+  const [learnKind,        setLearnKind]        = useState("reading");
+  const [learnSource,      setLearnSource]      = useState("");
+  const [learnDuration,    setLearnDuration]    = useState("");
+  const [moneyAmount,      setMoneyAmount]      = useState("");
+  const [moneyKind,        setMoneyKind]        = useState<typeof MONEY_KINDS[number]>("expense");
+  const [moneyCategory,    setMoneyCategory]    = useState("");
+
+  // Derived summaries
+  const focusTotalMin  = focus.rows.reduce((s, r) => s + (Number(r.duration_min) || 0), 0);
+  const cardioTotalMin = cardio.rows.reduce((s, r) => s + (Number(r.duration_min) || 0), 0);
+  const socialCount    = social.rows.length;
+  const libidoLatest   = libido.rows[0]?.rating as number | undefined;
+  const aestheticCount = aesthetic.rows.length;
+  const caffeineTotalMg = caffeine.rows.reduce((s, r) => s + (Number(r.mg) || 0), 0);
+  const sunTotalMin    = sun.rows.reduce((s, r) => s + (Number(r.duration_min) || 0), 0);
+  const learnTotalMin  = learning.rows.reduce((s, r) => s + (Number(r.duration_min) || 0), 0);
+  const moneyDelta     = money.rows.reduce((s, r) => {
+    const a = Number(r.amount) || 0;
+    return r.kind === "income" || r.kind === "business_revenue" ? s + a : s - a;
+  }, 0);
 
   function toggle(key: string) {
     setExpanded((prev) => (prev === key ? null : key));
@@ -284,6 +342,320 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
             </div>
           </LogTile>
 
+          {/* ── BODY ── */}
+          <Section>Body</Section>
+
+          {/* Cardio */}
+          <LogTile
+            emoji="🏃"
+            label="Cardio"
+            meta={cardioTotalMin > 0 ? `${cardioTotalMin} min today` : "none today"}
+            expanded={expanded === "cardio"}
+            onToggle={() => toggle("cardio")}
+          >
+            <div className="pt-2 space-y-2">
+              <div className="flex gap-1.5 flex-wrap">
+                {CARDIO_KINDS.map((k) => (
+                  <PillBtn key={k} on={cardioKind === k} onClick={() => setCardioKind(k)}>{k}</PillBtn>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="number" placeholder="min" value={cardioDuration} onChange={(e) => setCardioDuration(e.target.value)} className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+                <button
+                  onClick={async () => {
+                    const m = parseInt(cardioDuration, 10);
+                    if (!(m > 0)) return;
+                    setSaving("cardio"); haptic("light");
+                    await cardio.logEntry({ kind: cardioKind, duration_min: m });
+                    setCardioDuration(""); setSaving(null); setSaved("cardio");
+                    setTimeout(() => setSaved(null), 1500);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white"
+                  style={{ background: "rgba(14,165,233,0.25)", border: "1px solid rgba(14,165,233,0.25)" }}
+                >
+                  {saving === "cardio" ? "..." : saved === "cardio" ? "✓" : "Log"}
+                </button>
+              </div>
+            </div>
+          </LogTile>
+
+          {/* Sun */}
+          <LogTile
+            emoji="☀️"
+            label="Sun"
+            meta={sunTotalMin > 0 ? `${sunTotalMin} min today` : "none today"}
+            expanded={expanded === "sun"}
+            onToggle={() => toggle("sun")}
+          >
+            <div className="pt-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="number" placeholder="min" value={sunDuration} onChange={(e) => setSunDuration(e.target.value)} className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+                <label className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                  <input type="checkbox" checked={sunSunscreen} onChange={(e) => setSunSunscreen(e.target.checked)} />
+                  SPF
+                </label>
+                <button
+                  onClick={async () => {
+                    const m = parseInt(sunDuration, 10);
+                    if (!(m > 0)) return;
+                    setSaving("sun"); haptic("light");
+                    await sun.logEntry({ duration_min: m, with_sunscreen: sunSunscreen });
+                    setSunDuration(""); setSunSunscreen(false); setSaving(null); setSaved("sun");
+                    setTimeout(() => setSaved(null), 1500);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white"
+                  style={{ background: "rgba(251,191,36,0.25)", border: "1px solid rgba(251,191,36,0.25)" }}
+                >
+                  {saving === "sun" ? "..." : saved === "sun" ? "✓" : "Log"}
+                </button>
+              </div>
+            </div>
+          </LogTile>
+
+          {/* Caffeine */}
+          <LogTile
+            emoji="☕"
+            label="Caffeine"
+            meta={caffeineTotalMg > 0 ? `${caffeineTotalMg} mg today` : "none today"}
+            expanded={expanded === "caffeine"}
+            onToggle={() => toggle("caffeine")}
+          >
+            <div className="pt-2 grid grid-cols-2 gap-1.5">
+              {CAFFEINE_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={async () => {
+                    setSaving(`caffeine-${p.label}`); haptic("light");
+                    await caffeine.logEntry({ mg: p.mg, source: p.source });
+                    setSaving(null); setSaved(`caffeine-${p.label}`);
+                    setTimeout(() => setSaved(null), 1500);
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm font-semibold"
+                  style={{ background: "rgba(120,113,108,0.20)", color: "#a8a29e", border: "1px solid rgba(120,113,108,0.25)" }}
+                >
+                  {saved === `caffeine-${p.label}` ? "✓" : `${p.label} · ${p.mg}mg`}
+                </button>
+              ))}
+            </div>
+          </LogTile>
+
+          {/* ── MIND ── */}
+          <Section>Mind</Section>
+
+          {/* Focus session */}
+          <LogTile
+            emoji="🎯"
+            label="Focus session"
+            meta={focusTotalMin > 0 ? `${focusTotalMin} min today` : "no deep work logged"}
+            expanded={expanded === "focus"}
+            onToggle={() => toggle("focus")}
+          >
+            <div className="pt-2 space-y-2">
+              <input value={focusProject} onChange={(e) => setFocusProject(e.target.value)} placeholder="what you worked on (optional)" className="w-full px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+              <div className="flex items-center gap-2">
+                <input type="number" placeholder="min" value={focusDuration} onChange={(e) => setFocusDuration(e.target.value)} className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+                <button
+                  onClick={async () => {
+                    const m = parseInt(focusDuration, 10);
+                    if (!(m > 0)) return;
+                    setSaving("focus"); haptic("light");
+                    await focus.logEntry({ duration_min: m, project: focusProject.trim() || null });
+                    setFocusDuration(""); setFocusProject(""); setSaving(null); setSaved("focus");
+                    setTimeout(() => setSaved(null), 1500);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white"
+                  style={{ background: "rgba(167,139,250,0.25)", border: "1px solid rgba(167,139,250,0.25)" }}
+                >
+                  {saving === "focus" ? "..." : saved === "focus" ? "✓" : "Log"}
+                </button>
+              </div>
+            </div>
+          </LogTile>
+
+          {/* Libido */}
+          <LogTile
+            emoji="🔥"
+            label="Libido"
+            meta={libidoLatest ? `today: ${libidoLatest}/10` : "not logged"}
+            expanded={expanded === "libido"}
+            onToggle={() => toggle("libido")}
+          >
+            <div className="pt-2">
+              <div className="flex gap-1">
+                {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                  <button
+                    key={n}
+                    onClick={async () => {
+                      setLibidoRating(n);
+                      setSaving("libido"); haptic("light");
+                      await libido.logEntry({ rating: n });
+                      setSaving(null); setSaved("libido");
+                      setTimeout(() => { setSaved(null); setLibidoRating(null); }, 1500);
+                    }}
+                    className="flex-1 py-2 rounded-md text-sm font-bold tabular-nums"
+                    style={{
+                      background: (libidoRating ?? libidoLatest) === n ? "rgba(244,63,94,0.30)" : "rgba(255,255,255,0.05)",
+                      color: (libidoRating ?? libidoLatest) === n ? "#fb7185" : "#a1a1aa",
+                      border: `1px solid ${(libidoRating ?? libidoLatest) === n ? "rgba(244,63,94,0.4)" : "rgba(255,255,255,0.05)"}`,
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </LogTile>
+
+          {/* ── LIFE ── */}
+          <Section>Life</Section>
+
+          {/* Social */}
+          <LogTile
+            emoji="👥"
+            label="Social"
+            meta={socialCount > 0 ? `${socialCount} ${socialCount === 1 ? "interaction" : "interactions"} today` : "no contact logged"}
+            expanded={expanded === "social"}
+            onToggle={() => toggle("social")}
+          >
+            <div className="pt-2 space-y-2">
+              <input value={socialContact} onChange={(e) => setSocialContact(e.target.value)} placeholder="who (name or context)" className="w-full px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+              <div className="flex gap-1.5 flex-wrap">
+                {SOCIAL_KINDS.map((k) => (
+                  <PillBtn key={k} on={socialKind === k} onClick={() => setSocialKind(k)}>{k}</PillBtn>
+                ))}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!socialContact.trim()) return;
+                  setSaving("social"); haptic("light");
+                  await social.logEntry({ contact_name: socialContact.trim(), kind: socialKind });
+                  setSocialContact(""); setSaving(null); setSaved("social");
+                  setTimeout(() => setSaved(null), 1500);
+                }}
+                className="w-full py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ background: "rgba(96,165,250,0.25)", border: "1px solid rgba(96,165,250,0.25)" }}
+              >
+                {saving === "social" ? "..." : saved === "social" ? "✓ Logged" : "Log interaction"}
+              </button>
+            </div>
+          </LogTile>
+
+          {/* Learning */}
+          <LogTile
+            emoji="📚"
+            label="Learning"
+            meta={learnTotalMin > 0 ? `${learnTotalMin} min today` : "none today"}
+            expanded={expanded === "learning"}
+            onToggle={() => toggle("learning")}
+          >
+            <div className="pt-2 space-y-2">
+              <div className="flex gap-1.5 flex-wrap">
+                {LEARN_KINDS.map((k) => (
+                  <PillBtn key={k} on={learnKind === k} onClick={() => setLearnKind(k)}>{k}</PillBtn>
+                ))}
+              </div>
+              <input value={learnSource} onChange={(e) => setLearnSource(e.target.value)} placeholder="source (book / channel / etc)" className="w-full px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+              <div className="flex items-center gap-2">
+                <input type="number" placeholder="min" value={learnDuration} onChange={(e) => setLearnDuration(e.target.value)} className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+                <button
+                  onClick={async () => {
+                    const m = parseInt(learnDuration, 10);
+                    if (!(m > 0)) return;
+                    setSaving("learning"); haptic("light");
+                    await learning.logEntry({ kind: learnKind, source: learnSource.trim() || null, duration_min: m });
+                    setLearnDuration(""); setLearnSource(""); setSaving(null); setSaved("learning");
+                    setTimeout(() => setSaved(null), 1500);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white"
+                  style={{ background: "rgba(52,211,153,0.25)", border: "1px solid rgba(52,211,153,0.25)" }}
+                >
+                  {saving === "learning" ? "..." : saved === "learning" ? "✓" : "Log"}
+                </button>
+              </div>
+            </div>
+          </LogTile>
+
+          {/* Aesthetic check-in */}
+          <LogTile
+            emoji="🪞"
+            label="Aesthetic"
+            meta={aestheticCount > 0 ? `${aestheticCount} check-in${aestheticCount === 1 ? "" : "s"} today` : "no check-in today"}
+            expanded={expanded === "aesthetic"}
+            onToggle={() => toggle("aesthetic")}
+          >
+            <div className="pt-2 space-y-2">
+              <div className="flex gap-1.5 flex-wrap">
+                {AESTHETIC_ANGLES.map((a) => (
+                  <PillBtn key={a} on={aestheticAngle === a} onClick={() => setAestheticAngle(a)}>{a}</PillBtn>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                  <button key={n} onClick={() => setAestheticRating(n)} className="flex-1 py-1.5 rounded-md text-xs font-bold tabular-nums"
+                    style={{
+                      background: aestheticRating === n ? "rgba(251,191,36,0.3)" : "rgba(255,255,255,0.05)",
+                      color: aestheticRating === n ? "#fbbf24" : "#a1a1aa",
+                      border: `1px solid ${aestheticRating === n ? "rgba(251,191,36,0.4)" : "rgba(255,255,255,0.05)"}`,
+                    }}>{n}</button>
+                ))}
+              </div>
+              <textarea value={aestheticNotes} onChange={(e) => setAestheticNotes(e.target.value)} placeholder="notes — leaner, fuller, etc" rows={2} className="w-full px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none resize-none" />
+              <button
+                onClick={async () => {
+                  if (aestheticRating == null) return;
+                  setSaving("aesthetic"); haptic("light");
+                  await aesthetic.logEntry({ angle: aestheticAngle, rating: aestheticRating, notes: aestheticNotes.trim() || null });
+                  setAestheticRating(null); setAestheticNotes(""); setSaving(null); setSaved("aesthetic");
+                  setTimeout(() => setSaved(null), 1500);
+                }}
+                disabled={aestheticRating == null}
+                className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
+                style={{ background: "rgba(251,191,36,0.25)", border: "1px solid rgba(251,191,36,0.25)" }}
+              >
+                {saving === "aesthetic" ? "..." : saved === "aesthetic" ? "✓ Logged" : "Log check-in"}
+              </button>
+            </div>
+          </LogTile>
+
+          {/* Money */}
+          <LogTile
+            emoji="💵"
+            label="Money"
+            meta={moneyDelta !== 0 ? `${moneyDelta >= 0 ? "+" : ""}$${moneyDelta.toFixed(2)} today` : "nothing logged"}
+            expanded={expanded === "money"}
+            onToggle={() => toggle("money")}
+          >
+            <div className="pt-2 space-y-2">
+              <div className="flex gap-1.5 flex-wrap">
+                {MONEY_KINDS.map((k) => (
+                  <PillBtn key={k} on={moneyKind === k} onClick={() => setMoneyKind(k)}>{k.replace("_", " ")}</PillBtn>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-sm">$</span>
+                <input type="number" step="0.01" value={moneyAmount} onChange={(e) => setMoneyAmount(e.target.value)} placeholder="amount" className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+                <input value={moneyCategory} onChange={(e) => setMoneyCategory(e.target.value)} placeholder="category" className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none" />
+              </div>
+              <button
+                onClick={async () => {
+                  const a = parseFloat(moneyAmount);
+                  if (!isFinite(a) || a <= 0) return;
+                  setSaving("money"); haptic("light");
+                  await money.logEntry({ amount: a, kind: moneyKind, category: moneyCategory.trim() || null });
+                  setMoneyAmount(""); setMoneyCategory(""); setSaving(null); setSaved("money");
+                  setTimeout(() => setSaved(null), 1500);
+                }}
+                className="w-full py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ background: "rgba(34,197,94,0.25)", border: "1px solid rgba(34,197,94,0.25)" }}
+              >
+                {saving === "money" ? "..." : saved === "money" ? "✓ Logged" : "Log"}
+              </button>
+            </div>
+          </LogTile>
+
+          {/* ── REFLECTION ── */}
+          <Section>Reflection</Section>
+
           {/* Brain dump — single entry with category tag */}
           <LogTile
             emoji="🧠"
@@ -349,6 +721,33 @@ function faithSummary(faith: { prayed: boolean; bible_min: number; church_attend
   if (faith.bible_min > 0) parts.push(`${faith.bible_min}min bible`);
   if (faith.church_attended) parts.push("church");
   return parts.length > 0 ? parts.join(" · ") : "nothing logged";
+}
+
+// Small section header to chunk the log surfaces (Body / Mind / Life /
+// Reflection). Sticky-feeling separator between groups of tiles.
+function Section({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pt-3 pb-1">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-600 font-semibold">— {children}</span>
+    </div>
+  );
+}
+
+// Compact pill button for kind/category pickers inside log tiles.
+function PillBtn({ children, on, onClick }: { children: React.ReactNode; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
+      style={{
+        background: on ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)",
+        color: on ? "#fafafa" : "#a1a1aa",
+        border: `1px solid ${on ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.06)"}`,
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 function LogTile({
