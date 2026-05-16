@@ -13,6 +13,7 @@ import { useGoalMetrics } from "@/hooks/useGoalMetrics";
 import type { LongTermGoal, GoalType } from "@/hooks/useLongTermGoals";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import LinkRoutinePicker from "./LinkRoutinePicker";
+import LinkedChats from "@/components/businesses/LinkedChats";
 
 type Props = {
   goal: LongTermGoal;
@@ -560,6 +561,12 @@ export default function GoalWidget({
             >
               <Archive size={11} /> Archive
             </button>
+          </div>
+
+          {/* Linked chats — external Claude.ai / ChatGPT conversations
+              about this goal (research, protocol design, brainstorms) */}
+          <div className="pt-4 border-t border-zinc-800">
+            <LinkedChats goalId={goal.id} />
           </div>
         </div>
       )}

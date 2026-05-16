@@ -76,7 +76,11 @@ export async function buildContext(userId: string) {
     // marketing_experiments (0032) closes the agent learning loop —
     // variants + outcomes per business so Jarvis can recognize what
     // actually converts for Sir's audience.
-    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes, marketingExperimentsRes,
+    // linked_chats (0033) are references to external Claude.ai /
+    // ChatGPT conversations attached to a business or goal — Jarvis
+    // can tell Sir "you have a 6/12 Claude chat about pricing tied to
+    // SaaS v2" so prior thinking stays visible.
+    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes, marketingExperimentsRes, linkedChatsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -154,6 +158,11 @@ export async function buildContext(userId: string) {
     // "your last 10 Twitter posts averaged 1.2% CVR; variant C broke
     // pattern with 8.4%" instead of giving generic advice.
     supabase.from("marketing_experiments").select("business_id, variant_label, variant_text, channel, posted_at, impressions, clicks, conversions, revenue_attributed").eq("user_id", userId).is("archived_at", null).order("posted_at", { ascending: false, nullsFirst: false }).limit(150),
+    // Linked chats (migration 0033) — references to external AI
+    // conversations attached to a business or goal. Surface title +
+    // source + summary so Jarvis can reference prior reasoning ("you
+    // already worked through pricing in a Claude chat 3 days ago").
+    supabase.from("linked_chats").select("business_id, goal_id, title, url, source, summary, created_at").eq("user_id", userId).is("archived_at", null).order("created_at", { ascending: false }).limit(60),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -795,6 +804,10 @@ export async function buildContext(userId: string) {
       const allGoals     = (ltGoalsRes.data ?? []) as GoalRow[];
       const allMetrics   = (goalMetricsRes.data ?? []) as MetricRow[];
       const allMilestones = (goalMilestonesRes.data ?? []) as MilestoneRow[];
+      // Linked chats — pulled from the same query the businesses block
+      // uses; we just look up the goal_id-filtered subset here.
+      type ChatRow2 = { business_id: string | null; goal_id: string | null; title: string; url: string | null; source: string; summary: string | null; created_at: string };
+      const allChats     = (linkedChatsRes.data ?? []) as ChatRow2[];
 
       return allGoals.map((g) => {
         const goalMetrics = allMetrics.filter((m) => m.goal_id === g.id);
@@ -848,6 +861,9 @@ export async function buildContext(userId: string) {
             done,
             nextOpen: next ? { title: next.title, target_date: next.target_date } : null,
           },
+          linkedChats: allChats
+            .filter((c) => c.goal_id === g.id)
+            .map((c) => ({ title: c.title, source: c.source, url: c.url, summary: c.summary, createdAt: c.created_at })),
         };
       });
     })(),
@@ -868,12 +884,14 @@ export async function buildContext(userId: string) {
       type ArtifactRow = { id: string; name: string; business_id: string | null; business_agent_id: string | null; created_at: string };
       type TaskRow     = { business_id: string; title: string; priority: -1 | 0 | 1; due_date: string | null };
       type ExpRow      = { business_id: string; variant_label: string; variant_text: string; channel: string; posted_at: string | null; impressions: number | null; clicks: number | null; conversions: number | null; revenue_attributed: number | null };
+      type ChatRow     = { business_id: string | null; goal_id: string | null; title: string; url: string | null; source: string; summary: string | null; created_at: string };
       const bizRows      = (businessesRes.data ?? []) as Biz[];
       const revRows      = (businessRevenue90dRes.data ?? []) as RevRow[];
       const agentRows    = (businessAgentsRes.data ?? []) as AgentRow[];
       const artifactRows = (businessArtifactsRes.data ?? []) as ArtifactRow[];
       const taskRows     = (businessTasksRes.data ?? []) as TaskRow[];
       const expRows      = (marketingExperimentsRes.data ?? []) as ExpRow[];
+      const chatRows     = (linkedChatsRes.data ?? []) as ChatRow[];
 
       // Build latest-artifact-per-agent index (rows already sorted desc).
       const latestArtByAgent = new Map<string, ArtifactRow>();
@@ -936,6 +954,9 @@ export async function buildContext(userId: string) {
           agents:           myAgents,
           openTasks:        myOpenTasks,
           recentExperiments: myExperiments,
+          linkedChats:      chatRows
+            .filter((c) => c.business_id === b.id)
+            .map((c) => ({ title: c.title, source: c.source, url: c.url, summary: c.summary, createdAt: c.created_at })),
         };
       });
       return { count: bizRows.length, totalMRR: total, items };
