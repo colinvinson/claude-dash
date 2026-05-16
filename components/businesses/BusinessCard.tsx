@@ -1,7 +1,8 @@
 "use client";
 
+import { AlertCircle } from "lucide-react";
 import Card from "@/components/ui/Card";
-import { PALETTE, TYPE } from "@/lib/design-tokens";
+import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import type { Business, BusinessStatus } from "@/hooks/useBusinesses";
 
 // One business at a glance. Tap to open detail sheet. Status chip on the
@@ -33,12 +34,19 @@ function fmtMoney(n: number): string {
 
 export default function BusinessCard({
   business,
+  topTask,
+  stale,
   onOpen,
 }: {
   business: Business;
-  onOpen: () => void;
+  topTask?: string | null;
+  stale?:   boolean;
+  onOpen:   () => void;
 }) {
   const color = STATUS_COLOR[business.status];
+  // Top open task takes precedence; legacy next_action only surfaces if
+  // no tasks exist yet (pre-migration data).
+  const nextLine = topTask ?? business.next_action;
 
   return (
     <Card>
@@ -62,6 +70,15 @@ export default function BusinessCard({
                   {business.category}
                 </span>
               )}
+              {stale && (
+                <span
+                  className="text-[9px] uppercase tracking-widest font-bold flex items-center gap-1 px-1.5 py-0.5 rounded"
+                  style={{ color: PALETTE.warning, background: "rgba(245, 158, 11, 0.08)" }}
+                  aria-label="No activity in 7+ days"
+                >
+                  <AlertCircle size={ICON.xs} /> stale
+                </span>
+              )}
             </div>
 
             {/* Money + customers row — only when there's real revenue or customers */}
@@ -76,11 +93,11 @@ export default function BusinessCard({
               </div>
             )}
 
-            {/* Next action — the one thing this business needs */}
-            {business.next_action && (
+            {/* Next — top open task (or legacy next_action) */}
+            {nextLine && (
               <p className="mt-1.5 text-[12px] text-zinc-300 leading-snug">
                 <span className={`${TYPE.label} mr-1`}>Next</span>
-                {business.next_action}
+                {nextLine}
               </p>
             )}
           </div>

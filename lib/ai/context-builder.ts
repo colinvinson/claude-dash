@@ -71,8 +71,9 @@ export async function buildContext(userId: string) {
     // say "the SaaS competitor watcher hasn't run in 4 days." Business
     // artifacts (0029) feed Jarvis the latest deliverable per agent so
     // he can reference outputs by name without a separate read_artifact
-    // call.
-    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes,
+    // call. business_tasks (0030) is the actual work list per business —
+    // open items, priority-sorted, with optional due dates.
+    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -141,6 +142,10 @@ export async function buildContext(userId: string) {
     // across all businesses — context-builder selects the latest per
     // business_agent_id when building the per-agent block below.
     supabase.from("jarvis_artifacts").select("id, name, business_id, business_agent_id, created_at").eq("user_id", userId).not("business_id", "is", null).order("created_at", { ascending: false }).limit(50),
+    // Per-business tasks (migration 0030). Open tasks only — Jarvis cares
+    // about WHAT'S TO DO, not the done log. Sorted same as the UI:
+    // priority desc, then created_at asc.
+    supabase.from("business_tasks").select("business_id, title, priority, due_date").eq("user_id", userId).eq("is_complete", false).order("priority", { ascending: false }).order("created_at", { ascending: true }),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -853,10 +858,12 @@ export async function buildContext(userId: string) {
       type RevRow = { business_id: string; amount: number; log_date: string };
       type AgentRow    = { id: string; business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null };
       type ArtifactRow = { id: string; name: string; business_id: string | null; business_agent_id: string | null; created_at: string };
+      type TaskRow     = { business_id: string; title: string; priority: -1 | 0 | 1; due_date: string | null };
       const bizRows      = (businessesRes.data ?? []) as Biz[];
       const revRows      = (businessRevenue90dRes.data ?? []) as RevRow[];
       const agentRows    = (businessAgentsRes.data ?? []) as AgentRow[];
       const artifactRows = (businessArtifactsRes.data ?? []) as ArtifactRow[];
+      const taskRows     = (businessTasksRes.data ?? []) as TaskRow[];
 
       // Build latest-artifact-per-agent index (rows already sorted desc).
       const latestArtByAgent = new Map<string, ArtifactRow>();
@@ -887,16 +894,21 @@ export async function buildContext(userId: string) {
             latestArtifact: latestArt ? { id: latestArt.id, name: latestArt.name, createdAt: latestArt.created_at } : null,
           };
         });
+        const myOpenTasks = taskRows
+          .filter((t) => t.business_id === b.id)
+          .map((t) => ({ title: t.title, priority: t.priority, dueDate: t.due_date }));
         return {
           name:        b.name,
           status:      b.status,
           category:    b.category,
           mrr:         Number(b.monthly_revenue) || 0,
           customers:   Number(b.customer_count)  || 0,
-          nextAction:  b.next_action,
+          // next_action is legacy; tasks[0] is the canonical "next" now.
+          nextAction:  myOpenTasks[0]?.title ?? b.next_action,
           momPct,
           revLogCount: myRev.length,
           agents:      myAgents,
+          openTasks:   myOpenTasks,
         };
       });
       return { count: bizRows.length, totalMRR: total, items };

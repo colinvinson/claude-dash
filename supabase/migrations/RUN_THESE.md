@@ -4,7 +4,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 
 ## What to do right now if you've fallen behind
 
-1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0029` in order.
+1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0030` in order.
 2. **You've been keeping up but might've missed recent ones:** run the post-0018 list below; idempotent guards skip the ones already applied.
 
 ## Migrations after the catch-up (0018) — apply these in order
@@ -22,6 +22,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 | 0027 | `0027_businesses.sql` | `businesses` + `business_revenue_log` tables | Businesses portfolio hub on /businesses tab |
 | 0028 | `0028_business_agents.sql` | `business_agents` table | Per-business agent workforce in BusinessDetail sheet |
 | 0029 | `0029_artifacts_to_businesses.sql` | `business_id` + `business_agent_id` on `jarvis_artifacts` | Inline per-agent artifact previews in BusinessAgents |
+| 0030 | `0030_business_tasks.sql` | `business_tasks` table + auto-import of legacy `next_action` | Tasks checklist + activity feed on BusinessDetail |
 
 ## After running, verify
 

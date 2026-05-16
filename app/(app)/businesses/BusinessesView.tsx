@@ -14,7 +14,7 @@ import GoalsList from "@/components/goals/GoalsList";
 const STATUS_ORDER: Business["status"][] = ["growing", "live", "building", "idea", "paused"];
 
 export default function BusinessesView() {
-  const { businesses, loading } = useBusinesses();
+  const { businesses, loading, staleIds, topTasks } = useBusinesses();
   const [openId, setOpenId] = useState<string | null>(null);
   const openBusiness = openId ? businesses.find((b) => b.id === openId) ?? null : null;
 
@@ -43,7 +43,13 @@ export default function BusinessesView() {
 
       <div className="anim-fade-up stagger-2 space-y-3">
         {sorted.map((b) => (
-          <BusinessCard key={b.id} business={b} onOpen={() => setOpenId(b.id)} />
+          <BusinessCard
+            key={b.id}
+            business={b}
+            topTask={topTasks.get(b.id) ?? null}
+            stale={staleIds.has(b.id)}
+            onOpen={() => setOpenId(b.id)}
+          />
         ))}
       </div>
 

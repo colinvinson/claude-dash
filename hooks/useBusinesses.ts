@@ -26,10 +26,16 @@ export type AddBusinessArgs = {
   category?: string;
 };
 
+const STALE_THRESHOLD_MS = 7 * 24 * 3600 * 1000;
+
 export function useBusinesses() {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [userId, setUserId]         = useState<string | null>(null);
+  const [businesses, setBusinesses]     = useState<Business[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [userId, setUserId]             = useState<string | null>(null);
+  const [staleIds, setStaleIds]         = useState<Set<string>>(new Set());
+  // Top open task per business — drives the "Next" line on BusinessCard.
+  // Falls back to legacy next_action only if no tasks exist.
+  const [topTasks, setTopTasks]         = useState<Map<string, string>>(new Map());
   const supabase = createClient();
 
   const load = useCallback(async () => {
@@ -37,19 +43,65 @@ export function useBusinesses() {
     if (!user) { setLoading(false); return; }
     setUserId(user.id);
 
-    const { data } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("user_id", user.id)
-      .is("archived_at", null)
-      .order("monthly_revenue", { ascending: false })
-      .order("created_at",      { ascending: false });
+    const [bizRes, revRes, agentRes, doneTaskRes, openTaskRes] = await Promise.all([
+      supabase
+        .from("businesses")
+        .select("*")
+        .eq("user_id", user.id)
+        .is("archived_at", null)
+        .order("monthly_revenue", { ascending: false })
+        .order("created_at",      { ascending: false }),
+      // Three sources feed the "is this stale" check — most recent of each
+      // per business is enough.
+      supabase.from("business_revenue_log").select("business_id, log_date").eq("user_id", user.id).order("log_date", { ascending: false }),
+      supabase.from("business_agents").select("business_id, last_run_at").eq("user_id", user.id).not("last_run_at", "is", null),
+      supabase.from("business_tasks").select("business_id, completed_at").eq("user_id", user.id).eq("is_complete", true).not("completed_at", "is", null),
+      // Open tasks — sorted same way the per-business hook sorts so the
+      // first row per business is what the card should display.
+      supabase.from("business_tasks").select("business_id, title, priority, created_at").eq("user_id", user.id).eq("is_complete", false).order("priority", { ascending: false }).order("created_at", { ascending: true }),
+    ]);
 
-    setBusinesses(((data ?? []) as Business[]).map((b) => ({
+    const rows = ((bizRes.data ?? []) as Business[]).map((b) => ({
       ...b,
       monthly_revenue: Number(b.monthly_revenue) || 0,
       customer_count:  Number(b.customer_count)  || 0,
-    })));
+    }));
+
+    // Compute "last activity" per business across all three sources.
+    const lastByBiz = new Map<string, number>();
+    function bump(bid: string, ts: number) {
+      const prev = lastByBiz.get(bid);
+      if (prev == null || prev < ts) lastByBiz.set(bid, ts);
+    }
+    for (const r of (revRes.data ?? []) as Array<{ business_id: string; log_date: string }>) {
+      bump(r.business_id, new Date(r.log_date + "T00:00:00").getTime());
+    }
+    for (const r of (agentRes.data ?? []) as Array<{ business_id: string; last_run_at: string }>) {
+      bump(r.business_id, new Date(r.last_run_at).getTime());
+    }
+    for (const r of (doneTaskRes.data ?? []) as Array<{ business_id: string; completed_at: string }>) {
+      bump(r.business_id, new Date(r.completed_at).getTime());
+    }
+
+    // First open task per business (rows already pre-sorted).
+    const topByBiz = new Map<string, string>();
+    for (const r of (openTaskRes.data ?? []) as Array<{ business_id: string; title: string }>) {
+      if (!topByBiz.has(r.business_id)) topByBiz.set(r.business_id, r.title);
+    }
+    setTopTasks(topByBiz);
+    const now = Date.now();
+    const stale = new Set<string>();
+    for (const b of rows) {
+      const last = lastByBiz.get(b.id);
+      // Brand-new businesses (created in the last 7d, no activity yet) aren't
+      // "stale" — they just haven't built history. Use created_at as fallback.
+      const createdAt = new Date(b.created_at).getTime();
+      const lastTs    = last ?? createdAt;
+      if (now - lastTs > STALE_THRESHOLD_MS) stale.add(b.id);
+    }
+
+    setBusinesses(rows);
+    setStaleIds(stale);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -111,6 +163,8 @@ export function useBusinesses() {
     totalMRR,
     totalCustomers,
     liveCount,
+    staleIds,
+    topTasks,
     addBusiness,
     updateBusiness,
     archiveBusiness,
