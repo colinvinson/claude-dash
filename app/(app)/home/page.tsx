@@ -97,24 +97,42 @@ export default function HomePage() {
     <>
       <StreakCelebration />
 
-      <div className="anim-fade-up"><WelcomeCard /></div>
-
+      {/* Conditional alerts — rendered bare (no wrapper divs) so when they
+          return null React renders nothing AND the parent's space-y-5
+          selector skips them. Putting them inside the grid would leave
+          ghost cells with grid-gap. */}
+      <WelcomeCard />
       {health.todays_call_severity === "red" && health.todays_call_body && (
-        <div className="anim-fade-up">
-          <TodaysCall severity={health.todays_call_severity} headline={health.todays_call_body} bullets={[]} />
-        </div>
+        <TodaysCall severity={health.todays_call_severity} headline={health.todays_call_body} bullets={[]} />
       )}
+      <StreakAlert />
 
-      <div className="anim-fade-up"><StreakAlert /></div>
-      <div className="anim-fade-up"><DayBrief /></div>
-      <div className="anim-fade-up stagger-1"><RightNowCard /></div>
-      <div className="anim-fade-up stagger-2"><TodayWrap /></div>
-      <div className="anim-fade-up stagger-3">
-        <PriorityFocusCard goals={goals} totalGoals={goals.length} onToggle={toggleGoal} />
+      {/* Dashboard grid. col-span-2 = full width (most cards), no span =
+          half width (paired tiles). The 2-col tile row (PriorityFocus +
+          DayRing) is the visual break that turns Home from "list of cards"
+          into a dashboard. */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Morning ritual */}
+        <div className="col-span-2 anim-fade-up"><DayBrief /></div>
+
+        {/* HERO — score + 3 rings + recap */}
+        <div className="col-span-2 anim-fade-up stagger-1"><TodayWrap /></div>
+
+        {/* Primary CTA — full width */}
+        <div className="col-span-2 anim-fade-up stagger-2"><RightNowCard /></div>
+
+        {/* 2-col tile row — Focus goals + time-of-day phase */}
+        <div className="anim-fade-up stagger-3">
+          <PriorityFocusCard goals={goals} totalGoals={goals.length} onToggle={toggleGoal} />
+        </div>
+        <div className="anim-fade-up stagger-3"><Card><DayRing /></Card></div>
+
+        {/* Glance pills — already a horizontal layout */}
+        <div className="col-span-2 anim-fade-up stagger-4"><QuickStatsStrip pills={pills} /></div>
+
+        {/* Idempotent — vanishes after subscribed */}
+        <div className="col-span-2 anim-fade-up stagger-5"><PushSubscriber /></div>
       </div>
-      <div className="anim-fade-up stagger-4"><Card><DayRing /></Card></div>
-      <div className="anim-fade-up stagger-5"><QuickStatsStrip pills={pills} /></div>
-      <div className="anim-fade-up stagger-6"><PushSubscriber /></div>
     </>
   );
 }
