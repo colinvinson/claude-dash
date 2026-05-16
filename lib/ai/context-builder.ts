@@ -73,7 +73,10 @@ export async function buildContext(userId: string) {
     // he can reference outputs by name without a separate read_artifact
     // call. business_tasks (0030) is the actual work list per business —
     // open items, priority-sorted, with optional due dates.
-    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes,
+    // marketing_experiments (0032) closes the agent learning loop —
+    // variants + outcomes per business so Jarvis can recognize what
+    // actually converts for Sir's audience.
+    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes, marketingExperimentsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -146,6 +149,11 @@ export async function buildContext(userId: string) {
     // about WHAT'S TO DO, not the done log. Sorted same as the UI:
     // priority desc, then created_at asc.
     supabase.from("business_tasks").select("business_id, title, priority, due_date").eq("user_id", userId).eq("is_complete", false).order("priority", { ascending: false }).order("created_at", { ascending: true }),
+    // Marketing experiments (migration 0032). Recent + posted variants
+    // with their outcomes feed the closed-loop learning — Jarvis can say
+    // "your last 10 Twitter posts averaged 1.2% CVR; variant C broke
+    // pattern with 8.4%" instead of giving generic advice.
+    supabase.from("marketing_experiments").select("business_id, variant_label, variant_text, channel, posted_at, impressions, clicks, conversions, revenue_attributed").eq("user_id", userId).is("archived_at", null).order("posted_at", { ascending: false, nullsFirst: false }).limit(150),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -859,11 +867,13 @@ export async function buildContext(userId: string) {
       type AgentRow    = { id: string; business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null; schedule_kind: string; schedule_hour: number | null; schedule_dow: number | null; schedule_dom: number | null; next_run_at: string | null };
       type ArtifactRow = { id: string; name: string; business_id: string | null; business_agent_id: string | null; created_at: string };
       type TaskRow     = { business_id: string; title: string; priority: -1 | 0 | 1; due_date: string | null };
+      type ExpRow      = { business_id: string; variant_label: string; variant_text: string; channel: string; posted_at: string | null; impressions: number | null; clicks: number | null; conversions: number | null; revenue_attributed: number | null };
       const bizRows      = (businessesRes.data ?? []) as Biz[];
       const revRows      = (businessRevenue90dRes.data ?? []) as RevRow[];
       const agentRows    = (businessAgentsRes.data ?? []) as AgentRow[];
       const artifactRows = (businessArtifactsRes.data ?? []) as ArtifactRow[];
       const taskRows     = (businessTasksRes.data ?? []) as TaskRow[];
+      const expRows      = (marketingExperimentsRes.data ?? []) as ExpRow[];
 
       // Build latest-artifact-per-agent index (rows already sorted desc).
       const latestArtByAgent = new Map<string, ArtifactRow>();
@@ -900,6 +910,19 @@ export async function buildContext(userId: string) {
         const myOpenTasks = taskRows
           .filter((t) => t.business_id === b.id)
           .map((t) => ({ title: t.title, priority: t.priority, dueDate: t.due_date }));
+        const myExperiments = expRows
+          .filter((e) => e.business_id === b.id)
+          .slice(0, 12)
+          .map((e) => ({
+            label:    e.variant_label,
+            text:     e.variant_text.length > 160 ? e.variant_text.slice(0, 160) + "…" : e.variant_text,
+            channel:  e.channel,
+            postedAt: e.posted_at,
+            impressions: e.impressions,
+            clicks:      e.clicks,
+            conversions: e.conversions,
+            revenue:     e.revenue_attributed != null ? Number(e.revenue_attributed) : null,
+          }));
         return {
           name:        b.name,
           status:      b.status,
@@ -910,8 +933,9 @@ export async function buildContext(userId: string) {
           nextAction:  myOpenTasks[0]?.title ?? b.next_action,
           momPct,
           revLogCount: myRev.length,
-          agents:      myAgents,
-          openTasks:   myOpenTasks,
+          agents:           myAgents,
+          openTasks:        myOpenTasks,
+          recentExperiments: myExperiments,
         };
       });
       return { count: bizRows.length, totalMRR: total, items };

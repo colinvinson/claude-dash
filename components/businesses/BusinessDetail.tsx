@@ -13,6 +13,7 @@ import BusinessAgents from "./BusinessAgents";
 import BusinessTasks from "./BusinessTasks";
 import BusinessActivity from "./BusinessActivity";
 import MRRSparkline from "./MRRSparkline";
+import MarketingExperiments from "./MarketingExperiments";
 
 // Per-business control panel. Layout flows top-down by what Sir needs to
 // SEE first vs ACT on first vs reference occasionally:
@@ -203,6 +204,9 @@ export default function BusinessDetail({
 
           {/* ── AGENTS — workforce + artifact feedback ── */}
           <BusinessAgents business={business} />
+
+          {/* ── MARKETING EXPERIMENTS — closed-loop variant + outcome log ── */}
+          <MarketingExperiments businessId={business.id} />
 
           {/* ── ACTIVITY — chronological feed of everything that happened ── */}
           <BusinessActivity businessId={business.id} />

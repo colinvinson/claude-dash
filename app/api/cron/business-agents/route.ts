@@ -65,13 +65,31 @@ export async function GET(req: NextRequest) {
   // Load every referenced business in one shot so we don't issue N
   // queries when several agents on the same business fire together.
   const bizIds = Array.from(new Set(due.map((a) => a.business_id)));
-  const { data: bizRows } = await sb
-    .from("businesses")
-    .select("id, name, status, monthly_revenue, customer_count, next_action")
-    .in("id", bizIds);
+  const [bizRowsRes, expRowsRes] = await Promise.all([
+    sb.from("businesses")
+      .select("id, name, status, monthly_revenue, customer_count, next_action")
+      .in("id", bizIds),
+    // Recent experiments per business — fed into each deploy prompt so
+    // content/agents see what's been tried + how it performed.
+    sb.from("marketing_experiments")
+      .select("business_id, variant_label, variant_text, channel, posted_at, impressions, clicks, conversions, revenue_attributed")
+      .in("business_id", bizIds)
+      .is("archived_at", null)
+      .order("posted_at",  { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(150),
+  ]);
   const bizById = new Map<string, BizRow>(
-    ((bizRows ?? []) as BizRow[]).map((b) => [b.id, { ...b, monthly_revenue: Number(b.monthly_revenue) || 0, customer_count: Number(b.customer_count) || 0 }]),
+    ((bizRowsRes.data ?? []) as BizRow[]).map((b) => [b.id, { ...b, monthly_revenue: Number(b.monthly_revenue) || 0, customer_count: Number(b.customer_count) || 0 }]),
   );
+
+  type ExpRow = { business_id: string; variant_label: string; variant_text: string; channel: string; posted_at: string | null; impressions: number | null; clicks: number | null; conversions: number | null; revenue_attributed: number | null };
+  const expByBiz = new Map<string, ExpRow[]>();
+  for (const e of ((expRowsRes.data ?? []) as ExpRow[])) {
+    const arr = expByBiz.get(e.business_id) ?? [];
+    arr.push(e);
+    expByBiz.set(e.business_id, arr);
+  }
 
   let fired = 0;
   const errors: string[] = [];
@@ -81,12 +99,22 @@ export async function GET(req: NextRequest) {
     if (!biz) { errors.push(`business ${a.business_id} not found for agent ${a.id}`); continue; }
 
     const prompt = buildRunPrompt({
-      business:        biz,
-      businessAgentId: a.id,
-      agentName:       a.agent_name,
-      roleLabel:       a.role_label,
-      purpose:         a.purpose,
-      scheduled:       true,
+      business:          biz,
+      businessAgentId:   a.id,
+      agentName:         a.agent_name,
+      roleLabel:         a.role_label,
+      purpose:           a.purpose,
+      scheduled:         true,
+      recentExperiments: (expByBiz.get(biz.id) ?? []).map((e) => ({
+        variant_label:      e.variant_label,
+        variant_text:       e.variant_text,
+        channel:            e.channel,
+        posted_at:          e.posted_at,
+        impressions:        e.impressions,
+        clicks:             e.clicks,
+        conversions:        e.conversions,
+        revenue_attributed: e.revenue_attributed != null ? Number(e.revenue_attributed) : null,
+      })),
     });
 
     // Insert the dispatch row — same path as the manual Run button via

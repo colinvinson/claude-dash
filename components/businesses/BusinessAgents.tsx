@@ -7,9 +7,10 @@ import FormLabel from "@/components/ui/FormLabel";
 import Button from "@/components/ui/Button";
 import { useBusinessAgents, type BusinessAgent } from "@/hooks/useBusinessAgents";
 import { useBusinessAgentArtifacts, type BusinessArtifact } from "@/hooks/useBusinessAgentArtifacts";
+import { useMarketingExperiments } from "@/hooks/useMarketingExperiments";
 import type { Business } from "@/hooks/useBusinesses";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
-import { artifactTagInstructions, businessContextLine } from "@/lib/businesses/agent-prompts";
+import { artifactTagInstructions, businessContextLine, buildRunPrompt } from "@/lib/businesses/agent-prompts";
 import { describeSchedule, type ScheduleKind } from "@/lib/businesses/schedule";
 
 // Per-business agent workforce surface. Renders inside BusinessDetail.
@@ -41,6 +42,9 @@ function openJarvis(prompt: string) {
 export default function BusinessAgents({ business }: { business: Business }) {
   const { agents, assignAgent, removeAgent, markRun, setSchedule } = useBusinessAgents(business.id);
   const { latestByAgent } = useBusinessAgentArtifacts(business.id);
+  // Recent experiments feed the closed loop — agents see what's been tried
+  // + outcomes when they're dispatched, so drafts get smarter over time.
+  const { experiments } = useMarketingExperiments(business.id);
   const [adding, setAdding]         = useState(false);
   const [roleLabel, setRoleLabel]   = useState("");
   const [purpose, setPurpose]       = useState("");
@@ -75,12 +79,14 @@ export default function BusinessAgents({ business }: { business: Business }) {
   }
 
   async function runExisting(agentId: string, agentName: string | null, roleLabel: string, purpose: string | null) {
-    const target = agentName ? `the "${agentName}" agent` : `a generic Claude Code agent`;
-    const prompt =
-      `Dispatch ${target} for ${businessContextLine(business)}. Role: ${roleLabel}.` +
-      `${purpose ? ` Purpose: ${purpose}.` : ""}` +
-      ` Run it now with the business context above as grounding. Return the session id when dispatched.` +
-      artifactTagInstructions(business.id, agentId);
+    const prompt = buildRunPrompt({
+      business,
+      businessAgentId:   agentId,
+      agentName,
+      roleLabel,
+      purpose,
+      recentExperiments: experiments,
+    });
     openJarvis(prompt);
     void markRun(agentId);
   }
