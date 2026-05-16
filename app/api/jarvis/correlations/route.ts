@@ -99,6 +99,17 @@ export async function POST() {
 
   const service = createServiceClient();
 
+  // Sweep stale garbage from earlier versions of this engine. The old code
+  // emitted (a) r=1.00 / r=-1.00 pairs (trivial co-occurrence) and (b)
+  // rows containing the raw supp_/med_/stack_ prefix in the body string.
+  // Hard-delete those rows so they stop surfacing in WhatMattersCard.
+  await service
+    .from("jarvis_insights")
+    .delete()
+    .eq("user_id", uid)
+    .eq("kind", "correlation")
+    .or("body.ilike.%r=1.00%,body.ilike.%r=-1.00%,body.ilike.%supp %,body.ilike.%med %,body.ilike.%stack %");
+
   // Weekly gate — bail if any correlation insight has fired in the last 7 days.
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   const existing = await service
