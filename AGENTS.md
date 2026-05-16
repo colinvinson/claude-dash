@@ -77,3 +77,19 @@ You are operating on Sir's metered Claude budget. Every input + output token is 
 
 These rules apply to every CC agent run from this repository, regardless of what its agent definition says.
 <!-- END:token-discipline -->
+
+<!-- BEGIN:design-system-reuse -->
+# Design system reuse (mandatory before any UI work)
+
+Before building or modifying any UI surface, read [components/ui/DESIGN.md](components/ui/DESIGN.md). The app went through a cohesion pass because it grew into 16 cards on Home, 4 ways to render "done," and amber meaning two different things. The DESIGN doc is the antidote.
+
+Hard rules:
+
+- **Reuse primitives.** `Card`, `CompletionToggle`, `FormInput` / `FormTextarea` / `FormSelect`, `FormLabel`, `EmptyState`, `ConfettiBurst`. Never hand-roll the equivalent inline.
+- **Reuse tokens.** Import `PALETTE`, `TINT`, `BORDER`, `SPACING`, `TYPE` from [lib/design-tokens.ts](lib/design-tokens.ts). No hex literals in `components/` or `app/(app)/` except in `lib/schedule/icons.ts` (intentional per-item identity).
+- **Each color token has ONE meaning.** Don't reuse `PALETTE.warning` for a primary action because you "wanted some color." Primary is white, secondary is bordered zinc.
+- **Home is for triage**, not features. Default new features to their dedicated tab.
+- **One way to render "done"** — `CompletionToggle`. If you need a new size, add a mode to it; don't fork.
+
+If a primitive doesn't fit your case, extend the primitive (add a prop / mode) and update DESIGN.md. Forking styling is the exact thing that caused the cohesion mess this rule prevents.
+<!-- END:design-system-reuse -->
