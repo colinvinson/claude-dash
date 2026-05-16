@@ -81,20 +81,59 @@ export const ICON = {
 } as const;
 
 // ── TYPE — used as className spread ─────────────────────────────────────
+// A real scale with intentional weight contrast and tightened leading on
+// the larger sizes. Lean on this — every text node in components/ should
+// resolve to one of these tokens, not a hand-rolled text-Nxl + font-Y.
+//
+// Display is the loudest moment a surface gets (daily score landing, hero
+// MRR, milestone reached). Use sparingly — overuse kills its weight.
 
 export const TYPE = {
-  // Tiny uppercase section label — used at the top of every Card.
-  label:    "text-[10px] uppercase tracking-widest text-zinc-500",
-  // Standard body text — descriptions, secondary copy.
+  // ── Voice (existing — keep for backward compat) ──
+  label:    "text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-semibold",
   body:     "text-sm text-zinc-200",
-  // Muted body — explanatory subtext.
   bodyMute: "text-xs text-zinc-400",
-  // Card / row title — strong, readable, anchors a surface.
-  title:    "text-base font-semibold text-zinc-100",
-  // Big numeric metric (e.g. score, weight).
-  metric:   "text-2xl font-bold tabular-nums text-zinc-50",
-  // Hero metric — used sparingly, the centerpiece of a surface.
-  hero:     "text-5xl font-black tabular-nums text-zinc-50",
+  title:    "text-base font-semibold text-zinc-100 tracking-[-0.01em]",
+  metric:   "text-2xl font-bold tabular-nums text-zinc-50 tracking-[-0.02em]",
+  hero:     "text-5xl font-black tabular-nums text-zinc-50 leading-none tracking-[-0.04em]",
+
+  // ── New scale (use these for new code) ──
+  // Display — the single biggest moment on a surface. Negative tracking
+  // closes the gap so the number feels solid, not floaty. leading-none so
+  // it doesn't fight with the surrounding rhythm.
+  display:  "text-6xl font-black tabular-nums text-zinc-50 leading-none tracking-[-0.04em]",
+  // Headline — section anchor + standout copy ("Day owned.", "STALE").
+  headline: "text-xl font-bold text-zinc-100 tracking-[-0.015em] leading-tight",
+  // Subtitle — pairs under headline / hero, more presence than caption.
+  subtitle: "text-sm font-medium text-zinc-300 leading-snug",
+  // Caption — small contextual text under body content.
+  caption:  "text-xs text-zinc-500 leading-snug",
+  // Micro — tiny uppercase tag, used for stage chips, badges. Tracked
+  // wider than label so it reads at small size without crushing.
+  micro:    "text-[9px] uppercase tracking-[0.22em] font-bold",
+} as const;
+
+// ── SHADOW — three depth tiers for the Card variants ───────────────────
+// Card hero variant gets the deepest shadow + the inner highlight at the
+// top edge (the "lit from above" Apple look). Primary is the everyday
+// glass card. Inline is no shadow — just a border, used when stacking
+// multiple cards inside a parent already lifted off the bg.
+
+export const SHADOW = {
+  hero:    "0 24px 60px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.10)",
+  primary: "0 12px 40px rgba(0, 0, 0, 0.45)",
+  inline:  "none",
+} as const;
+
+// ── SPRING — three motion personalities for one-shot animations ────────
+// EASE above is the everyday smooth curve. These are for the moments
+// when smooth isn't enough — when a tap should feel springy, when a
+// reveal should overshoot slightly, when a celebration needs energy.
+
+export const SPRING = {
+  smooth:  "cubic-bezier(0.22, 1, 0.36, 1)",           // alias for EASE — the everyday curve
+  snappy:  "cubic-bezier(0.34, 1.56, 0.64, 1)",        // light overshoot — toggles, taps
+  bounce:  "cubic-bezier(0.68, -0.55, 0.265, 1.55)",   // strong overshoot — celebrations only
 } as const;
 
 // ── MOTION — single spring, three durations ─────────────────────────────

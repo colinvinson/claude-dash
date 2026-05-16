@@ -30,8 +30,8 @@ export default function BusinessHero() {
   })();
 
   return (
-    <Card>
-      <div className="flex items-baseline gap-3 mb-1">
+    <Card variant="hero">
+      <div className="flex items-baseline gap-3 mb-2">
         <span className={TYPE.label}>Total MRR</span>
         {liveCount > 0 && (
           <span className="text-[10px] text-zinc-500">
@@ -40,19 +40,19 @@ export default function BusinessHero() {
         )}
       </div>
       <div className="flex items-end gap-3">
-        <span className="text-4xl font-black tabular-nums leading-none" style={{ color: totalMRR > 0 ? PALETTE.success : PALETTE.dim }}>
+        <span className={TYPE.display} style={{ color: totalMRR > 0 ? PALETTE.success : PALETTE.dim }}>
           {fmtMoney(totalMRR)}
         </span>
-        <span className="text-xs text-zinc-500 pb-1">/mo</span>
+        <span className="text-xs text-zinc-500 pb-1.5">/mo</span>
         {totalCustomers > 0 && (
-          <span className="text-xs text-zinc-500 pb-1 ml-auto tabular-nums">
+          <span className="text-xs text-zinc-500 pb-1.5 ml-auto tabular-nums">
             {totalCustomers} customer{totalCustomers === 1 ? "" : "s"}
           </span>
         )}
       </div>
       {fastest && businesses.length > 1 && (
-        <p className="text-[11px] text-zinc-500 mt-2">
-          Top earner: <span className="text-zinc-300">{fastest.name}</span> · {fmtMoney(fastest.monthly_revenue)}/mo
+        <p className="text-[11px] text-zinc-500 mt-2.5">
+          Top earner: <span className="text-zinc-300 font-medium">{fastest.name}</span> · {fmtMoney(fastest.monthly_revenue)}/mo
         </p>
       )}
     </Card>

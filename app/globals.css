@@ -215,7 +215,10 @@ button:not(.no-tap):not(:disabled):active {
   * { transition-duration: 0.01ms !important; }
 }
 
-/* ── Radial washes ── */
+/* ── Radial washes — atmospheric ambient. Three layered radials at low
+   opacity give the dark bg subtle depth so the surface doesn't read as
+   flat black. Drifts on a 36s loop. Score-driven accent overrides the
+   warm top wash via [data-score] below. ── */
 body::before {
   content: '';
   position: fixed;
@@ -223,13 +226,16 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(224, 118, 88, 0.16) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 180, 200, 0.06) 0%, transparent 100%);
+    radial-gradient(ellipse 90% 55% at 82% 12%, rgba(224, 118, 88, 0.20) 0%, transparent 100%),
+    radial-gradient(ellipse 70% 55% at 18% 92%, rgba(96, 165, 250, 0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.025) 0%, transparent 100%);
   filter: blur(40px);
   animation: wash-drift 36s ease-in-out infinite alternate;
 }
 
-/* ── Film grain ── */
+/* ── Film grain — kills the perfect-digital-flat look. Almost subliminal
+   at 0.018 opacity but it's the difference between a Notion-flat
+   surface and something that feels physical. ── */
 body::after {
   content: '';
   position: fixed;
@@ -238,7 +244,7 @@ body::after {
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
   background-size: 300px 300px;
-  opacity: 0.014;
+  opacity: 0.018;
 }
 
 @keyframes wash-drift {

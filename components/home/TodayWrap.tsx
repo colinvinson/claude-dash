@@ -195,7 +195,7 @@ export default function TodayWrap() {
   }
 
   return (
-    <Card style={{ padding: "28px 22px" }}>
+    <Card variant="hero" style={{ padding: "28px 22px" }}>
       <div className="relative flex items-stretch gap-5">
         <div className="relative flex-shrink-0">
           {/* Hero ring — 180px diameter. Significantly bigger than the
@@ -206,18 +206,19 @@ export default function TodayWrap() {
             <Ring radius={58} pct={pctStack} color={COLOR_STACK} stroke={11} />
             <Ring radius={44} pct={pctFuel}  color={COLOR_FUEL}  stroke={11} />
           </svg>
-          {/* Score number in the center of the rings — larger, more confident */}
+          {/* Score number in the center of the rings — display type, the
+              one moment per surface that earns this size. */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-5xl font-black tabular-nums leading-none" style={{ color: scoreColor }}>
+            <span className={`${TYPE.display}`} style={{ color: scoreColor }}>
               {displayScore}
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">score</span>
+            <span className={`${TYPE.label} mt-1`}>score</span>
           </div>
           <ConfettiBurst trigger={burst} count={48} spread={180} />
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <p className="text-base font-semibold text-zinc-100 leading-snug mb-4">{wrapHeadline}</p>
+          <p className={`${TYPE.headline} mb-4`}>{wrapHeadline}</p>
 
           <RingRow label="Goals" color={COLOR_GOALS} value={`${goalsDone}/${goalsTotal || 0}`} pct={pctGoals} />
           <RingRow label="Stack" color={COLOR_STACK} value={`${stackDone}/${stackTotal || 0}`} pct={pctStack} />

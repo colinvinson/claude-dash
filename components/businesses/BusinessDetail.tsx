@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { useBusinesses, type Business, type BusinessStatus } from "@/hooks/useBusinesses";
 import { useBusinessRevenue } from "@/hooks/useBusinessRevenue";
-import { PALETTE, ICON } from "@/lib/design-tokens";
+import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import BusinessAgents from "./BusinessAgents";
 import BusinessTasks from "./BusinessTasks";
 import BusinessActivity from "./BusinessActivity";
@@ -139,8 +139,8 @@ export default function BusinessDetail({
             {/* MRR + sparkline + MoM */}
             <div className="flex items-end gap-4">
               <div className="flex-shrink-0">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black tabular-nums leading-none" style={{ color: business.monthly_revenue > 0 ? PALETTE.success : PALETTE.dim }}>
+                <div className="flex items-baseline gap-1.5">
+                  <span className={TYPE.display} style={{ color: business.monthly_revenue > 0 ? PALETTE.success : PALETTE.dim }}>
                     {fmtMoney(business.monthly_revenue)}
                   </span>
                   <span className="text-xs text-zinc-500">/mo</span>
