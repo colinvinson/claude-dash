@@ -167,29 +167,27 @@ export default function TodayWrap() {
     return headline;
   }, [allClosed, headline]);
 
-  // Loading skeleton — keeps the card structure stable (no flash of empty,
-  // no layout jump when data arrives). Dim placeholder rings + "—" score.
+  // Loading skeleton — keeps the card structure stable.
   if (isLoading) {
     return (
-      <Card>
-        <div className="flex items-stretch gap-4">
+      <Card style={{ padding: "28px 22px" }}>
+        <div className="flex items-stretch gap-5">
           <div className="relative flex-shrink-0">
-            <svg width={140} height={140} viewBox="0 0 140 140">
-              <circle cx={70} cy={70} r={55} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
-              <circle cx={70} cy={70} r={44} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
-              <circle cx={70} cy={70} r={33} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
+            <svg width={180} height={180} viewBox="0 0 180 180">
+              <circle cx={90} cy={90} r={72} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={11} />
+              <circle cx={90} cy={90} r={58} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={11} />
+              <circle cx={90} cy={90} r={44} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={11} />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black tabular-nums text-zinc-700">—</span>
-              <span className="text-[9px] uppercase tracking-widest text-zinc-700 mt-0.5">score</span>
+              <span className="text-5xl font-black tabular-nums text-zinc-700">—</span>
+              <span className="text-[10px] uppercase tracking-widest text-zinc-700 mt-1">score</span>
             </div>
           </div>
-          <div className="flex-1 min-w-0 flex flex-col">
-            <span className={TYPE.label}>— Today</span>
-            <div className="h-3 rounded mt-2 mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
-            <div className="h-2 rounded mb-1.5 w-2/3" style={{ background: "rgba(255,255,255,0.03)" }} />
-            <div className="h-2 rounded mb-1.5 w-1/2" style={{ background: "rgba(255,255,255,0.03)" }} />
-            <div className="h-2 rounded w-3/5" style={{ background: "rgba(255,255,255,0.03)" }} />
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="h-3 rounded mb-3 w-2/3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="h-2 rounded mb-2 w-3/5" style={{ background: "rgba(255,255,255,0.03)" }} />
+            <div className="h-2 rounded mb-2 w-1/2" style={{ background: "rgba(255,255,255,0.03)" }} />
+            <div className="h-2 rounded w-2/5" style={{ background: "rgba(255,255,255,0.03)" }} />
           </div>
         </div>
       </Card>
@@ -197,27 +195,29 @@ export default function TodayWrap() {
   }
 
   return (
-    <Card>
-      <div className="relative flex items-stretch gap-4">
+    <Card style={{ padding: "28px 22px" }}>
+      <div className="relative flex items-stretch gap-5">
         <div className="relative flex-shrink-0">
-          <svg width={140} height={140} viewBox="0 0 140 140">
-            <Ring radius={55} pct={pctGoals} color={COLOR_GOALS} />
-            <Ring radius={44} pct={pctStack} color={COLOR_STACK} />
-            <Ring radius={33} pct={pctFuel}  color={COLOR_FUEL} />
+          {/* Hero ring — 180px diameter. Significantly bigger than the
+              previous 140 so TodayWrap actually anchors Home as THE
+              moment, not just another card. */}
+          <svg width={180} height={180} viewBox="0 0 180 180">
+            <Ring radius={72} pct={pctGoals} color={COLOR_GOALS} stroke={11} />
+            <Ring radius={58} pct={pctStack} color={COLOR_STACK} stroke={11} />
+            <Ring radius={44} pct={pctFuel}  color={COLOR_FUEL}  stroke={11} />
           </svg>
-          {/* Score number in the center of the rings — replaces the old ScoreHeadline card */}
+          {/* Score number in the center of the rings — larger, more confident */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-black tabular-nums" style={{ color: scoreColor }}>
+            <span className="text-5xl font-black tabular-nums leading-none" style={{ color: scoreColor }}>
               {displayScore}
             </span>
-            <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0.5">score</span>
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">score</span>
           </div>
-          <ConfettiBurst trigger={burst} count={40} spread={150} />
+          <ConfettiBurst trigger={burst} count={48} spread={180} />
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col">
-          <span className={TYPE.label}>— Today</span>
-          <p className="text-sm font-semibold text-zinc-100 leading-snug mt-1 mb-3">{wrapHeadline}</p>
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <p className="text-base font-semibold text-zinc-100 leading-snug mb-4">{wrapHeadline}</p>
 
           <RingRow label="Goals" color={COLOR_GOALS} value={`${goalsDone}/${goalsTotal || 0}`} pct={pctGoals} />
           <RingRow label="Stack" color={COLOR_STACK} value={`${stackDone}/${stackTotal || 0}`} pct={pctStack} />

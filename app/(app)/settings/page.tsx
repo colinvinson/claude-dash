@@ -11,6 +11,7 @@ import GoalTemplatesEditor from "@/components/settings/GoalTemplatesEditor";
 import { LogOut } from "lucide-react";
 import { PALETTE, TINT, BORDER, TYPE } from "@/lib/design-tokens";
 import pkg from "@/package.json";
+import PushSubscriber from "@/components/home/PushSubscriber";
 
 // Settings — grouped into 4 sections separated by SectionLabel so the page
 // has visual rhythm rather than reading as 5 stacked editors. Each editor
@@ -32,6 +33,9 @@ export default function SettingsPage() {
 
       <div className="pt-4"><SectionLabel>Goal templates</SectionLabel></div>
       <GoalTemplatesEditor />
+
+      <div className="pt-4"><SectionLabel>Notifications</SectionLabel></div>
+      <PushSubscriber />
 
       <div className="pt-4"><SectionLabel>Account</SectionLabel></div>
       <Card style={{ background: TINT.danger, border: `1px solid ${BORDER.danger}` }}>
