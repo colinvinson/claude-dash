@@ -32,7 +32,7 @@ export default function PriorityFocusCard({
 
   if (totalGoals === 0) {
     return (
-      <Card>
+      <Card className="h-full">
         <EmptyState
           icon={Target}
           title="No goals set for today"
@@ -44,7 +44,7 @@ export default function PriorityFocusCard({
 
   if (allDone) {
     return (
-      <Card>
+      <Card className="h-full">
         <div className="flex items-center gap-2">
           <Target size={14} className="text-emerald-400" />
           <span className="text-sm text-zinc-200 font-medium">All goals done. Solid day.</span>

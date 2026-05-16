@@ -94,30 +94,29 @@ export default function DayRing() {
     return () => clearInterval(id);
   }, []);
 
+  // Vertical-stacked layout (ring on top, text below) — fits cleanly inside
+  // a half-width dashboard tile on mobile (~175px wide) without wrapping
+  // unpredictably. Old horizontal layout broke at narrow widths.
   if (!ring) {
     return (
-      <div className="flex items-center gap-5 flex-wrap justify-center">
-        <div style={{ width: 168, height: 168 }} />
-        <div className="flex flex-col gap-1.5" style={{ maxWidth: 240 }} />
+      <div className="flex flex-col items-center gap-2 h-full justify-center">
+        <div style={{ width: 120, height: 120 }} />
       </div>
     );
   }
 
+  const RING_SIZE = 120;
   return (
-    <div className="flex items-center gap-5 flex-wrap justify-center">
-      {/* SVG ring */}
-      <div className="relative" style={{ width: 168, height: 168 }}>
-        <svg viewBox="0 0 120 120" width={168} height={168}>
+    <div className="flex flex-col items-center gap-2 h-full justify-center">
+      <div className="relative" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg viewBox="0 0 120 120" width={RING_SIZE} height={RING_SIZE}>
           <defs>
             <filter id="glow">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          {/* track */}
-          <circle cx={60} cy={60} r={52}
-            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
-          {/* fill */}
+          <circle cx={60} cy={60} r={52} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
           <circle cx={60} cy={60} r={52}
             fill="none"
             stroke={ring.color}
@@ -131,23 +130,18 @@ export default function DayRing() {
             style={{ transition: "stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1), stroke 0.7s cubic-bezier(0.22,1,0.36,1)" }}
           />
         </svg>
-        {/* center overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-[40px] font-extrabold text-white tabular-nums leading-none" style={{ letterSpacing: "-0.04em" }}>
+          <span className="text-3xl font-extrabold text-white tabular-nums leading-none" style={{ letterSpacing: "-0.04em" }}>
             {ring.pct === 0 && ring.phase === "SLEEPING" ? "—" : `${ring.pct}%`}
           </span>
-          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500 mt-1">
+          <span className="text-[8px] font-black uppercase tracking-[0.16em] text-zinc-500 mt-1">
             {ring.phase}
           </span>
-          <span className="text-[10.5px] text-zinc-500 mt-0.5 tabular-nums">{ring.clock}</span>
         </div>
       </div>
-
-      {/* text column */}
-      <div className="flex flex-col gap-1.5" style={{ maxWidth: 240 }}>
-        <p className="text-sm font-bold text-zinc-100">{ring.status}</p>
-        <p className="text-xs text-zinc-400 tabular-nums">{ring.remain}</p>
-        <p className="text-[11px] text-zinc-600 tabular-nums">8:00 AM – 12:00 AM</p>
+      <div className="text-center mt-1">
+        <p className="text-[11px] text-zinc-200 leading-tight">{ring.remain}</p>
+        <p className="text-[10px] text-zinc-500 tabular-nums mt-0.5">{ring.clock}</p>
       </div>
     </div>
   );

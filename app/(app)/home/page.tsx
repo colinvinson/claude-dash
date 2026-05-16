@@ -121,11 +121,16 @@ export default function HomePage() {
         {/* Primary CTA — full width */}
         <div className="col-span-2 anim-fade-up stagger-2"><RightNowCard /></div>
 
-        {/* 2-col tile row — Focus goals + time-of-day phase */}
-        <div className="anim-fade-up stagger-3">
+        {/* 2-col tile row — Focus goals + time-of-day phase.
+            `items-stretch` on the grid + `h-full` on each child = equal
+            height regardless of content (avoids the "DayRing towers over
+            an empty PriorityFocus" mismatch). */}
+        <div className="anim-fade-up stagger-3 h-full">
           <PriorityFocusCard goals={goals} totalGoals={goals.length} onToggle={toggleGoal} />
         </div>
-        <div className="anim-fade-up stagger-3"><Card><DayRing /></Card></div>
+        <div className="anim-fade-up stagger-3 h-full">
+          <Card className="h-full"><DayRing /></Card>
+        </div>
 
         {/* Glance pills — already a horizontal layout */}
         <div className="col-span-2 anim-fade-up stagger-4"><QuickStatsStrip pills={pills} /></div>

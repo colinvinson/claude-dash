@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGoals } from "@/hooks/useGoals";
 import { useStack } from "@/hooks/useStack";
 import { useProtein } from "@/hooks/useProtein";
@@ -102,6 +102,36 @@ export default function TodayWrap() {
     haptic("milestone");
   }, [allClosed]);
 
+  // Score count-up animation. When the underlying score changes, ease the
+  // displayed number over ~700ms so progress feels rewarding instead of
+  // jumping. Skips animation on first render (no jarring 0 → score climb
+  // on page load).
+  const [displayScore, setDisplayScore] = useState(score);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      setDisplayScore(score);
+      return;
+    }
+    if (score === displayScore) return;
+    const start = displayScore;
+    const delta = score - start;
+    const duration = 700;
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / duration);
+      // cubic ease-out
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplayScore(Math.round(start + delta * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score]);
+
   // Audible recap state.
   const [speaking, setSpeaking]     = useState(false);
   const [recapText, setRecapText]   = useState<string | null>(null);
@@ -147,7 +177,7 @@ export default function TodayWrap() {
           {/* Score number in the center of the rings — replaces the old ScoreHeadline card */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-3xl font-black tabular-nums" style={{ color: scoreColor }}>
-              {score}
+              {displayScore}
             </span>
             <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0.5">score</span>
           </div>
