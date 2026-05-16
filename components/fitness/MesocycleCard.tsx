@@ -19,7 +19,7 @@ export default function MesocycleCard() {
   // on the first logged workout set — no CTA needed.
   if (!active || !state) {
     return (
-      <Card>
+      <Card className="h-full">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] uppercase tracking-widest text-zinc-500">— Mesocycle</span>
           <span className="text-[10px] text-zinc-600">auto-starts on first lift</span>
@@ -41,7 +41,7 @@ export default function MesocycleCard() {
     : `Week ${w}/${totalWeeks} · accumulate`;
 
   return (
-    <Card>
+    <Card className="h-full">
       <div className="flex items-center justify-between mb-3">
         <span className="text-[10px] uppercase tracking-widest text-zinc-500">— Mesocycle</span>
         <span className="text-[10px] tabular-nums" style={{ color: phaseColor }}>

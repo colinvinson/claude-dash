@@ -43,7 +43,7 @@ export default function OptimizationCard() {
   }
 
   return (
-    <Card>
+    <Card className="h-full">
       <div className="flex items-center justify-between mb-3">
         <span className="text-[10px] uppercase tracking-widest text-zinc-500 flex items-center gap-1">
           <Sparkles size={11} /> Coach Optimization
