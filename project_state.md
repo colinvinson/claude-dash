@@ -1,7 +1,12 @@
 # Rowan Dashboard — Project State (Source of Truth)
 
-> Last updated: 2026-05-10
+> Last updated: 2026-05-16
 > Note: `ARCHITECTURE.md` is an outdated original spec. This file reflects the actual current state.
+>
+> **2026-05-16 — Apple-level design pass shipped** (Phases 1-3):
+> Phase 1: extended `lib/design-tokens.ts` (RADIUS, ICON, DURATION, EASE, TAP, BORDER.hair, TYPE.title/hero); upgraded `Card` + `FormInput` to use tokens; added `Button` primitive (4 variants × 2 sizes, 44pt default).
+> Phase 2: removed "Sir" from all user-visible UI strings (persona stays in `lib/jarvis/prompts.ts`); copy is now second-person / imperative.
+> Phase 3: text-only and icon-only buttons (Skip, dismiss ✕, Clear, X close) gained `-m-2 p-2` to extend tap zones past the 44pt Apple HIG floor without changing visual size.
 
 ---
 
