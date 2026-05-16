@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { StackItem } from "@/hooks/useStack";
 import type { StackInsight } from "@/hooks/useStackInsights";
-import { AlertTriangle, X, Check } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { resolveItemStyle } from "@/lib/schedule/icons";
-import { haptic } from "@/lib/feedback/haptics";
-import ConfettiBurst from "@/components/ui/ConfettiBurst";
+import CompletionToggle from "@/components/ui/CompletionToggle";
+import EmptyState from "@/components/ui/EmptyState";
+import { CalendarPlus } from "lucide-react";
+import { PALETTE } from "@/lib/design-tokens";
 
 // Schedule timeline — visual style matches the mockup:
 //   - Section header per bucket with emoji + clock range
@@ -78,27 +80,8 @@ function ItemRow({
   const isSupply = SUPPLY_CATEGORIES.has(item.category);
   const canShowRunningLow = isSupply && onToggleRunningLow;
   // Per-item icon + color (pill, syringe, sun, dumbbell, etc.) so each row
-  // is glanceable. When the item is taken, the circle flips to solid green
-  // with a check; otherwise it shows the item's own icon over a color tint.
+  // is glanceable. CompletionToggle handles the check / burst / haptic.
   const { Icon, color } = resolveItemStyle(item);
-
-  // Burst trigger — incremented on every successful "now taken" toggle so the
-  // ConfettiBurst component re-fires. Also drives the .anim-check-burst spring
-  // on the circle itself.
-  const [burstTrigger, setBurstTrigger] = useState(0);
-  const burstAnimKey   = useRef(0);
-  function handleToggle(e: React.MouseEvent) {
-    e.stopPropagation();
-    const willBeTaken = !item.taken;
-    if (willBeTaken) {
-      setBurstTrigger((n) => n + 1);
-      burstAnimKey.current += 1;
-      haptic("success");
-    } else {
-      haptic("tap");
-    }
-    onToggle();
-  }
 
   return (
     <div
@@ -108,24 +91,13 @@ function ItemRow({
           : "bg-zinc-900/40 border-zinc-800/60"
       }`}
     >
-      {/* Big circle — item icon when undone, green check when done */}
-      <button
-        onClick={handleToggle}
-        aria-label={item.taken ? "Mark not done" : "Mark done"}
-        key={item.taken ? `taken-${burstAnimKey.current}` : "untaken"}
-        className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${item.taken ? "anim-check-burst" : ""}`}
-        style={
-          item.taken
-            ? { background: "#10b981", border: "2px solid #10b981" }
-            : { background: `${color}1a`, border: `2px solid ${color}66` }
-        }
-      >
-        {item.taken
-          ? <Check size={16} strokeWidth={3} className="text-white" />
-          : <Icon size={16} style={{ color }} />}
-      </button>
-
-      <ConfettiBurst trigger={burstTrigger} count={14} spread={70} />
+      <CompletionToggle
+        done={item.taken}
+        onToggle={onToggle}
+        mode="large"
+        icon={Icon}
+        accent={color}
+      />
 
       {/* Title + subtitle (tap to edit) */}
       <button onClick={onEdit} className="flex-1 min-w-0 text-left" aria-label="Edit item">
@@ -134,7 +106,10 @@ function ItemRow({
             {item.name}
           </span>
           {item.is_running_low && (
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-px">
+            <span
+              className="text-[9px] font-semibold uppercase tracking-wider rounded px-1.5 py-px"
+              style={{ color: PALETTE.warning, background: "rgba(245,158,11,0.12)", border: `1px solid ${PALETTE.warning}55` }}
+            >
               not ordered
             </span>
           )}
@@ -202,9 +177,11 @@ export default function TimelineSchedule({
 
   if (items.length === 0) {
     return (
-      <p className="text-xs text-zinc-500 py-6 text-center">
-        No items yet. Add one below to start building your stack.
-      </p>
+      <EmptyState
+        icon={CalendarPlus}
+        title="No items yet"
+        description="Add one below to start building your stack."
+      />
     );
   }
 

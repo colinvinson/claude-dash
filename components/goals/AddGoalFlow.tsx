@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { Plus, Sparkles, ChevronRight, X } from "lucide-react";
 import Card from "@/components/ui/Card";
+import { FormInput, FormTextarea } from "@/components/ui/FormInput";
+import FormLabel from "@/components/ui/FormLabel";
 import { useStack } from "@/hooks/useStack";
 import type { GoalBucket, LongTermGoal } from "@/hooks/useLongTermGoals";
+import { PALETTE, TINT, BORDER, TYPE } from "@/lib/design-tokens";
 
 type Suggestion = {
   name: string;
@@ -132,46 +135,41 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
   if (phase === "fork" || phase === "manual") {
     return (
       <Card>
-        <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-3">{headerLabel}</span>
+        <span className={`${TYPE.label} block mb-3`}>{headerLabel}</span>
         <div className="space-y-3">
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Title</span>
-            <input
+          <div>
+            <FormLabel>Title</FormLabel>
+            <FormInput
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={bucket === "business" ? "e.g. Ship SaaS v1" : "e.g. Boost testosterone"}
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
             />
-          </label>
+          </div>
           <div className="flex gap-2">
-            <label className="flex-1">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Tag (optional)</span>
-              <input
+            <div className="flex-1">
+              <FormLabel optional>Tag</FormLabel>
+              <FormInput
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 placeholder={bucket === "business" ? "SaaS" : "Hormones / Tan / …"}
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
               />
-            </label>
+            </div>
             <div className="w-44">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-500">Target date</span>
+                <FormLabel className="mb-0">Target date</FormLabel>
                 {date && (
                   <button onClick={() => setDate("")} className="text-[10px] text-zinc-500 hover:text-zinc-300">Clear</button>
                 )}
               </div>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-              />
+              <FormInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
 
-          {error && <p className="text-[11px] text-red-400">{error}</p>}
+          {error && <p className="text-[11px]" style={{ color: PALETTE.danger }}>{error}</p>}
 
-          {/* Path fork */}
+          {/* Path fork — both buttons match the global primary/secondary
+              language (white = primary, bordered = secondary). No more
+              amber-as-primary that meant something different elsewhere. */}
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               onClick={handleManualSave}
@@ -183,7 +181,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
             <button
               onClick={handleResearch}
               disabled={busy || !title.trim()}
-              className="py-2.5 rounded-xl bg-amber-300 text-zinc-900 hover:opacity-90 text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"
+              className="py-2.5 rounded-xl bg-white text-zinc-900 hover:opacity-90 text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"
             >
               <Sparkles size={13} /> Help me build one
             </button>
@@ -214,7 +212,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
     return (
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] uppercase tracking-widest text-amber-300 font-bold flex items-center gap-1">
+          <span className={`${TYPE.label} font-bold flex items-center gap-1`} style={{ color: PALETTE.celebration }}>
             <Sparkles size={11} /> Jarvis&apos;s protocol for &ldquo;{title}&rdquo;
           </span>
           <button onClick={reset} className="text-zinc-500 hover:text-zinc-200" aria-label="Cancel"><X size={14} /></button>
@@ -222,12 +220,11 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
 
         {/* Plan — editable */}
         <div className="mb-4">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">The plan</span>
-          <textarea
+          <FormLabel>The plan</FormLabel>
+          <FormTextarea
             value={editingPlan}
             onChange={(e) => setEditingPlan(e.target.value)}
             rows={5}
-            className="w-full bg-zinc-900 text-zinc-100 rounded-lg px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700 resize-y"
           />
         </div>
 
@@ -235,7 +232,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
         {draft.suggested_items.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500">Add to schedule</span>
+              <FormLabel className="mb-0">Add to schedule</FormLabel>
               <span className="text-[10px] text-zinc-600">{acceptedCount} of {draft.suggested_items.length} selected</span>
             </div>
             <div className="space-y-1.5">
@@ -245,17 +242,18 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
                   <button
                     key={i}
                     onClick={() => setAccepted((a) => ({ ...a, [i]: !a[i] }))}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
-                      on ? "border-amber-500/40 bg-amber-500/5"
-                         : "border-zinc-800 bg-zinc-900/50 opacity-60"
-                    }`}
+                    className="w-full text-left px-3 py-2.5 rounded-lg border transition-all"
+                    style={on
+                      ? { borderColor: BORDER.celebration, background: TINT.celebration }
+                      : { borderColor: "rgb(39 39 42)", background: "rgba(24,24,27,0.5)", opacity: 0.6 }
+                    }
                   >
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <span className="text-sm font-semibold text-zinc-100 truncate">{s.name}</span>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {s.dose && <span className="text-[10px] text-zinc-500 tabular-nums">{s.dose}</span>}
                         {s.timing && <span className="text-[10px] text-zinc-600">· {s.timing}</span>}
-                        <span className={`text-[9px] uppercase tracking-wider font-bold ${on ? "text-amber-300" : "text-zinc-600"}`}>
+                        <span className="text-[9px] uppercase tracking-wider font-bold" style={{ color: on ? PALETTE.celebration : "rgb(82 82 91)" }}>
                           {on ? "added" : "skip"}
                         </span>
                       </div>
@@ -280,7 +278,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
           <button
             onClick={handleResearchSave}
             disabled={busy}
-            className="flex-1 py-2.5 rounded-xl bg-amber-300 text-zinc-900 hover:opacity-90 text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 rounded-xl bg-white text-zinc-900 hover:opacity-90 text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"
           >
             {busy ? "Saving…" : <>Save goal + {acceptedCount} {acceptedCount === 1 ? "item" : "items"} <ChevronRight size={13} /></>}
           </button>

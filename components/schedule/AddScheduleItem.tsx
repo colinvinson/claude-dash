@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { X, Sparkles, Trash2 } from "lucide-react";
 import type { StackCategory, CreateItemArgs, StackItem } from "@/hooks/useStack";
 import { useLongTermGoals } from "@/hooks/useLongTermGoals";
+import { FormInput, FormTextarea, FormSelect } from "@/components/ui/FormInput";
+import FormLabel from "@/components/ui/FormLabel";
 
 type Classification = {
   category: StackCategory;
@@ -203,13 +205,12 @@ export default function AddScheduleItem({
         </div>
 
         {/* Name */}
-        <label className="block mb-3">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Name</span>
-          <input
+        <div className="mb-3">
+          <FormLabel>Name</FormLabel>
+          <FormInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Morning sunlight, Yoga, …"
-            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
             autoFocus
           />
           {classifying && (
@@ -222,31 +223,29 @@ export default function AddScheduleItem({
               <Sparkles size={10} /> Recognized as <span className="text-zinc-300 capitalize">{classification.category}</span>
             </p>
           )}
-        </label>
+        </div>
 
         {/* Dose / detail */}
-        <label className="block mb-3">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Dose / detail (optional)</span>
-          <input
+        <div className="mb-3">
+          <FormLabel optional>Dose / detail</FormLabel>
+          <FormInput
             value={dose}
             onChange={(e) => setDose(e.target.value)}
             placeholder="400mg, 30 min, …"
-            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
           />
-        </label>
+        </div>
 
         {/* Notes — fully manual. The classifier's suggestion appears as a
             tap-to-apply chip below; it never auto-fills this field. */}
-        <label className="block mb-1">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Notes (optional)</span>
-          <textarea
+        <div className="mb-1">
+          <FormLabel optional>Notes</FormLabel>
+          <FormTextarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="empty stomach, 10 min before food, only on lift days…"
             rows={2}
-            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700 resize-y"
           />
-        </label>
+        </div>
         {classification?.notes && classification.notes.trim() !== notes.trim() && !classifying && (
           <button
             onClick={() => setNotes(classification.notes!)}
@@ -315,26 +314,14 @@ export default function AddScheduleItem({
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <label>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Specific time (optional)</span>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-              />
-            </label>
-            <label>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Duration (optional)</span>
-              <input
-                type="number"
-                min={0}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="min"
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-              />
-            </label>
+            <div>
+              <FormLabel optional>Specific time</FormLabel>
+              <FormInput type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+            <div>
+              <FormLabel optional>Duration</FormLabel>
+              <FormInput type="number" min={0} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="min" />
+            </div>
           </div>
           <p className="text-[10px] text-zinc-600 mt-1.5">
             {bucket === "Anytime"   && `Lands in the "Anytime today" cluster — no clock time.`}
@@ -400,19 +387,15 @@ export default function AddScheduleItem({
         {/* Optional goal linkage — surfaces this item under its parent goal in /goals. */}
         {allGoals.length > 0 && (
           <div className="mb-4">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5 block">Link to a goal (optional)</span>
-            <select
-              value={linkedGoalId}
-              onChange={(e) => setLinkedGoalId(e.target.value)}
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            >
+            <FormLabel optional>Link to a goal</FormLabel>
+            <FormSelect value={linkedGoalId} onChange={(e) => setLinkedGoalId(e.target.value)}>
               <option value="">— not linked —</option>
               {allGoals.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.bucket === "business" ? "Biz" : "Life"} · {g.title}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         )}
 

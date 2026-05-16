@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useStack, type StackItem } from "@/hooks/useStack";
 import { useStackInsights } from "@/hooks/useStackInsights";
 import Card from "@/components/ui/Card";
+import { FormInput, FormSelect } from "@/components/ui/FormInput";
+import { TYPE } from "@/lib/design-tokens";
 import TimelineSchedule from "@/components/schedule/TimelineSchedule";
 import AddScheduleItem from "@/components/schedule/AddScheduleItem";
 
@@ -93,35 +95,35 @@ export default function SchedulePage() {
 
           {/* Inline add */}
           <div className="mt-5 pt-4 border-t border-zinc-800/60">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Add to stack</div>
+            <div className={`${TYPE.label} mb-2`}>Add to stack</div>
             <div className="flex items-center gap-2">
-              <input
+              <FormInput
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
                 placeholder="Name"
-                className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600"
+                className="flex-1 min-w-0"
               />
-              <input
+              <FormInput
                 value={draftDose}
                 onChange={(e) => setDraftDose(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
                 placeholder="Dose"
-                className="w-20 px-3 py-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600"
+                className="w-20"
               />
-              <select
+              <FormSelect
                 value={draftTiming}
                 onChange={(e) => setDraftTiming(e.target.value)}
-                className="px-3 py-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+                className="w-28"
               >
                 {BUCKET_OPTIONS.map((b) => (
                   <option key={b.value} value={b.value}>{b.label}</option>
                 ))}
-              </select>
+              </FormSelect>
               <button
                 onClick={handleAdd}
                 disabled={adding || draftName.trim().length === 0}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-zinc-100 text-zinc-900 disabled:opacity-40 whitespace-nowrap"
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white text-zinc-900 disabled:opacity-40 whitespace-nowrap"
               >
                 {adding ? "…" : "+ Add"}
               </button>

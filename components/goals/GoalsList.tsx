@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import { Target, Briefcase } from "lucide-react";
 import { useLongTermGoals, type GoalBucket } from "@/hooks/useLongTermGoals";
 import GoalWidget from "./GoalWidget";
 import AddGoalFlow from "./AddGoalFlow";
@@ -40,9 +42,11 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
     <div className="space-y-3">
       {goals.length === 0 && (
         <Card>
-          <p className="text-sm text-zinc-400">
-            No {bucket === "business" ? "businesses" : "life goals"} yet. Add one below.
-          </p>
+          <EmptyState
+            icon={bucket === "business" ? Briefcase : Target}
+            title={bucket === "business" ? "No businesses yet" : "No life goals yet"}
+            description="Add one below to start tracking."
+          />
         </Card>
       )}
 
