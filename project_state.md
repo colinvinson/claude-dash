@@ -7,6 +7,9 @@
 > Phase 1: extended `lib/design-tokens.ts` (RADIUS, ICON, DURATION, EASE, TAP, BORDER.hair, TYPE.title/hero); upgraded `Card` + `FormInput` to use tokens; added `Button` primitive (4 variants × 2 sizes, 44pt default).
 > Phase 2: removed "Sir" from all user-visible UI strings (persona stays in `lib/jarvis/prompts.ts`); copy is now second-person / imperative.
 > Phase 3: text-only and icon-only buttons (Skip, dismiss ✕, Clear, X close) gained `-m-2 p-2` to extend tap zones past the 44pt Apple HIG floor without changing visual size.
+>
+> **2026-05-16 — Businesses portfolio hub shipped (0027):**
+> Replaced the old "/businesses is a goals list filtered by bucket" pattern with a real business-entity portfolio. New tables `businesses` (status / category / MRR / customers / next_action / notes) and `business_revenue_log` (date-stamped revenue entries for MoM growth). `/businesses` page now: BusinessHero (total MRR + top earner), per-business cards sorted by status, AddBusinessFlow inline, BusinessDetail sheet for the drill-in (status, MRR + revenue log + history, customers, next action, notes, archive). Per AGENTS.md 5-place rule: wired into `lib/ai/context-builder.ts` as `context.businesses` (count + totalMRR + items[] with momPct), into `lib/ai/snapshot-builder.ts` as the new `business_mrr_total` snapshot column (lets correlation engine spot focus_min ↔ MRR etc.), into `app/api/jarvis/correlations/route.ts` LABEL map as "total business MRR", and documented in `lib/jarvis/prompts.ts` under `context.businesses`. Business long-term goals still live below the portfolio on the same page.
 
 ---
 

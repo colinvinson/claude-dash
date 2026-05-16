@@ -67,6 +67,10 @@ export type DaySnapshot = {
   sun_min:           number | null;
   learning_min:      number | null;
   money_net:         number | null;
+  // businesses portfolio (migration 0027) — total MRR snapshotted per day
+  // from business_revenue_log, so the correlation engine can spot
+  // "MRR climbs when focus_min climbs" etc.
+  business_mrr_total: number | null;
   // per-supplement booleans (dynamically added in buildDailySnapshot)
   [supKey: `supp_${string}`]: 0 | 1 | null | undefined;
 };
@@ -99,6 +103,7 @@ export async function buildDailySnapshot(
     waterRes, meditRes, moodRes, alcRes, weightRes, faithRes,
     setsRes, goalsRes, proteinRes,
     focusRes, socialRes, cardioRes, libidoRes, aestheticRes, caffeineRes, sunRes, learningRes, moneyRes,
+    businessRevRes,
   ] = await Promise.all([
     supabase.from("health_logs").select("*").eq("user_id", userId).gte("date", cutoff).order("date", { ascending: true }),
     supabase.from("supplement_stack").select("id, name").eq("user_id", userId).eq("is_active", true),
@@ -123,6 +128,10 @@ export async function buildDailySnapshot(
     supabase.from("sun_logs").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
     supabase.from("learning_logs").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
     supabase.from("money_logs").select("amount, kind, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    // Business revenue snapshots (migration 0027). Each log = the MRR for
+    // that business on that day; summing across businesses per date gives
+    // total portfolio MRR over time.
+    supabase.from("business_revenue_log").select("amount, log_date").eq("user_id", userId).gte("log_date", cutoff),
   ]);
 
   type HealthRow = Record<string, unknown> & { date: string };
@@ -239,6 +248,14 @@ export async function buildDailySnapshot(
     if (r.rating != null) aestheticByDate.set(r.log_date, r.rating);
   }
 
+  // Total business MRR snapshotted per day — sums across all businesses.
+  // Last logged amount per business carries forward if the date is in the
+  // window (handled here: latest amount per business per day).
+  const businessMRRByDate = new Map<string, number>();
+  for (const r of ((businessRevRes.data ?? []) as Array<{ amount: number; log_date: string }>)) {
+    businessMRRByDate.set(r.log_date, (businessMRRByDate.get(r.log_date) ?? 0) + Number(r.amount));
+  }
+
   // Money net (income + business_revenue) - expenses + savings reads as positive contribution
   const moneyNetByDate = new Map<string, number>();
   for (const r of ((moneyRes.data ?? []) as Array<{ amount: number; kind: string; log_date: string }>)) {
@@ -308,6 +325,7 @@ export async function buildDailySnapshot(
       sun_min:           sunMinByDate.get(date)      ?? null,
       learning_min:      learningMinByDate.get(date) ?? null,
       money_net:         moneyNetByDate.get(date)    ?? null,
+      business_mrr_total: businessMRRByDate.get(date) ?? null,
     };
 
     // Per-supplement boolean

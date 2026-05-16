@@ -53,6 +53,7 @@ const LABEL: Record<string, string> = {
   water_glasses:     "water",
   meditation_min:    "meditation",
   bible_min:         "bible time",
+  business_mrr_total: "total business MRR",
 };
 
 // Strip dynamic-indexer prefixes (supp_, med_, stack_) so the user reads

@@ -64,6 +64,10 @@ export async function buildContext(userId: string) {
     // Jarvis's awareness.
     focus14dRes, social14dRes, cardio14dRes, libido14dRes, aesthetic14dRes,
     caffeine14dRes, sun14dRes, learning14dRes, money14dRes,
+    // Businesses portfolio (migration 0027). Active businesses + last 90d
+    // of revenue logs so Jarvis can reason about MoM growth and tell Sir
+    // which business is moving vs stagnant.
+    businessesRes, businessRevenue90dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -125,6 +129,8 @@ export async function buildContext(userId: string) {
     supabase.from("sun_logs").select("duration_min, with_sunscreen, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
     supabase.from("learning_logs").select("kind, source, duration_min, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
     supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("businesses").select("id, name, status, category, monthly_revenue, customer_count, next_action").eq("user_id", userId).is("archived_at", null),
+    supabase.from("business_revenue_log").select("business_id, amount, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(90)).order("log_date", { ascending: true }),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -828,6 +834,40 @@ export async function buildContext(userId: string) {
     goalPatterns,
     recovery,
     performance,
+    // Businesses portfolio (migration 0027). Per-business state + 90d of
+    // revenue logs aggregated into a MoM growth %. Lets Jarvis answer
+    // "which business is moving?" and "what's the next action on X?"
+    // grounded in real numbers, not vibes.
+    businesses: (() => {
+      type Biz = { id: string; name: string; status: string; category: string | null; monthly_revenue: number; customer_count: number; next_action: string | null };
+      type RevRow = { business_id: string; amount: number; log_date: string };
+      const bizRows = (businessesRes.data ?? []) as Biz[];
+      const revRows = (businessRevenue90dRes.data ?? []) as RevRow[];
+      const total   = bizRows.reduce((s, b) => s + (Number(b.monthly_revenue) || 0), 0);
+      const items   = bizRows.map((b) => {
+        const myRev = revRows.filter((r) => r.business_id === b.id);
+        let momPct: number | null = null;
+        if (myRev.length >= 2) {
+          const latest = myRev[myRev.length - 1];
+          const cutoff = new Date(latest.log_date); cutoff.setDate(cutoff.getDate() - 21);
+          const prior  = [...myRev].reverse().find((r) => new Date(r.log_date) <= cutoff);
+          if (prior && Number(prior.amount) > 0) {
+            momPct = Math.round(((Number(latest.amount) - Number(prior.amount)) / Number(prior.amount)) * 100);
+          }
+        }
+        return {
+          name:        b.name,
+          status:      b.status,
+          category:    b.category,
+          mrr:         Number(b.monthly_revenue) || 0,
+          customers:   Number(b.customer_count)  || 0,
+          nextAction:  b.next_action,
+          momPct,
+          revLogCount: myRev.length,
+        };
+      });
+      return { count: bizRows.length, totalMRR: total, items };
+    })(),
     dailySnapshot: {
       windowDays: 21,
       columns: snapshot.columns,
