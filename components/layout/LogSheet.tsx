@@ -10,6 +10,7 @@ import ProteinTile from "@/components/protein/ProteinTile";
 import { useToast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptic";
 import { matchGoals, formatAlignment, type ActionKind } from "@/lib/goals/alignment";
+import { uploadAestheticPhoto } from "@/lib/storage/aesthetic-photo";
 
 const DRINK_TYPES = ["Beer", "Wine", "Spirits", "Cocktail"];
 const MOOD_EMOJIS = ["😞", "😐", "🙂", "😊", "🤩"];
@@ -79,6 +80,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
   const [aestheticAngle,   setAestheticAngle]   = useState("front");
   const [aestheticRating,  setAestheticRating]  = useState<number | null>(null);
   const [aestheticNotes,   setAestheticNotes]   = useState("");
+  const [aestheticPhoto,   setAestheticPhoto]   = useState<File | null>(null);
   const [sunDuration,      setSunDuration]      = useState("");
   const [sunSunscreen,     setSunSunscreen]     = useState(false);
   const [learnKind,        setLearnKind]        = useState("reading");
@@ -620,20 +622,54 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                 ))}
               </div>
               <textarea value={aestheticNotes} onChange={(e) => setAestheticNotes(e.target.value)} placeholder="notes — leaner, fuller, etc" rows={2} className="w-full px-3 py-1.5 rounded-lg text-sm bg-transparent text-white border border-zinc-700 focus:border-zinc-500 outline-none resize-none" />
+              {/* Photo attach — Supabase Storage upload. Capture="environment"
+                  triggers iOS native rear-camera UI when tapped on mobile. */}
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-transparent border border-zinc-700 hover:border-zinc-600 cursor-pointer text-[11px] text-zinc-400">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => setAestheticPhoto(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+                <span>📷</span>
+                <span className="flex-1 truncate">
+                  {aestheticPhoto ? aestheticPhoto.name : "Attach photo (optional)"}
+                </span>
+                {aestheticPhoto && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setAestheticPhoto(null); }}
+                    className="text-zinc-600 hover:text-red-400"
+                  >×</button>
+                )}
+              </label>
               <button
                 onClick={async () => {
                   if (aestheticRating == null) return;
                   setSaving("aesthetic"); haptic("light");
-                  await aesthetic.logEntry({ angle: aestheticAngle, rating: aestheticRating, notes: aestheticNotes.trim() || null });
+                  let photoPath: string | null = null;
+                  if (aestheticPhoto) {
+                    const result = await uploadAestheticPhoto({ file: aestheticPhoto, angle: aestheticAngle });
+                    if ("path" in result) photoPath = result.path;
+                    else toast(`Photo upload failed: ${result.error}`, "error");
+                  }
+                  await aesthetic.logEntry({
+                    angle: aestheticAngle,
+                    rating: aestheticRating,
+                    notes: aestheticNotes.trim() || null,
+                    photo_url: photoPath,
+                  });
                   flashAlignment("aesthetic");
-                  setAestheticRating(null); setAestheticNotes(""); setSaving(null); setSaved("aesthetic");
+                  setAestheticRating(null); setAestheticNotes(""); setAestheticPhoto(null);
+                  setSaving(null); setSaved("aesthetic");
                   setTimeout(() => setSaved(null), 1500);
                 }}
                 disabled={aestheticRating == null}
                 className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
                 style={{ background: "rgba(251,191,36,0.25)", border: "1px solid rgba(251,191,36,0.25)" }}
               >
-                {saving === "aesthetic" ? "..." : saved === "aesthetic" ? "✓ Logged" : "Log check-in"}
+                {saving === "aesthetic" ? (aestheticPhoto ? "Uploading..." : "...") : saved === "aesthetic" ? "✓ Logged" : "Log check-in"}
               </button>
             </div>
           </LogTile>
