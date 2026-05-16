@@ -33,6 +33,49 @@ const TYPE_LABEL: Record<GoalType, string> = {
   aesthetic:    "Aesthetic",
 };
 
+// Open-ended-goal rating. A goal without a deadline can't be "% complete" —
+// there's no finish line. Instead we score how well the user is currently
+// doing in that area and surface a qualitative chip. Prefers adherence
+// (direct: "am I doing the work?") and falls back to metric trend
+// (indirect: "is the number moving the right way?").
+type RatingTier = "DIALED" | "STEADY" | "SLIPPING" | "STALLED";
+
+function computeRating(args: {
+  adherencePct:  number | null;
+  ratePerWeek:   number;
+  targetValue:   number | null;
+  latest:        number | null;
+  startingValue: number | null;
+}): RatingTier | null {
+  const { adherencePct, ratePerWeek, targetValue, latest, startingValue } = args;
+  if (adherencePct != null) {
+    if (adherencePct >= 75) return "DIALED";
+    if (adherencePct >= 50) return "STEADY";
+    if (adherencePct >= 25) return "SLIPPING";
+    return "STALLED";
+  }
+  if (targetValue != null && latest != null && ratePerWeek !== 0) {
+    const goingUp     = targetValue > (startingValue ?? latest);
+    const movingRight = goingUp ? ratePerWeek > 0 : ratePerWeek < 0;
+    if (!movingRight) return "SLIPPING";
+    const remaining = Math.abs(targetValue - latest);
+    const wks       = remaining / Math.abs(ratePerWeek);
+    if (wks < 12) return "DIALED";
+    if (wks < 52) return "STEADY";
+    return "SLIPPING";
+  }
+  return null;
+}
+
+function ratingColor(tier: RatingTier): string {
+  switch (tier) {
+    case "DIALED":   return PALETTE.success;
+    case "STEADY":   return PALETTE.info;
+    case "SLIPPING": return PALETTE.warning;
+    case "STALLED":  return PALETTE.danger;
+  }
+}
+
 function timeSince(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.floor(ms / 60000);
@@ -197,8 +240,11 @@ export default function GoalWidget({
               </div>
             )}
 
-            {/* Progress bar */}
-            {progressPct != null && (
+            {/* Progress display — deadline-bound goals show a % bar
+                (there's a real finish line); open-ended goals show a
+                qualitative rating chip (no finish, just "how am I
+                doing in this area right now"). */}
+            {goal.target_date && progressPct != null && (
               <div className="mt-2 flex items-center gap-2">
                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                   <div
@@ -213,7 +259,34 @@ export default function GoalWidget({
                 <span className="text-[11px] text-zinc-500 tabular-nums">{progressPct}%</span>
               </div>
             )}
-            {progressPct == null && (
+            {!goal.target_date && (() => {
+              const tier = computeRating({
+                adherencePct,
+                ratePerWeek:   stats.ratePerWeek,
+                targetValue:   goal.target_value ?? null,
+                latest:        stats.latest,
+                startingValue: goal.starting_value ?? null,
+              });
+              if (!tier) {
+                return (
+                  <p className="text-[11px] text-zinc-500 mt-1.5">
+                    {goal.goal_type === "quantitative"
+                      ? "Log a metric to see how you're tracking."
+                      : "Link a routine item to see how you're tracking."}
+                  </p>
+                );
+              }
+              const color = ratingColor(tier);
+              return (
+                <div className="mt-2 inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                  <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color }}>
+                    {tier}
+                  </span>
+                </div>
+              );
+            })()}
+            {goal.target_date && progressPct == null && (
               <p className="text-[11px] text-zinc-500 mt-1.5">
                 {goal.goal_type === "quantitative"
                   ? "Log a metric to see progress."
