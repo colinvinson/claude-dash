@@ -51,7 +51,7 @@ function generateSession(): string {
   return Array.from({ length: 4 }, () => Array.from({ length: 4 }, hex).join("")).join("-");
 }
 
-export default function JarvisHUD({ onClose }: { onClose: () => void }) {
+export default function JarvisHUD({ onClose, initialMessage }: { onClose: () => void; initialMessage?: string }) {
   const { health } = useHealth();
   const { streak, goals } = useGoals();
   const { totalToday: proteinToday, target: proteinTarget } = useProtein();
@@ -85,6 +85,16 @@ export default function JarvisHUD({ onClose }: { onClose: () => void }) {
       recognitionRef.current?.stop();
       stopAudioMeter();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When opened with a prefill (e.g. "deploy this agent for SaaS v2"),
+  // autosend on mount so the user lands in the response instead of
+  // re-typing what the surface already knows.
+  useEffect(() => {
+    if (initialMessage && initialMessage.trim()) {
+      void sendMessage(initialMessage.trim());
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

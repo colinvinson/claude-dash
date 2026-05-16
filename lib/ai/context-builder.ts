@@ -66,8 +66,10 @@ export async function buildContext(userId: string) {
     caffeine14dRes, sun14dRes, learning14dRes, money14dRes,
     // Businesses portfolio (migration 0027). Active businesses + last 90d
     // of revenue logs so Jarvis can reason about MoM growth and tell Sir
-    // which business is moving vs stagnant.
-    businessesRes, businessRevenue90dRes,
+    // which business is moving vs stagnant. business_agents (0028) is the
+    // per-business workforce — what's wired to each business so Jarvis can
+    // say "the SaaS competitor watcher hasn't run in 4 days."
+    businessesRes, businessRevenue90dRes, businessAgentsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -131,6 +133,7 @@ export async function buildContext(userId: string) {
     supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
     supabase.from("businesses").select("id, name, status, category, monthly_revenue, customer_count, next_action").eq("user_id", userId).is("archived_at", null),
     supabase.from("business_revenue_log").select("business_id, amount, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(90)).order("log_date", { ascending: true }),
+    supabase.from("business_agents").select("business_id, agent_name, role_label, purpose, last_run_at").eq("user_id", userId),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -841,9 +844,11 @@ export async function buildContext(userId: string) {
     businesses: (() => {
       type Biz = { id: string; name: string; status: string; category: string | null; monthly_revenue: number; customer_count: number; next_action: string | null };
       type RevRow = { business_id: string; amount: number; log_date: string };
-      const bizRows = (businessesRes.data ?? []) as Biz[];
-      const revRows = (businessRevenue90dRes.data ?? []) as RevRow[];
-      const total   = bizRows.reduce((s, b) => s + (Number(b.monthly_revenue) || 0), 0);
+      type AgentRow = { business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null };
+      const bizRows   = (businessesRes.data ?? []) as Biz[];
+      const revRows   = (businessRevenue90dRes.data ?? []) as RevRow[];
+      const agentRows = (businessAgentsRes.data ?? []) as AgentRow[];
+      const total     = bizRows.reduce((s, b) => s + (Number(b.monthly_revenue) || 0), 0);
       const items   = bizRows.map((b) => {
         const myRev = revRows.filter((r) => r.business_id === b.id);
         let momPct: number | null = null;
@@ -855,6 +860,12 @@ export async function buildContext(userId: string) {
             momPct = Math.round(((Number(latest.amount) - Number(prior.amount)) / Number(prior.amount)) * 100);
           }
         }
+        const myAgents = agentRows.filter((a) => a.business_id === b.id).map((a) => ({
+          name:       a.agent_name,
+          role:       a.role_label,
+          purpose:    a.purpose,
+          lastRunAt:  a.last_run_at,
+        }));
         return {
           name:        b.name,
           status:      b.status,
@@ -864,6 +875,7 @@ export async function buildContext(userId: string) {
           nextAction:  b.next_action,
           momPct,
           revLogCount: myRev.length,
+          agents:      myAgents,
         };
       });
       return { count: bizRows.length, totalMRR: total, items };

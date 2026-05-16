@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, CalendarClock, Dumbbell, Target, Briefcase } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
 // 6-tab nav (5 icon tabs + center Jarvis orb). Life + Businesses live as
@@ -27,7 +27,21 @@ const PILL_PAD = 5;
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [jarvisOpen, setJarvisOpen] = useState(false);
+  const [jarvisOpen, setJarvisOpen]       = useState(false);
+  const [jarvisPrefill, setJarvisPrefill] = useState<string | undefined>(undefined);
+
+  // Global "open Jarvis with this prompt" event — lets any surface
+  // (e.g. BusinessAgents' Run button) dispatch into Jarvis without
+  // wiring its own state up the tree.
+  useEffect(() => {
+    function onOpen(e: Event) {
+      const detail = (e as CustomEvent<{ prompt?: string }>).detail;
+      setJarvisPrefill(detail?.prompt);
+      setJarvisOpen(true);
+    }
+    window.addEventListener("jarvis:open", onOpen as EventListener);
+    return () => window.removeEventListener("jarvis:open", onOpen as EventListener);
+  }, []);
 
   const activeIndex = (() => {
     for (let i = 0; i < tabs.length; i++) {
@@ -53,7 +67,12 @@ export default function BottomNav() {
 
   return (
     <>
-      {jarvisOpen && <JarvisHUD onClose={() => setJarvisOpen(false)} />}
+      {jarvisOpen && (
+        <JarvisHUD
+          onClose={() => { setJarvisOpen(false); setJarvisPrefill(undefined); }}
+          initialMessage={jarvisPrefill}
+        />
+      )}
 
       <div
         className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"

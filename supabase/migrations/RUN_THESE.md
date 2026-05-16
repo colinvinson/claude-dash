@@ -4,7 +4,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 
 ## What to do right now if you've fallen behind
 
-1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0027` in order.
+1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0028` in order.
 2. **You've been keeping up but might've missed recent ones:** run the post-0018 list below; idempotent guards skip the ones already applied.
 
 ## Migrations after the catch-up (0018) — apply these in order
@@ -20,6 +20,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 | 0025 | `0025_monthly_retros.sql` | `monthly_retros` table | MonthlyRetroCard on Home |
 | 0026 | `0026_aesthetic_photos_bucket.sql` | Private Storage bucket `aesthetic-photos` + RLS | Aesthetic check-in photo upload |
 | 0027 | `0027_businesses.sql` | `businesses` + `business_revenue_log` tables | Businesses portfolio hub on /businesses tab |
+| 0028 | `0028_business_agents.sql` | `business_agents` table | Per-business agent workforce in BusinessDetail sheet |
 
 ## After running, verify
 

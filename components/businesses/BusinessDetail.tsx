@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { useBusinesses, type Business, type BusinessStatus } from "@/hooks/useBusinesses";
 import { useBusinessRevenue } from "@/hooks/useBusinessRevenue";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
+import BusinessAgents from "./BusinessAgents";
 
 // Per-business drill-in sheet. Slides up from the bottom; tap anywhere
 // outside the sheet to close. Holds everything specific to one business:
@@ -218,6 +219,9 @@ export default function BusinessDetail({
               placeholder="Stack, decisions, links, ideas..."
             />
           </div>
+
+          {/* Agents — per-business workforce wired to Claude Code agents */}
+          <BusinessAgents business={business} />
 
           {/* Archive */}
           <div className="pt-2">
