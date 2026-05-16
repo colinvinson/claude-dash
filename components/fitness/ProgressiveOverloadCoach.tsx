@@ -15,6 +15,8 @@ import { pick } from "@/lib/feedback/phrases";
 import ConfettiBurst from "@/components/ui/ConfettiBurst";
 import RestTimer from "@/components/fitness/RestTimer";
 import { recommendRest, formatRest } from "@/lib/fitness/rest-timer";
+import LiveWorkoutView from "@/components/fitness/LiveWorkoutView";
+import { Play } from "lucide-react";
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -71,6 +73,7 @@ export default function ProgressiveOverloadCoach() {
 
   const [setBurst, setSetBurst] = useState(0);
   const [isPr,     setIsPr]     = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   // Rest-timer state — auto-arms after each set log. `restOpenKey` increments
   // to re-open the RestTimer; the timer reads `restSeconds` + `restHint` from
@@ -269,6 +272,18 @@ export default function ProgressiveOverloadCoach() {
               )}
             </div>
           </div>
+
+          {/* Go Live — full-screen focused workout mode. Big numbers, big
+              tap targets, big rest timer. Sticks the prescription onto a
+              single distraction-free surface so Sir isn't scrolling
+              through cards mid-set. */}
+          <button
+            onClick={() => setLiveOpen(true)}
+            className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-900 text-sm font-black tracking-wide flex items-center justify-center gap-2 transition-colors"
+          >
+            <Play size={15} fill="currentColor" strokeWidth={0} />
+            Start live workout
+          </button>
 
           {/* Per-set intensity protocol — when to push, when to hold back, when to extend past failure */}
           {(verdict.setProtocol.length > 0 || verdict.warmupSets.length > 0) && (
@@ -563,6 +578,10 @@ export default function ProgressiveOverloadCoach() {
           Select an exercise above to start tracking
         </div>
       )}
+
+      {/* Live workout view — full-screen overlay portal-style. Reads its
+          own state from useWorkout so logging stays consistent. */}
+      <LiveWorkoutView open={liveOpen} onClose={() => setLiveOpen(false)} />
     </div>
   );
 }
