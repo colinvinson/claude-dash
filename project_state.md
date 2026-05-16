@@ -8,6 +8,9 @@
 > Phase 2: removed "Sir" from all user-visible UI strings (persona stays in `lib/jarvis/prompts.ts`); copy is now second-person / imperative.
 > Phase 3: text-only and icon-only buttons (Skip, dismiss ✕, Clear, X close) gained `-m-2 p-2` to extend tap zones past the 44pt Apple HIG floor without changing visual size.
 >
+> **2026-05-16 — Agent artifacts wired back to businesses (0029):**
+> Each `jarvis_artifact` can now be tagged with `business_id` + `business_agent_id`. BusinessAgents UI surfaces the latest deliverable per agent inline (collapsed: name + first-line preview + relative time; expanded: full content). When the BusinessAgents UI dispatches a run, the deploy prompt explicitly tells Jarvis to pass these IDs through to `write_artifact` so outputs flow back automatically. `useBusinessAgentArtifacts` realtime-subscribes to artifact inserts so new deliverables appear without refresh. Context-builder adds `latestArtifact: { id, name, createdAt }` to each agent in `context.businesses.items[].agents[]` so Jarvis can reference outputs by name without a separate read_artifact call.
+>
 > **2026-05-16 — Per-business agent workforce shipped (0028):**
 > Each business in the portfolio now has its own agent workforce. New `business_agents` table links a business_id to one or more agent roles (agent_name maps to a `.claude/agents/<name>.md` definition). BusinessDetail sheet gained an Agents section: list of assigned agents, Run button (auto-injects business context — name/status/MRR/next action — into the deploy prompt), define-new flow (creates the definition + dispatches first run via Jarvis). JarvisHUD now accepts an `initialMessage` prop and autosends; BottomNav listens for a global `jarvis:open` CustomEvent so any surface can dispatch into Jarvis with a prefilled prompt. Context-builder surfaces `businesses[].agents[]` (name, role, purpose, lastRunAt) so Jarvis can answer "what's working on SaaS v2?" without being told.
 >

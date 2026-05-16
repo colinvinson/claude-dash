@@ -68,8 +68,11 @@ export async function buildContext(userId: string) {
     // of revenue logs so Jarvis can reason about MoM growth and tell Sir
     // which business is moving vs stagnant. business_agents (0028) is the
     // per-business workforce — what's wired to each business so Jarvis can
-    // say "the SaaS competitor watcher hasn't run in 4 days."
-    businessesRes, businessRevenue90dRes, businessAgentsRes,
+    // say "the SaaS competitor watcher hasn't run in 4 days." Business
+    // artifacts (0029) feed Jarvis the latest deliverable per agent so
+    // he can reference outputs by name without a separate read_artifact
+    // call.
+    businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -133,7 +136,11 @@ export async function buildContext(userId: string) {
     supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
     supabase.from("businesses").select("id, name, status, category, monthly_revenue, customer_count, next_action").eq("user_id", userId).is("archived_at", null),
     supabase.from("business_revenue_log").select("business_id, amount, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(90)).order("log_date", { ascending: true }),
-    supabase.from("business_agents").select("business_id, agent_name, role_label, purpose, last_run_at").eq("user_id", userId),
+    supabase.from("business_agents").select("id, business_id, agent_name, role_label, purpose, last_run_at").eq("user_id", userId),
+    // Per-business agent artifacts (migration 0029). Limit ~50 most recent
+    // across all businesses — context-builder selects the latest per
+    // business_agent_id when building the per-agent block below.
+    supabase.from("jarvis_artifacts").select("id, name, business_id, business_agent_id, created_at").eq("user_id", userId).not("business_id", "is", null).order("created_at", { ascending: false }).limit(50),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -844,10 +851,20 @@ export async function buildContext(userId: string) {
     businesses: (() => {
       type Biz = { id: string; name: string; status: string; category: string | null; monthly_revenue: number; customer_count: number; next_action: string | null };
       type RevRow = { business_id: string; amount: number; log_date: string };
-      type AgentRow = { business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null };
-      const bizRows   = (businessesRes.data ?? []) as Biz[];
-      const revRows   = (businessRevenue90dRes.data ?? []) as RevRow[];
-      const agentRows = (businessAgentsRes.data ?? []) as AgentRow[];
+      type AgentRow    = { id: string; business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null };
+      type ArtifactRow = { id: string; name: string; business_id: string | null; business_agent_id: string | null; created_at: string };
+      const bizRows      = (businessesRes.data ?? []) as Biz[];
+      const revRows      = (businessRevenue90dRes.data ?? []) as RevRow[];
+      const agentRows    = (businessAgentsRes.data ?? []) as AgentRow[];
+      const artifactRows = (businessArtifactsRes.data ?? []) as ArtifactRow[];
+
+      // Build latest-artifact-per-agent index (rows already sorted desc).
+      const latestArtByAgent = new Map<string, ArtifactRow>();
+      for (const a of artifactRows) {
+        if (a.business_agent_id && !latestArtByAgent.has(a.business_agent_id)) {
+          latestArtByAgent.set(a.business_agent_id, a);
+        }
+      }
       const total     = bizRows.reduce((s, b) => s + (Number(b.monthly_revenue) || 0), 0);
       const items   = bizRows.map((b) => {
         const myRev = revRows.filter((r) => r.business_id === b.id);
@@ -860,12 +877,16 @@ export async function buildContext(userId: string) {
             momPct = Math.round(((Number(latest.amount) - Number(prior.amount)) / Number(prior.amount)) * 100);
           }
         }
-        const myAgents = agentRows.filter((a) => a.business_id === b.id).map((a) => ({
-          name:       a.agent_name,
-          role:       a.role_label,
-          purpose:    a.purpose,
-          lastRunAt:  a.last_run_at,
-        }));
+        const myAgents = agentRows.filter((a) => a.business_id === b.id).map((a) => {
+          const latestArt = latestArtByAgent.get(a.id);
+          return {
+            name:       a.agent_name,
+            role:       a.role_label,
+            purpose:    a.purpose,
+            lastRunAt:  a.last_run_at,
+            latestArtifact: latestArt ? { id: latestArt.id, name: latestArt.name, createdAt: latestArt.created_at } : null,
+          };
+        });
         return {
           name:        b.name,
           status:      b.status,

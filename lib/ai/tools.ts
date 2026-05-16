@@ -178,13 +178,15 @@ export const JARVIS_EXTRA_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "write_artifact",
-    description: "Save a substantial output (blog post, plan, report, research, code, anything text). Returns the artifact id. Use for any output that should persist beyond this conversation.",
+    description: "Save a substantial output (blog post, plan, report, research, code, anything text). Returns the artifact id. Use for any output that should persist beyond this conversation. When working on a specific business (deploy prompts from BusinessAgents include the IDs explicitly), pass `business_id` (and `business_agent_id` if the deploy prompt specifies one) so the artifact surfaces inline on that business — otherwise it lives only in the global artifact list.",
     input_schema: {
       type: "object" as const,
       properties: {
         name:    { type: "string", description: "Short title for the artifact." },
         content: { type: "string" },
         type:    { type: "string", description: "markdown | text | json | html. Default markdown." },
+        business_id:       { type: "string", description: "Optional UUID. Tag this artifact to a business so it surfaces on the BusinessDetail sheet." },
+        business_agent_id: { type: "string", description: "Optional UUID. Tag this artifact to a specific agent role so it shows under that role's row in the workforce list." },
       },
       required: ["name", "content"],
     },
@@ -682,9 +684,13 @@ export async function executeTool(
         const name    = String(input.name ?? "").trim();
         const content = String(input.content ?? "");
         const type    = String(input.type ?? "markdown");
+        const businessId      = typeof input.business_id       === "string" && input.business_id.trim()       ? input.business_id.trim()       : null;
+        const businessAgentId = typeof input.business_agent_id === "string" && input.business_agent_id.trim() ? input.business_agent_id.trim() : null;
         if (!name || !content) return { ok: false, error: "name and content required" };
         const { data, error } = await supabase.from("jarvis_artifacts").insert({
           user_id: userId, name, type, content,
+          business_id:       businessId,
+          business_agent_id: businessAgentId,
         }).select("id").single();
         if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
         return { ok: true, message: `Wrote "${name}" (${type}, ${content.length} chars). id: ${data.id}` };
