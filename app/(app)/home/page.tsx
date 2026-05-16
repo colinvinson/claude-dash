@@ -24,6 +24,7 @@ import QuickStatsStrip from "@/components/home/QuickStatsStrip";
 import StreakCelebration from "@/components/home/StreakCelebration";
 import PushSubscriber from "@/components/home/PushSubscriber";
 import LongTermGoalsCard from "@/components/home/LongTermGoalsCard";
+import DailyInsightStrip from "@/components/home/DailyInsightStrip";
 
 // Home tab — consolidated cohesion pass.
 //
@@ -76,7 +77,9 @@ export default function HomePage() {
     return () => { delete document.body.dataset.score; };
   }, [accent]);
 
-  // Surprise PB detector — server-side dedup means firing every mount is safe.
+  // PB detector still fires alongside the daily-insights strip — they
+  // coexist (PB writes kind="pb", daily-insights writes performance/
+  // recovery/goal). Both dedupe server-side per day.
   useEffect(() => {
     void fetch("/api/jarvis/pb-insights", { method: "POST" }).catch(() => {});
   }, []);
@@ -115,6 +118,12 @@ export default function HomePage() {
       <div className="grid grid-cols-2 gap-3">
         {/* Morning ritual */}
         <div className="col-span-2 anim-fade-up"><DayBrief /></div>
+
+        {/* Jarvis insights — proactive observations Sir didn't have to ask
+            about. Surfaces 1-3 fresh observations per day across
+            performance / recovery / goal categories. Quiet when there's
+            nothing flagged. */}
+        <div className="col-span-2 anim-fade-up stagger-1"><DailyInsightStrip /></div>
 
         {/* HERO — score + 3 rings + recap */}
         <div className="col-span-2 anim-fade-up stagger-1"><TodayWrap /></div>
