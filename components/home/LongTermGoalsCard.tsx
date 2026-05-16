@@ -29,7 +29,7 @@ export default function LongTermGoalsCard() {
         <EmptyState
           icon={Target}
           title="No long-term goals yet"
-          description={<>What are Sir actually moving toward? Open the <Link href="/goals" className="text-zinc-300 underline">Goals tab</Link> to set one.</>}
+          description={<>What are Sir actually moving toward? Open the <Link href="/life" className="text-zinc-300 underline">Life</Link> or <Link href="/businesses" className="text-zinc-300 underline">Businesses</Link> tab to set one.</>}
         />
       </Card>
     );
@@ -47,14 +47,14 @@ export default function LongTermGoalsCard() {
           <Star size={11} style={{ color: PALETTE.celebration }} fill={PALETTE.celebration} />
           {focusGoals.length > 0 ? "Focus goals" : "Long-term goals"}
         </span>
-        <Link href="/goals" className="text-[11px] text-zinc-500 hover:text-zinc-200 flex items-center gap-0.5">
+        <Link href="/life" className="text-[11px] text-zinc-500 hover:text-zinc-200 flex items-center gap-0.5">
           All <ChevronRight size={11} />
         </Link>
       </div>
 
       <div className="space-y-3">
         {display.map((g) => (
-          <Link key={g.id} href="/goals" className="block group">
+          <Link key={g.id} href={g.bucket === "business" ? "/businesses" : "/life"} className="block group">
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="text-sm font-semibold text-zinc-100 truncate group-hover:text-white">

@@ -2,22 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarClock, Dumbbell, Target } from "lucide-react";
+import { Home, CalendarClock, Dumbbell, Target, Briefcase } from "lucide-react";
 import { useState } from "react";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
+// 6-tab nav (5 icon tabs + center Jarvis orb). Life + Businesses live as
+// peers — they're the dashboard's two main goal surfaces and deserve
+// equal top-level placement.
 const tabs = [
-  { href: "/home",     label: "Home",     icon: Home },
-  { href: "/schedule", label: "Schedule", icon: CalendarClock },
-  { center: true,      label: "Jarvis" },
-  { href: "/gym",      label: "Gym",      icon: Dumbbell },
-  { href: "/goals",    label: "Goals",    icon: Target },
+  { href: "/home",       label: "Home",       icon: Home },
+  { href: "/schedule",   label: "Schedule",   icon: CalendarClock },
+  { href: "/gym",        label: "Gym",        icon: Dumbbell },
+  { center: true,        label: "Jarvis" },
+  { href: "/life",       label: "Life",       icon: Target },
+  { href: "/businesses", label: "Biz",        icon: Briefcase },
 ] as const;
 
-const TAB_W    = 56;
-const GAP      = 4;
+// Tabs slimmed from 56 → 50px width to fit 5 icon tabs + orb without
+// overflowing on a 375px-wide phone.
+const TAB_W    = 50;
+const GAP      = 3;
 const CENTER_W = 48;
-const PILL_PAD = 6;
+const PILL_PAD = 5;
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -109,8 +115,9 @@ export default function BottomNav() {
                 key={href}
                 href={href}
                 aria-label={label}
-                className="tap relative flex flex-col items-center justify-center w-14 h-12 rounded-full"
+                className="tap relative flex flex-col items-center justify-center h-12 rounded-full"
                 style={{
+                  width: TAB_W,
                   color: active ? "#fafafa" : "#a1a1aa",
                   transition: "color 200ms ease, transform 120ms cubic-bezier(0.22,1,0.36,1)",
                 }}
