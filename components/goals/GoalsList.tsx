@@ -1,22 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
 import Card from "@/components/ui/Card";
 import { useLongTermGoals, type GoalBucket } from "@/hooks/useLongTermGoals";
 import GoalWidget from "./GoalWidget";
+import AddGoalFlow from "./AddGoalFlow";
 
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
   const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan } = useLongTermGoals(bucket);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  // Form state for adding a new goal in this bucket.
-  const [newTitle, setNewTitle]       = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  const [newDate, setNewDate]         = useState("");
-  const [adding, setAdding]           = useState(false);
 
   // Lazy weekly auto-refresh: when the page mounts (or bucket changes),
   // fire a background goal-summary call for any goal whose ai_summary is
@@ -33,14 +27,6 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, bucket, goals.length]);
-
-  async function handleAdd() {
-    if (!newTitle.trim()) return;
-    setAdding(true);
-    await addGoal({ title: newTitle, bucket, category: newCategory.trim() || undefined, target_date: newDate || undefined });
-    setNewTitle(""); setNewCategory(""); setNewDate("");
-    setAdding(false);
-  }
 
   if (loading) {
     return (
@@ -74,62 +60,8 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
         />
       ))}
 
-      {/* Add new */}
-      <Card>
-        <span className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-2">
-          {bucket === "business" ? "Add a business / project" : "Add a life goal"}
-        </span>
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Title</span>
-            <input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder={bucket === "business" ? "e.g. Ship SaaS v1" : "e.g. Get tan"}
-              className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-            />
-          </label>
-          <div className="flex gap-2">
-            <label className="flex-1">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Tag (optional)</span>
-              <input
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                placeholder={bucket === "business" ? "SaaS" : "Tan / Sleep / …"}
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-              />
-            </label>
-            <div className="w-44">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-500">Target date</span>
-                {newDate ? (
-                  <button
-                    onClick={() => setNewDate("")}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                  >
-                    Clear
-                  </button>
-                ) : (
-                  <span className="text-[10px] text-zinc-600">No deadline</span>
-                )}
-              </div>
-              <input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
-              />
-            </div>
-          </div>
-          <button
-            onClick={handleAdd}
-            disabled={adding || !newTitle.trim()}
-            className="w-full py-2 bg-white text-zinc-900 disabled:opacity-40 rounded-xl text-sm font-semibold transition-opacity flex items-center justify-center gap-1"
-          >
-            <Plus size={14} /> {adding ? "Adding…" : "Add"}
-          </button>
-        </div>
-      </Card>
+      {/* Add — onboarding fork between manual and Jarvis-drafted protocol */}
+      <AddGoalFlow bucket={bucket} onCreate={addGoal} onUpdate={updateGoal} />
     </div>
   );
 }
