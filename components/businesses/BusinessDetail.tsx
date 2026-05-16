@@ -15,6 +15,7 @@ import BusinessActivity from "./BusinessActivity";
 import MRRSparkline from "./MRRSparkline";
 import MarketingExperiments from "./MarketingExperiments";
 import LinkedChats from "./LinkedChats";
+import AddToWantsButton from "@/components/finances/AddToWantsButton";
 
 // Per-business control panel. Layout flows top-down by what Sir needs to
 // SEE first vs ACT on first vs reference occasionally:
@@ -211,6 +212,9 @@ export default function BusinessDetail({
 
           {/* ── LINKED CHATS — Claude.ai / external conversations about this business ── */}
           <LinkedChats businessId={business.id} />
+
+          {/* ── ADD TO WANTS — assigns a product to the Finances wishlist tagged to this business ── */}
+          <AddToWantsButton businessId={business.id} />
 
           {/* ── ACTIVITY — chronological feed of everything that happened ── */}
           <BusinessActivity businessId={business.id} />

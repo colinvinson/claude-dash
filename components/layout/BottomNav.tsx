@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarClock, Dumbbell, Target, Briefcase } from "lucide-react";
+import { Home, CalendarClock, Dumbbell, Target, Briefcase, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
-// 6-tab nav (5 icon tabs + center Jarvis orb). Life + Businesses live as
-// peers — they're the dashboard's two main goal surfaces and deserve
-// equal top-level placement.
+// 7-tab nav (6 icon tabs + center Jarvis orb). Finances earns its slot
+// because wealth-building is one of Sir's primary stated goals — the
+// surface where money decisions actually happen.
 const tabs = [
   { href: "/home",       label: "Home",       icon: Home },
   { href: "/schedule",   label: "Schedule",   icon: CalendarClock },
@@ -16,11 +16,14 @@ const tabs = [
   { center: true,        label: "Jarvis" },
   { href: "/life",       label: "Life",       icon: Target },
   { href: "/businesses", label: "Biz",        icon: Briefcase },
+  { href: "/finances",   label: "Money",      icon: Wallet },
 ] as const;
 
-// Tabs slimmed from 56 → 50px width to fit 5 icon tabs + orb without
-// overflowing on a 375px-wide phone.
-const TAB_W    = 50;
+// Tabs slimmed 50 → 44 (still Apple HIG floor with padding) to fit 6
+// icon tabs + orb on a 375px-wide phone. Width math:
+//   6 × 44 (icons) + 1 × 48 (orb) + 6 × 3 (gaps) + 2 × 5 (padding) = 340px.
+// Fits inside a 375px viewport with 14px margins both sides (347px usable).
+const TAB_W    = 44;
 const GAP      = 3;
 const CENTER_W = 48;
 const PILL_PAD = 5;

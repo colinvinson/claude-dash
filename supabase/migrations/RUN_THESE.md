@@ -4,7 +4,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 
 ## What to do right now if you've fallen behind
 
-1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0033` in order.
+1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0034` in order.
 2. **You've been keeping up but might've missed recent ones:** run the post-0018 list below; idempotent guards skip the ones already applied.
 
 ## Migrations after the catch-up (0018) — apply these in order
@@ -26,6 +26,7 @@ Run these in your Supabase project's SQL editor in **order**. Each is idempotent
 | 0031 | `0031_business_agents_schedule.sql` | `schedule_kind` / `schedule_hour` / `schedule_dow` / `schedule_dom` / `next_run_at` columns on `business_agents` | Vercel Cron scheduling for autonomous agent runs |
 | 0032 | `0032_marketing_experiments.sql` | `marketing_experiments` table — variant text + channel + outcome metrics | Closed-loop learning: agents see what's been tried + what converted before drafting new variants |
 | 0033 | `0033_linked_chats.sql` | `linked_chats` table — external Claude.ai / ChatGPT conversation references attached to a business or goal | Linked Chats section in BusinessDetail + GoalWidget |
+| 0034 | `0034_finances.sql` | `wishlist_items` + `net_worth_snapshots` tables | Finances tab — Wants list + Net worth snapshots + Cash flow aggregate + Strategy Jarvis surface |
 
 ## After running, verify
 

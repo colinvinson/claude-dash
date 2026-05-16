@@ -81,6 +81,10 @@ export async function buildContext(userId: string) {
     // can tell Sir "you have a 6/12 Claude chat about pricing tied to
     // SaaS v2" so prior thinking stays visible.
     businessesRes, businessRevenue90dRes, businessAgentsRes, businessArtifactsRes, businessTasksRes, marketingExperimentsRes, linkedChatsRes,
+    // Finances (migration 0034). Wishlist + most recent net worth
+    // snapshot + 30d money flow. Jarvis uses these to ground the
+    // "highest-EV move with what you have right now" advisory.
+    wishlistRes, netWorthRes, moneyFlow30dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -163,6 +167,11 @@ export async function buildContext(userId: string) {
     // source + summary so Jarvis can reference prior reasoning ("you
     // already worked through pricing in a Claude chat 3 days ago").
     supabase.from("linked_chats").select("business_id, goal_id, title, url, source, summary, created_at").eq("user_id", userId).is("archived_at", null).order("created_at", { ascending: false }).limit(60),
+    // Finances — wishlist (all open + recent bought), latest net-worth
+    // snapshot, and 30d of money_logs aggregated client-side below.
+    supabase.from("wishlist_items").select("title, price, kind, status, goal_id, business_id, priority").eq("user_id", userId).is("archived_at", null).neq("status", "dismissed").order("status", { ascending: true }).order("priority", { ascending: false }).limit(40),
+    supabase.from("net_worth_snapshots").select("snapshot_date, cash, investments, business_equity, debts").eq("user_id", userId).order("snapshot_date", { ascending: false }).limit(2),
+    supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(30)),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -960,6 +969,66 @@ export async function buildContext(userId: string) {
         };
       });
       return { count: bizRows.length, totalMRR: total, items };
+    })(),
+    // Finances (migration 0034) — strategy-layer surface for the
+    // "highest-EV move with what you have right now" advisory. Sir is
+    // 19, ambition is wealth, time horizon is decades — ground answers
+    // accordingly. Don't default to FIRE-blog "diversify into index
+    // funds" tropes; weight reinvest-into-businesses heavily when
+    // there's MRR to compound, and call out cope (consumption > 2×
+    // leverage) without padding.
+    finances: (() => {
+      type WishRow  = { title: string; price: number | null; kind: "leverage" | "consumption"; status: string; goal_id: string | null; business_id: string | null; priority: number };
+      type NWRow    = { snapshot_date: string; cash: number; investments: number; business_equity: number; debts: number };
+      type MoneyRow = { amount: number; kind: string; category: string | null; log_date: string };
+      const wishRows  = (wishlistRes.data ?? []) as WishRow[];
+      const nwRows    = (netWorthRes.data ?? []) as NWRow[];
+      const moneyRows = (moneyFlow30dRes.data ?? []) as MoneyRow[];
+
+      const wanted    = wishRows.filter((w) => w.status === "wanted");
+      const leverage  = wanted.filter((w) => w.kind === "leverage").reduce((s, w) => s + Number(w.price ?? 0), 0);
+      const cons      = wanted.filter((w) => w.kind === "consumption").reduce((s, w) => s + Number(w.price ?? 0), 0);
+
+      const latestNw = nwRows[0] ?? null;
+      const cash            = latestNw ? Number(latestNw.cash)            : 0;
+      const investments     = latestNw ? Number(latestNw.investments)     : 0;
+      const businessEquity  = latestNw ? Number(latestNw.business_equity) : 0;
+      const debts           = latestNw ? Number(latestNw.debts)           : 0;
+
+      let income30 = 0, expense30 = 0;
+      for (const m of moneyRows) {
+        const amt = Number(m.amount) || 0;
+        if (m.kind === "income" || m.kind === "business_revenue") income30 += amt;
+        if (m.kind === "expense") expense30 += amt;
+      }
+
+      return {
+        netWorth: latestNw ? {
+          snapshotDate: latestNw.snapshot_date,
+          cash, investments, businessEquity, debts,
+          total: cash + investments + businessEquity - debts,
+        } : null,
+        moneyFlow30d: {
+          income:  Math.round(income30),
+          expense: Math.round(expense30),
+          net:     Math.round(income30 - expense30),
+        },
+        wants: {
+          openCount:         wanted.length,
+          totalOpen:         Math.round(leverage + cons),
+          leverageOpen:      Math.round(leverage),
+          consumptionOpen:   Math.round(cons),
+          // The flag the StrategySection surfaces — keep Jarvis aware of it.
+          consumptionHeavy: cons > 0 && cons > leverage * 2,
+          topItems: wanted.slice(0, 8).map((w) => ({
+            title:    w.title,
+            price:    w.price != null ? Number(w.price) : null,
+            kind:     w.kind,
+            priority: w.priority,
+            tiedTo:   w.business_id ? "business" : (w.goal_id ? "goal" : "none"),
+          })),
+        },
+      };
     })(),
     dailySnapshot: {
       windowDays: 21,

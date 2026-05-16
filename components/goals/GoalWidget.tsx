@@ -14,6 +14,7 @@ import type { LongTermGoal, GoalType } from "@/hooks/useLongTermGoals";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import LinkRoutinePicker from "./LinkRoutinePicker";
 import LinkedChats from "@/components/businesses/LinkedChats";
+import AddToWantsButton from "@/components/finances/AddToWantsButton";
 
 type Props = {
   goal: LongTermGoal;
@@ -567,6 +568,12 @@ export default function GoalWidget({
               about this goal (research, protocol design, brainstorms) */}
           <div className="pt-4 border-t border-zinc-800">
             <LinkedChats goalId={goal.id} />
+          </div>
+
+          {/* Add to wants — assigns a product to the Finances wishlist
+              tagged to this goal. Goals can spend money on Sir's behalf. */}
+          <div className="pt-4 border-t border-zinc-800">
+            <AddToWantsButton goalId={goal.id} />
           </div>
         </div>
       )}
