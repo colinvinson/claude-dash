@@ -5,9 +5,11 @@ import { X } from "lucide-react";
 import { useLog } from "@/hooks/useLog";
 import { useJournal } from "@/hooks/useJournal";
 import { useDimensionLogs } from "@/hooks/useDimensionLogs";
+import { useLongTermGoals } from "@/hooks/useLongTermGoals";
 import ProteinTile from "@/components/protein/ProteinTile";
 import { useToast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptic";
+import { matchGoals, formatAlignment, type ActionKind } from "@/lib/goals/alignment";
 
 const DRINK_TYPES = ["Beer", "Wine", "Spirits", "Cocktail"];
 const MOOD_EMOJIS = ["😞", "😐", "🙂", "😊", "🤩"];
@@ -32,6 +34,18 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
   const { addEntry } = useJournal();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  // Active long-term goals — used for goal-alignment overlay so every
+  // logged action visibly ties back to what Sir's moving toward.
+  const { goals: allGoals } = useLongTermGoals();
+  const alignableGoals = allGoals.map((g) => ({
+    id: g.id, title: g.title, category: g.category, goal_type: g.goal_type,
+  }));
+  function flashAlignment(actionKind: ActionKind) {
+    const matches = matchGoals(actionKind, alignableGoals);
+    const msg = formatAlignment(matches);
+    if (msg) toast(msg);
+  }
 
   // The 9 new dimensions — one hook per table, today's rows only.
   const focus     = useDimensionLogs("focus_sessions");
@@ -367,6 +381,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                     if (!(m > 0)) return;
                     setSaving("cardio"); haptic("light");
                     await cardio.logEntry({ kind: cardioKind, duration_min: m });
+                    flashAlignment("cardio");
                     setCardioDuration(""); setSaving(null); setSaved("cardio");
                     setTimeout(() => setSaved(null), 1500);
                   }}
@@ -400,6 +415,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                     if (!(m > 0)) return;
                     setSaving("sun"); haptic("light");
                     await sun.logEntry({ duration_min: m, with_sunscreen: sunSunscreen });
+                    flashAlignment("sun");
                     setSunDuration(""); setSunSunscreen(false); setSaving(null); setSaved("sun");
                     setTimeout(() => setSaved(null), 1500);
                   }}
@@ -460,6 +476,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                     if (!(m > 0)) return;
                     setSaving("focus"); haptic("light");
                     await focus.logEntry({ duration_min: m, project: focusProject.trim() || null });
+                    flashAlignment("focus");
                     setFocusDuration(""); setFocusProject(""); setSaving(null); setSaved("focus");
                     setTimeout(() => setSaved(null), 1500);
                   }}
@@ -489,6 +506,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                       setLibidoRating(n);
                       setSaving("libido"); haptic("light");
                       await libido.logEntry({ rating: n });
+                      flashAlignment("libido");
                       setSaving(null); setSaved("libido");
                       setTimeout(() => { setSaved(null); setLibidoRating(null); }, 1500);
                     }}
@@ -529,6 +547,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                   if (!socialContact.trim()) return;
                   setSaving("social"); haptic("light");
                   await social.logEntry({ contact_name: socialContact.trim(), kind: socialKind });
+                  flashAlignment("social");
                   setSocialContact(""); setSaving(null); setSaved("social");
                   setTimeout(() => setSaved(null), 1500);
                 }}
@@ -563,6 +582,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                     if (!(m > 0)) return;
                     setSaving("learning"); haptic("light");
                     await learning.logEntry({ kind: learnKind, source: learnSource.trim() || null, duration_min: m });
+                    flashAlignment("learning");
                     setLearnDuration(""); setLearnSource(""); setSaving(null); setSaved("learning");
                     setTimeout(() => setSaved(null), 1500);
                   }}
@@ -605,6 +625,7 @@ export default function LogSheet({ open, onClose }: { open: boolean; onClose: ()
                   if (aestheticRating == null) return;
                   setSaving("aesthetic"); haptic("light");
                   await aesthetic.logEntry({ angle: aestheticAngle, rating: aestheticRating, notes: aestheticNotes.trim() || null });
+                  flashAlignment("aesthetic");
                   setAestheticRating(null); setAestheticNotes(""); setSaving(null); setSaved("aesthetic");
                   setTimeout(() => setSaved(null), 1500);
                 }}
