@@ -164,6 +164,31 @@ button:not(.no-tap):not(:disabled):active {
   100% { transform: scale(1); }
 }
 
+/* Check-burst — used when toggling a schedule item / completing a goal.
+   Bigger spring than .anim-pop so it lands as a "moment". */
+@keyframes checkBurst {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0     rgba(16, 185, 129, 0.55); }
+  40%  { transform: scale(1.25); box-shadow: 0 0 0 14px  rgba(16, 185, 129, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0     rgba(16, 185, 129, 0); }
+}
+.anim-check-burst { animation: checkBurst 520ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Confetti — used by ConfettiBurst. Each piece tweens to its own
+   (--tx, --ty, --rot) via CSS variables set inline on the element. */
+@keyframes confettiBurst {
+  0%   { transform: translate(0, 0) rotate(0deg);                              opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot));        opacity: 0; }
+}
+.confetti-piece { animation: confettiBurst 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Gold pulse — PR moments on the trend line / 1RM card */
+@keyframes prFlash {
+  0%   { background-color: rgba(251, 191, 36, 0);    }
+  20%  { background-color: rgba(251, 191, 36, 0.35); }
+  100% { background-color: rgba(251, 191, 36, 0);    }
+}
+.anim-pr-flash { animation: prFlash 1.8s ease-out; }
+
 .anim-fade-up { animation: fadeInUp 400ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .anim-fade    { animation: fadeIn 300ms ease-out both; }
 .anim-scale   { animation: scaleIn 350ms cubic-bezier(0.22, 1, 0.36, 1) both; }

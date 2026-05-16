@@ -10,6 +10,9 @@ import RecoveryStrainCard from "@/components/fitness/RecoveryStrainCard";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 import { X, Zap } from "lucide-react";
 import { kgToLb, lbToKg, roundToPlate } from "@/lib/units";
+import { haptic } from "@/lib/feedback/haptics";
+import { pick } from "@/lib/feedback/phrases";
+import ConfettiBurst from "@/components/ui/ConfettiBurst";
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -64,12 +67,26 @@ export default function ProgressiveOverloadCoach() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExId, forcePR, verdict?.recoveryAdjustment?.applied]);
 
+  const [setBurst, setSetBurst] = useState(0);
+  const [isPr,     setIsPr]     = useState(false);
   async function handleLog() {
     setLogging(true);
-    // Store in DB as kg.
+    const newEst1rm = Math.round(lbToKg(weight) * (1 + reps / 30));
+    // PR check: bigger than every prior session's top est_1rm for this exercise.
+    const prevBest = pastSessions.reduce((m, s) => Math.max(m, s.topEst1rm), 0);
+    const pr = newEst1rm > prevBest && prevBest > 0;
     await logSet(lbToKg(weight), reps);
     setLogging(false);
-    setFlash(`Set ${todaySets.length + 1} logged`);
+    setSetBurst((n) => n + 1);
+    if (pr) {
+      setIsPr(true);
+      haptic("milestone");
+      setFlash(`PR! ${kgToLb(newEst1rm).toFixed(0)} lb estimated 1RM`);
+      setTimeout(() => setIsPr(false), 1800);
+    } else {
+      haptic("success");
+      setFlash(pick("setLogged", { n: todaySets.length + 1 }));
+    }
     setTimeout(() => setFlash(null), 2500);
   }
 
@@ -410,14 +427,21 @@ export default function ProgressiveOverloadCoach() {
               </span>
             </div>
 
-            <button
-              onClick={handleLog}
-              disabled={logging || !activeGymId}
-              className="w-full py-3.5 bg-white hover:bg-zinc-100 disabled:bg-zinc-800 rounded-xl text-sm font-bold text-zinc-900 disabled:text-zinc-600 transition-colors"
-            >
-              {logging ? "Logging…" : `Log Set ${todaySets.length + 1}`}
-            </button>
-            {flash && <p className="text-xs text-green-400 text-center mt-2">{flash}</p>}
+            <div className="relative">
+              <button
+                onClick={handleLog}
+                disabled={logging || !activeGymId}
+                className={`w-full py-3.5 bg-white hover:bg-zinc-100 disabled:bg-zinc-800 rounded-xl text-sm font-bold text-zinc-900 disabled:text-zinc-600 transition-colors ${isPr ? "anim-pr-flash" : ""}`}
+              >
+                {logging ? "Logging…" : `Log Set ${todaySets.length + 1}`}
+              </button>
+              <ConfettiBurst trigger={setBurst} count={isPr ? 36 : 20} spread={isPr ? 140 : 90} />
+            </div>
+            {flash && (
+              <p className={`text-xs text-center mt-2 ${isPr ? "text-amber-300 font-semibold tracking-wide" : "text-green-400"}`}>
+                {flash}
+              </p>
+            )}
           </Card>
 
           {/* Trend */}

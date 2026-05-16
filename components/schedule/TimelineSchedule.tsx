@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { StackItem } from "@/hooks/useStack";
 import type { StackInsight } from "@/hooks/useStackInsights";
 import { AlertTriangle, X, Check } from "lucide-react";
 import { resolveItemStyle } from "@/lib/schedule/icons";
+import { haptic } from "@/lib/feedback/haptics";
+import ConfettiBurst from "@/components/ui/ConfettiBurst";
 
 // Schedule timeline — visual style matches the mockup:
 //   - Section header per bucket with emoji + clock range
@@ -80,9 +82,27 @@ function ItemRow({
   // with a check; otherwise it shows the item's own icon over a color tint.
   const { Icon, color } = resolveItemStyle(item);
 
+  // Burst trigger — incremented on every successful "now taken" toggle so the
+  // ConfettiBurst component re-fires. Also drives the .anim-check-burst spring
+  // on the circle itself.
+  const [burstTrigger, setBurstTrigger] = useState(0);
+  const burstAnimKey   = useRef(0);
+  function handleToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    const willBeTaken = !item.taken;
+    if (willBeTaken) {
+      setBurstTrigger((n) => n + 1);
+      burstAnimKey.current += 1;
+      haptic("success");
+    } else {
+      haptic("tap");
+    }
+    onToggle();
+  }
+
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${
+      className={`relative flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${
         item.taken
           ? "bg-emerald-500/5 border-emerald-500/15"
           : "bg-zinc-900/40 border-zinc-800/60"
@@ -90,9 +110,10 @@ function ItemRow({
     >
       {/* Big circle — item icon when undone, green check when done */}
       <button
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        onClick={handleToggle}
         aria-label={item.taken ? "Mark not done" : "Mark done"}
-        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all"
+        key={item.taken ? `taken-${burstAnimKey.current}` : "untaken"}
+        className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${item.taken ? "anim-check-burst" : ""}`}
         style={
           item.taken
             ? { background: "#10b981", border: "2px solid #10b981" }
@@ -103,6 +124,8 @@ function ItemRow({
           ? <Check size={16} strokeWidth={3} className="text-white" />
           : <Icon size={16} style={{ color }} />}
       </button>
+
+      <ConfettiBurst trigger={burstTrigger} count={14} spread={70} />
 
       {/* Title + subtitle (tap to edit) */}
       <button onClick={onEdit} className="flex-1 min-w-0 text-left" aria-label="Edit item">
