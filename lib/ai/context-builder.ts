@@ -137,7 +137,7 @@ export async function buildContext(userId: string) {
     supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
     supabase.from("businesses").select("id, name, status, category, monthly_revenue, customer_count, next_action").eq("user_id", userId).is("archived_at", null),
     supabase.from("business_revenue_log").select("business_id, amount, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(90)).order("log_date", { ascending: true }),
-    supabase.from("business_agents").select("id, business_id, agent_name, role_label, purpose, last_run_at").eq("user_id", userId),
+    supabase.from("business_agents").select("id, business_id, agent_name, role_label, purpose, last_run_at, schedule_kind, schedule_hour, schedule_dow, schedule_dom, next_run_at").eq("user_id", userId),
     // Per-business agent artifacts (migration 0029). Limit ~50 most recent
     // across all businesses — context-builder selects the latest per
     // business_agent_id when building the per-agent block below.
@@ -856,7 +856,7 @@ export async function buildContext(userId: string) {
     businesses: (() => {
       type Biz = { id: string; name: string; status: string; category: string | null; monthly_revenue: number; customer_count: number; next_action: string | null };
       type RevRow = { business_id: string; amount: number; log_date: string };
-      type AgentRow    = { id: string; business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null };
+      type AgentRow    = { id: string; business_id: string; agent_name: string | null; role_label: string; purpose: string | null; last_run_at: string | null; schedule_kind: string; schedule_hour: number | null; schedule_dow: number | null; schedule_dom: number | null; next_run_at: string | null };
       type ArtifactRow = { id: string; name: string; business_id: string | null; business_agent_id: string | null; created_at: string };
       type TaskRow     = { business_id: string; title: string; priority: -1 | 0 | 1; due_date: string | null };
       const bizRows      = (businessesRes.data ?? []) as Biz[];
@@ -892,6 +892,9 @@ export async function buildContext(userId: string) {
             purpose:    a.purpose,
             lastRunAt:  a.last_run_at,
             latestArtifact: latestArt ? { id: latestArt.id, name: latestArt.name, createdAt: latestArt.created_at } : null,
+            schedule: a.schedule_kind === "none"
+              ? null
+              : { kind: a.schedule_kind, hour: a.schedule_hour, dow: a.schedule_dow, dom: a.schedule_dom, nextRunAt: a.next_run_at },
           };
         });
         const myOpenTasks = taskRows

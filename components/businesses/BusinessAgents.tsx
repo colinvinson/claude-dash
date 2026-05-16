@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Trash2, Plus, X, Bot, FileText, ChevronDown, ChevronUp } from "lucide-react";
-import { FormInput, FormTextarea } from "@/components/ui/FormInput";
+import { Play, Trash2, Plus, X, Bot, FileText, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { FormInput, FormSelect, FormTextarea } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
 import Button from "@/components/ui/Button";
-import { useBusinessAgents } from "@/hooks/useBusinessAgents";
+import { useBusinessAgents, type BusinessAgent } from "@/hooks/useBusinessAgents";
 import { useBusinessAgentArtifacts, type BusinessArtifact } from "@/hooks/useBusinessAgentArtifacts";
 import type { Business } from "@/hooks/useBusinesses";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
+import { artifactTagInstructions, businessContextLine } from "@/lib/businesses/agent-prompts";
+import { describeSchedule, type ScheduleKind } from "@/lib/businesses/schedule";
 
 // Per-business agent workforce surface. Renders inside BusinessDetail.
 //
@@ -36,36 +38,18 @@ function openJarvis(prompt: string) {
   window.dispatchEvent(new CustomEvent("jarvis:open", { detail: { prompt } }));
 }
 
-function businessContextLine(b: Business): string {
-  const bits = [
-    `business "${b.name}"`,
-    `stage: ${b.status}`,
-  ];
-  if (b.monthly_revenue > 0) bits.push(`MRR: $${Math.round(b.monthly_revenue)}/mo`);
-  if (b.customer_count > 0)  bits.push(`${b.customer_count} customers`);
-  if (b.next_action)         bits.push(`next action: ${b.next_action}`);
-  return bits.join(" · ");
-}
-
 export default function BusinessAgents({ business }: { business: Business }) {
-  const { agents, assignAgent, removeAgent, markRun } = useBusinessAgents(business.id);
+  const { agents, assignAgent, removeAgent, markRun, setSchedule } = useBusinessAgents(business.id);
   const { latestByAgent } = useBusinessAgentArtifacts(business.id);
   const [adding, setAdding]         = useState(false);
   const [roleLabel, setRoleLabel]   = useState("");
   const [purpose, setPurpose]       = useState("");
   const [busy, setBusy]             = useState(false);
   const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(null);
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
 
   function resetForm() {
     setRoleLabel(""); setPurpose(""); setAdding(false);
-  }
-
-  // Standard footer appended to every business-agent prompt. Tells the
-  // agent (and Jarvis the dispatcher) to tag outputs with the business +
-  // role so they surface inline on BusinessDetail. Without this, artifacts
-  // land in the global jarvis_artifacts list with no link back.
-  function artifactTagInstructions(businessAgentId: string): string {
-    return ` When the agent produces an artifact via write_artifact, pass business_id="${business.id}" and business_agent_id="${businessAgentId}" so the output surfaces on this business.`;
   }
 
   async function deployNew() {
@@ -84,7 +68,7 @@ export default function BusinessAgents({ business }: { business: Business }) {
       `Define a new Claude Code agent named "${agentName}" for ${businessContextLine(business)}. Its role: ${roleLabel}.` +
       `${purpose ? ` Purpose: ${purpose}.` : ""}` +
       ` Pick the right tools + model for this kind of work, then dispatch it immediately on a first run grounded in the business context above.` +
-      artifactTagInstructions(row.id);
+      artifactTagInstructions(business.id, row.id);
     openJarvis(prompt);
     void markRun(row.id);
     resetForm();
@@ -96,7 +80,7 @@ export default function BusinessAgents({ business }: { business: Business }) {
       `Dispatch ${target} for ${businessContextLine(business)}. Role: ${roleLabel}.` +
       `${purpose ? ` Purpose: ${purpose}.` : ""}` +
       ` Run it now with the business context above as grounding. Return the session id when dispatched.` +
-      artifactTagInstructions(agentId);
+      artifactTagInstructions(business.id, agentId);
     openJarvis(prompt);
     void markRun(agentId);
   }
@@ -141,8 +125,21 @@ export default function BusinessAgents({ business }: { business: Business }) {
                       {a.agent_name ? <span className="text-zinc-500">{a.agent_name}</span> : <span className="italic">pending define</span>}
                       <span className="mx-1.5">·</span>
                       last run {timeSinceShort(a.last_run_at)}
+                      {a.schedule_kind !== "none" && (
+                        <>
+                          <span className="mx-1.5">·</span>
+                          <span style={{ color: PALETTE.info }}>{describeSchedule({ kind: a.schedule_kind, hour: a.schedule_hour ?? undefined, dow: a.schedule_dow ?? undefined, dom: a.schedule_dom ?? undefined })}</span>
+                        </>
+                      )}
                     </p>
                   </div>
+                  <button
+                    onClick={() => setSchedulingId(schedulingId === a.id ? null : a.id)}
+                    aria-label={`Schedule ${a.role_label}`}
+                    className="flex-shrink-0 text-zinc-500 hover:text-zinc-200 -m-2 p-2"
+                  >
+                    <Clock size={ICON.sm} style={{ color: a.schedule_kind !== "none" ? PALETTE.info : undefined }} />
+                  </button>
                   <button
                     onClick={() => runExisting(a.id, a.agent_name, a.role_label, a.purpose)}
                     aria-label={`Run ${a.role_label}`}
@@ -159,6 +156,15 @@ export default function BusinessAgents({ business }: { business: Business }) {
                     <Trash2 size={ICON.xs} />
                   </button>
                 </div>
+
+                {/* Inline schedule picker — toggles via the clock icon */}
+                {schedulingId === a.id && (
+                  <SchedulePicker
+                    agent={a}
+                    onSave={(kind, hour, dow, dom) => { void setSchedule(a.id, { kind, hour, dow, dom }); setSchedulingId(null); }}
+                    onClose={() => setSchedulingId(null)}
+                  />
+                )}
 
                 {/* Latest artifact preview — the workforce feedback loop.
                     Click expands the full content inline. */}
@@ -212,6 +218,77 @@ export default function BusinessAgents({ business }: { business: Business }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// Inline schedule picker — three kinds (daily / weekly / monthly) plus
+// hour. Cron route reads next_run_at and dispatches when due.
+function SchedulePicker({
+  agent, onSave, onClose,
+}: {
+  agent:   BusinessAgent;
+  onSave:  (kind: ScheduleKind, hour?: number, dow?: number, dom?: number) => void;
+  onClose: () => void;
+}) {
+  const [kind, setKind] = useState<ScheduleKind>(agent.schedule_kind);
+  const [hour, setHour] = useState<number>(agent.schedule_hour ?? 9);
+  const [dow,  setDow]  = useState<number>(agent.schedule_dow  ?? 1);
+  const [dom,  setDom]  = useState<number>(agent.schedule_dom  ?? 1);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => i);
+  const DAYS  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <div className="border-t border-zinc-800 px-3 py-3 bg-zinc-900/40 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <span className={TYPE.label}>Schedule</span>
+        <button onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-zinc-200 -m-2 p-2">
+          <X size={ICON.xs} />
+        </button>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {(["none", "daily", "weekly", "monthly"] as ScheduleKind[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={`py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-colors ${
+              kind === k ? "bg-white text-zinc-900" : "bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800"
+            }`}
+          >
+            {k === "none" ? "off" : k}
+          </button>
+        ))}
+      </div>
+      {kind !== "none" && (
+        <div className="flex gap-2">
+          {kind === "weekly" && (
+            <FormSelect value={String(dow)} onChange={(e) => setDow(parseInt(e.target.value, 10))} className="flex-1">
+              {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            </FormSelect>
+          )}
+          {kind === "monthly" && (
+            <FormSelect value={String(dom)} onChange={(e) => setDom(parseInt(e.target.value, 10))} className="flex-1">
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}{d === 1 ? "st" : d === 2 ? "nd" : d === 3 ? "rd" : "th"}</option>)}
+            </FormSelect>
+          )}
+          <FormSelect value={String(hour)} onChange={(e) => setHour(parseInt(e.target.value, 10))} className="flex-1">
+            {HOURS.map((h) => (
+              <option key={h} value={h}>
+                {h === 0 ? 12 : h > 12 ? h - 12 : h}{h < 12 ? "am" : "pm"}
+              </option>
+            ))}
+          </FormSelect>
+        </div>
+      )}
+      <Button
+        variant="primary"
+        size="sm"
+        fullWidth
+        onClick={() => onSave(kind, kind === "none" ? undefined : hour, kind === "weekly" ? dow : undefined, kind === "monthly" ? dom : undefined)}
+      >
+        Save schedule
+      </Button>
     </div>
   );
 }
