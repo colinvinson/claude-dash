@@ -5,68 +5,106 @@ import { useGoals } from "@/hooks/useGoals";
 import { useStack } from "@/hooks/useStack";
 import { useProtein } from "@/hooks/useProtein";
 import { useWorkout } from "@/hooks/useWorkout";
+import { useHealth } from "@/hooks/useHealth";
+import { useHealthBaselines } from "@/hooks/useHealthBaselines";
+import { useDailyContext } from "@/hooks/useDailyContext";
+import { computeDailyScore } from "@/lib/scoring";
 import Card from "@/components/ui/Card";
 import { Sparkles, Volume2 } from "lucide-react";
 import { haptic } from "@/lib/feedback/haptics";
 import { speak, cancelSpeech } from "@/lib/jarvis/voice";
 import ConfettiBurst from "@/components/ui/ConfettiBurst";
+import { PALETTE, TYPE } from "@/lib/design-tokens";
 
-// End-of-day wrap. Surfaces when:
-//   - everything is closed (goals 100% + schedule 100% + protein ≥100%), OR
-//   - clock is past 9pm.
-// Sir can dismiss it for the day. State persists in localStorage so it
-// doesn't re-pop on every refresh.
+// THE day-card. Replaces ScoreHeadline + ActivityRings + the old end-of-day
+// TodayWrap. Always-on summary surface:
+//   - Daily score (number + accent color)
+//   - Three closure rings (Goals / Stack / Fuel) inline
+//   - Headline that shifts through the day (morning vs. end-of-day)
+//   - Recap CTA (audible) when there's something worth recapping
+//   - "All three closed" confetti once per day
+//
+// Compact in the morning when nothing's done yet, rich at end of day.
+
+const COLOR_GOALS = PALETTE.success;
+const COLOR_STACK = PALETTE.info;
+const COLOR_FUEL  = "#fb7185"; // pink — distinct from success/info, not reused elsewhere
+
+function Ring({ radius, pct, color, stroke = 9 }: { radius: number; pct: number; color: string; stroke?: number }) {
+  const C = 2 * Math.PI * radius;
+  const dash = C * Math.max(0, Math.min(1, pct));
+  return (
+    <g>
+      <circle cx={70} cy={70} r={radius} fill="none" stroke={`${color}22`} strokeWidth={stroke} />
+      <circle
+        cx={70} cy={70} r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${C - dash}`}
+        strokeDashoffset={C / 4}
+        transform="rotate(-90 70 70)"
+        style={{ transition: "stroke-dasharray 900ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+      />
+    </g>
+  );
+}
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function TodayWrap() {
-  const { goals, streak } = useGoals();
+  const { goals } = useGoals();
   const { items: stack } = useStack();
   const { totalToday: pToday, target: pTarget } = useProtein();
   const { todaySets } = useWorkout();
+  const { health } = useHealth();
+  const { baselines } = useHealthBaselines();
+  const { hasCheckedIn } = useDailyContext();
 
+  const goalsTotal = goals.length;
   const goalsDone  = goals.filter((g) => g.is_complete).length;
+  const stackTotal = stack.length;
   const stackDone  = stack.filter((s) => s.taken).length;
-  const proteinPct = pTarget > 0 ? (pToday / pTarget) : 0;
+  const fuelPct    = pTarget > 0 ? pToday / pTarget : 0;
+
+  const pctGoals = goalsTotal > 0 ? goalsDone / goalsTotal : 0;
+  const pctStack = stackTotal > 0 ? stackDone / stackTotal : 0;
+  const pctFuel  = Math.min(1, fuelPct);
+  const allClosed = pctGoals >= 1 && pctStack >= 1 && pctFuel >= 1;
   const setsLogged = todaySets.length;
 
-  const allClosed = goals.length > 0 && goalsDone === goals.length &&
-                    stack.length > 0 && stackDone === stack.length &&
-                    proteinPct >= 1;
+  const supplementsTaken = stackDone; // alias for clarity in score call
+  const { score, accent, headline } = computeDailyScore({
+    goalsComplete:     goalsDone,
+    goalsTotal,
+    readinessScore:    health.readiness_score,
+    readinessBaseline: baselines.readiness_score ?? null,
+    workoutDoneToday:  setsLogged > 0,
+    supplementsTaken,
+    supplementsTotal:  stackTotal,
+    checkedIn:         hasCheckedIn,
+    proteinPct:        pTarget > 0 ? pToday / pTarget : null,
+    proteinTarget:     pTarget,
+  });
 
-  const hour = new Date().getHours();
-  const pastNine = hour >= 21;
-  const eligible = allClosed || pastNine;
-
-  const dismissKey = `wrapDismissed-${todayKey()}`;
-  const [dismissed, setDismissed] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setDismissed(window.localStorage.getItem(dismissKey) === "1");
-  }, [dismissKey]);
-
+  // Confetti + haptic on all-closed transition (once per day).
   const [burst, setBurst] = useState(0);
-  const [speaking, setSpeaking] = useState(false);
-  const [recapText, setRecapText] = useState<string | null>(null);
-
-  // Confetti once when wrap appears at the all-closed end of day.
   useEffect(() => {
-    if (eligible && !dismissed && allClosed) {
-      setBurst((n) => n + 1);
-      haptic("milestone");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligible, dismissed]);
-
-  function dismiss() {
+    if (!allClosed) return;
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(dismissKey, "1");
-    setDismissed(true);
-    cancelSpeech();
-  }
+    const k = "ringsClosedDay";
+    if (window.localStorage.getItem(k) === todayKey()) return;
+    window.localStorage.setItem(k, todayKey());
+    setBurst((n) => n + 1);
+    haptic("milestone");
+  }, [allClosed]);
 
+  // Audible recap state.
+  const [speaking, setSpeaking]     = useState(false);
+  const [recapText, setRecapText]   = useState<string | null>(null);
   async function speakRecap() {
     if (speaking) { cancelSpeech(); setSpeaking(false); return; }
     setSpeaking(true);
@@ -77,66 +115,81 @@ export default function TodayWrap() {
       const text = j.recap ?? "Day logged. Well done, sir.";
       setRecapText(text);
       speak(text, { onEnd: () => setSpeaking(false) });
-    } catch {
-      setSpeaking(false);
-    }
+    } catch { setSpeaking(false); }
   }
 
-  const headline = useMemo(() => {
-    if (allClosed) return "Day closed. All three rings, all goals, all stack.";
-    if (proteinPct >= 1 && goalsDone === goals.length) return "Strong day — close out the stack to seal it.";
-    if (goalsDone === goals.length) return "Goals cleared. Stack and fuel still open.";
-    if (stackDone === stack.length) return "Stack done. Goals still open.";
-    return `${goalsDone}/${goals.length} goals · ${stackDone}/${stack.length} stack · ${Math.round(proteinPct * 100)}% protein.`;
-  }, [allClosed, goalsDone, goals.length, stackDone, stack.length, proteinPct]);
+  // Recap eligibility — late in the day OR all closed. No need to render the
+  // button before there's anything to recap.
+  const hour = new Date().getHours();
+  const recapEligible = allClosed || hour >= 18;
 
-  if (!eligible || dismissed) return null;
+  // Pull score accent → color mapping.
+  const scoreColor =
+    accent === "emerald" ? PALETTE.success :
+    accent === "amber"   ? PALETTE.celebration :
+    accent === "red"     ? PALETTE.danger :
+                           PALETTE.dim;
 
-  const accent = allClosed ? "#34d399" : "#fbbf24";
+  const wrapHeadline = useMemo(() => {
+    if (allClosed) return "All three rings closed. Sir owned the day.";
+    return headline;
+  }, [allClosed, headline]);
 
   return (
     <Card>
-      <div className="relative">
-        <ConfettiBurst trigger={burst} count={36} spread={160} />
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: accent }}>
-            — Today&apos;s wrap
-          </span>
-          <button
-            onClick={dismiss}
-            className="text-[10px] text-zinc-500 hover:text-zinc-300"
-          >
-            Dismiss
-          </button>
+      <div className="relative flex items-stretch gap-4">
+        <div className="relative flex-shrink-0">
+          <svg width={140} height={140} viewBox="0 0 140 140">
+            <Ring radius={55} pct={pctGoals} color={COLOR_GOALS} />
+            <Ring radius={44} pct={pctStack} color={COLOR_STACK} />
+            <Ring radius={33} pct={pctFuel}  color={COLOR_FUEL} />
+          </svg>
+          {/* Score number in the center of the rings — replaces the old ScoreHeadline card */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-3xl font-black tabular-nums" style={{ color: scoreColor }}>
+              {score}
+            </span>
+            <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0.5">score</span>
+          </div>
+          <ConfettiBurst trigger={burst} count={40} spread={150} />
         </div>
-        <h3 className="text-base font-bold text-zinc-50 mb-3 leading-snug">{headline}</h3>
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <Stat label="Streak"  value={`${streak}d`} accent={streak > 0 ? "text-amber-300" : "text-zinc-500"} />
-          <Stat label="Goals"   value={`${goalsDone}/${goals.length || 0}`} />
-          <Stat label="Stack"   value={`${stackDone}/${stack.length || 0}`} />
-          <Stat label="Sets"    value={`${setsLogged}`} />
+
+        <div className="flex-1 min-w-0 flex flex-col">
+          <span className={TYPE.label}>— Today</span>
+          <p className="text-sm font-semibold text-zinc-100 leading-snug mt-1 mb-3">{wrapHeadline}</p>
+
+          <RingRow label="Goals" color={COLOR_GOALS} value={`${goalsDone}/${goalsTotal || 0}`} pct={pctGoals} />
+          <RingRow label="Stack" color={COLOR_STACK} value={`${stackDone}/${stackTotal || 0}`} pct={pctStack} />
+          <RingRow label="Fuel"  color={COLOR_FUEL}  value={`${Math.round(pToday)}/${pTarget}g`} pct={pctFuel} />
         </div>
-        <button
-          onClick={speakRecap}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-zinc-100 text-zinc-900 text-sm font-bold hover:opacity-90 transition-opacity"
-        >
-          <Volume2 size={14} />
-          {speaking ? "Stop" : "Jarvis recap"}
-          <Sparkles size={12} className="opacity-60" />
-        </button>
-        {recapText && !speaking && (
-          <p className="text-[11px] text-zinc-500 mt-2 italic">&ldquo;{recapText}&rdquo;</p>
-        )}
       </div>
+
+      {recapEligible && (
+        <>
+          <button
+            onClick={speakRecap}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-bold hover:opacity-90 transition-opacity"
+          >
+            <Volume2 size={12} />
+            {speaking ? "Stop" : "Jarvis recap"}
+            <Sparkles size={11} className="opacity-60" />
+          </button>
+          {recapText && !speaking && (
+            <p className="text-[11px] text-zinc-500 mt-2 italic">&ldquo;{recapText}&rdquo;</p>
+          )}
+        </>
+      )}
     </Card>
   );
 }
 
-function Stat({ label, value, accent = "text-zinc-200" }: { label: string; value: string; accent?: string }) {
+function RingRow({ label, color, value, pct }: { label: string; color: string; value: string; pct: number }) {
   return (
-    <div className="text-center">
-      <p className="text-[9px] uppercase tracking-widest text-zinc-600">{label}</p>
-      <p className={`text-base font-bold tabular-nums ${accent}`}>{value}</p>
+    <div className="flex items-center gap-2 mb-1 last:mb-0">
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      <span className="text-[11px] text-zinc-400 w-10">{label}</span>
+      <span className="text-[11px] text-zinc-100 tabular-nums flex-1">{value}</span>
+      <span className="text-[10px] text-zinc-600 tabular-nums">{Math.round(pct * 100)}%</span>
     </div>
   );
 }

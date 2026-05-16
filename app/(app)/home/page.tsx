@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Card from "@/components/ui/Card";
 import { useGoals } from "@/hooks/useGoals";
 import { useHealth } from "@/hooks/useHealth";
 import { useStack } from "@/hooks/useStack";
@@ -10,27 +11,35 @@ import { useLog } from "@/hooks/useLog";
 import { useProtein } from "@/hooks/useProtein";
 import { useHealthBaselines } from "@/hooks/useHealthBaselines";
 import { computeDailyScore } from "@/lib/scoring";
-import Card from "@/components/ui/Card";
-import GoalTicker from "@/components/productivity/GoalTicker";
-import DayRing from "@/components/health/DayRing";
-import TodaysCall from "@/components/health/TodaysCall";
-import CheckInCard from "@/components/home/CheckInCard";
-import ScoreHeadline from "@/components/home/ScoreHeadline";
-import QuickStatsStrip from "@/components/home/QuickStatsStrip";
-import PriorityFocusCard from "@/components/home/PriorityFocusCard";
-import StreakAlert from "@/components/home/StreakAlert";
-import MorningBriefing from "@/components/home/MorningBriefing";
-import WeeklyReviewCard from "@/components/home/WeeklyReviewCard";
+
 import WelcomeCard from "@/components/home/WelcomeCard";
-import StreakCelebration from "@/components/home/StreakCelebration";
+import TodaysCall from "@/components/health/TodaysCall";
+import StreakAlert from "@/components/home/StreakAlert";
+import DayBrief from "@/components/home/DayBrief";
 import RightNowCard from "@/components/home/RightNowCard";
-import StreakForgivenessCard from "@/components/home/StreakForgivenessCard";
-import PushSubscriber from "@/components/home/PushSubscriber";
-import ActivityRings from "@/components/home/ActivityRings";
 import TodayWrap from "@/components/home/TodayWrap";
+import PriorityFocusCard from "@/components/home/PriorityFocusCard";
+import DayRing from "@/components/health/DayRing";
+import QuickStatsStrip from "@/components/home/QuickStatsStrip";
+import StreakCelebration from "@/components/home/StreakCelebration";
+import PushSubscriber from "@/components/home/PushSubscriber";
+
+// Home tab — consolidated cohesion pass.
+//
+// Render order (most cards conditional — typical day shows 6-7, not 16):
+//   1. WelcomeCard         — true first-time only
+//   2. TodaysCall          — red biometric severity only
+//   3. StreakAlert         — at-risk / paused-streak / late-day-prompt
+//   4. DayBrief            — plan input + Jarvis briefing (merged)
+//   5. RightNowCard        — ADHD one-action picker
+//   6. TodayWrap           — score + rings + recap (the day-card)
+//   7. PriorityFocusCard   — top 3 incomplete goals
+//   8. DayRing             — temporal phase
+//   9. QuickStatsStrip     — glance pill row
+//  10. PushSubscriber      — idempotent
 
 export default function HomePage() {
-  const { goals, streak, toggleGoal } = useGoals();
+  const { goals, toggleGoal } = useGoals();
   const { health } = useHealth();
   const { items: stackItems } = useStack();
   const { todaySets } = useWorkout();
@@ -41,10 +50,12 @@ export default function HomePage() {
 
   const supplementsTaken = stackItems.filter((s) => s.taken).length;
   const supplementsTotal = stackItems.length;
-  const goalsComplete = goals.filter((g) => g.is_complete).length;
+  const goalsComplete    = goals.filter((g) => g.is_complete).length;
   const workoutDoneToday = todaySets.length > 0;
 
-  const { score, accent, headline } = computeDailyScore({
+  // Score is computed in TodayWrap now. We still derive accent here for the
+  // body-data attribute that drives the radial wash color.
+  const { accent } = computeDailyScore({
     goalsComplete,
     goalsTotal: goals.length,
     readinessScore: health.readiness_score,
@@ -57,112 +68,53 @@ export default function HomePage() {
     proteinTarget: proteinTarget,
   });
 
-  // Sync score accent to body for radial wash color shift
+  // Body data attr for the global radial wash background color.
   useEffect(() => {
-    if (accent !== "amber") {
-      document.body.dataset.score = accent;
-    } else {
-      delete document.body.dataset.score;
-    }
+    if (accent !== "amber") document.body.dataset.score = accent;
+    else delete document.body.dataset.score;
     return () => { delete document.body.dataset.score; };
   }, [accent]);
 
-  // Surprise PB detector — fires once on mount. The server endpoint
-  // deduplicates per-day so a refresh doesn't spam new insights. Result
-  // surfaces via the existing jarvis_insights banner.
+  // Surprise PB detector — server-side dedup means firing every mount is safe.
   useEffect(() => {
     void fetch("/api/jarvis/pb-insights", { method: "POST" }).catch(() => {});
   }, []);
 
-  // Streak at risk: after 8pm, streak > 2, zero goals done
-  const now = new Date();
-  const streakAtRisk = now.getHours() >= 20 && streak > 2 && goalsComplete === 0;
-
-  // Quick stats pills
+  // QuickStatsStrip data — passive pill row of "things logged today."
   const pills = [
     {
       label: "Supps",
       value: supplementsTotal > 0 ? `${supplementsTaken}/${supplementsTotal}` : "—",
-      color: supplementsTaken === supplementsTotal && supplementsTotal > 0 ? "#34d399" : undefined,
+      color: supplementsTaken === supplementsTotal && supplementsTotal > 0 ? "#10b981" : undefined,
     },
-    {
-      label: "Water",
-      value: logState.water > 0 ? `${logState.water} glasses` : "0",
-    },
-    {
-      label: "Mood",
-      value: logState.mood ? ["😞","😐","🙂","😊","🤩"][logState.mood - 1] : "—",
-    },
-    {
-      label: "Gym",
-      value: workoutDoneToday ? "Trained ✓" : "Rest",
-      color: workoutDoneToday ? "#34d399" : undefined,
-    },
-    {
-      label: "Protein",
-      value: `${Math.round(proteinToday)}/${proteinTarget}g`,
-      color: proteinPct >= 80 ? "#34d399" : proteinPct >= 50 ? "#fbbf24" : undefined,
-    },
+    { label: "Water", value: logState.water > 0 ? `${logState.water} glasses` : "0" },
+    { label: "Mood",  value: logState.mood ? ["😞","😐","🙂","😊","🤩"][logState.mood - 1] : "—" },
+    { label: "Gym",   value: workoutDoneToday ? "Trained ✓" : "Rest", color: workoutDoneToday ? "#10b981" : undefined },
+    { label: "Protein", value: `${Math.round(proteinToday)}/${proteinTarget}g`, color: proteinPct >= 80 ? "#10b981" : proteinPct >= 50 ? "#f59e0b" : undefined },
   ];
 
   return (
     <>
       <StreakCelebration />
+
       <div className="anim-fade-up"><WelcomeCard /></div>
 
-      {/* ADHD-optimized "Right Now" widget — one action, one tap. Sits ABOVE
-          everything else so decision fatigue is killed before it starts. */}
-      <div className="anim-fade-up"><RightNowCard /></div>
-      <div className="anim-fade-up"><StreakForgivenessCard /></div>
-      <div className="anim-fade-up"><PushSubscriber /></div>
-
-      <div className="anim-fade-up stagger-1"><MorningBriefing /></div>
-      <div className="anim-fade-up stagger-2"><WeeklyReviewCard /></div>
-
-      {!hasCheckedIn && <div className="anim-fade-up stagger-2"><CheckInCard /></div>}
-      {streakAtRisk && <div className="anim-fade-up stagger-2"><StreakAlert streak={streak} /></div>}
-
-      <div className="anim-fade-up stagger-2">
-        <ActivityRings />
-      </div>
-
-      <div className="anim-fade-up stagger-2">
-        <TodayWrap />
-      </div>
-
-      <div className="anim-fade-up stagger-3">
-        <ScoreHeadline score={score} accent={accent} headline={headline} />
-      </div>
-
-      <div className="anim-fade-up stagger-3">
-        <GoalTicker />
-      </div>
-
-      <div className="anim-fade-up stagger-4">
-        <QuickStatsStrip pills={pills} />
-      </div>
-
-      <div className="anim-fade-up stagger-5">
-        <PriorityFocusCard
-          goals={goals}
-          totalGoals={goals.length}
-          onToggle={toggleGoal}
-        />
-      </div>
-
-      <div className="anim-fade-up stagger-6">
-        <Card><DayRing /></Card>
-      </div>
-
       {health.todays_call_severity === "red" && health.todays_call_body && (
-        <div className="anim-fade-up stagger-7">
-          <TodaysCall
-            severity={health.todays_call_severity}
-            headline={health.todays_call_body}
-            bullets={[]}
-          />
+        <div className="anim-fade-up">
+          <TodaysCall severity={health.todays_call_severity} headline={health.todays_call_body} bullets={[]} />
         </div>
       )}
+
+      <div className="anim-fade-up"><StreakAlert /></div>
+      <div className="anim-fade-up"><DayBrief /></div>
+      <div className="anim-fade-up stagger-1"><RightNowCard /></div>
+      <div className="anim-fade-up stagger-2"><TodayWrap /></div>
+      <div className="anim-fade-up stagger-3">
+        <PriorityFocusCard goals={goals} totalGoals={goals.length} onToggle={toggleGoal} />
+      </div>
+      <div className="anim-fade-up stagger-4"><Card><DayRing /></Card></div>
+      <div className="anim-fade-up stagger-5"><QuickStatsStrip pills={pills} /></div>
+      <div className="anim-fade-up stagger-6"><PushSubscriber /></div>
     </>
   );
 }
