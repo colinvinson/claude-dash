@@ -57,9 +57,24 @@ type DispatchRow = {
 
 type CmdResult = { stdout: string; stderr: string; code: number };
 
+// Build the env passed to `claude`. We deliberately strip
+// ANTHROPIC_API_KEY (and a few alternate names) so the CLI falls back
+// to Sir's OAuth session — which draws on his Claude Max subscription
+// instead of pay-as-you-go API tokens. Without this, dotenv would have
+// loaded the dashboard's API key into process.env and the spawned
+// `claude` would happily bill against it. Prereq: `claude login` must
+// have been run once on this machine.
+function claudeChildEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+  delete env.ANTHROPIC_AUTH_TOKEN;
+  delete env.CLAUDE_API_KEY;
+  return env;
+}
+
 function execClaude(args: string[]): Promise<CmdResult> {
   return new Promise((resolve) => {
-    const proc = spawn(CLAUDE_BIN, args, { cwd: REPO_ROOT });
+    const proc = spawn(CLAUDE_BIN, args, { cwd: REPO_ROOT, env: claudeChildEnv() });
     let stdout = "", stderr = "";
     proc.stdout.on("data", (d) => { stdout += d.toString(); });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
@@ -182,6 +197,7 @@ async function main() {
   console.log(`[jarvis-bridge]   repo:  ${REPO_ROOT}`);
   console.log(`[jarvis-bridge]   claude:${CLAUDE_BIN}`);
   console.log(`[jarvis-bridge]   sup:   ${SUPABASE_URL}`);
+  console.log(`[jarvis-bridge]   auth:  ${process.env.ANTHROPIC_API_KEY ? "stripping ANTHROPIC_API_KEY before spawn → claude will use Max OAuth" : "no API key in env → claude will use Max OAuth"}`);
 
   // Drain any pending rows that were inserted before we connected.
   const { data: pending } = await supabase
