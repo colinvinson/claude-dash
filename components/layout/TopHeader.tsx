@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Settings as SettingsIcon, Plus } from "lucide-react";
+import { Settings as SettingsIcon, Plus, Flame } from "lucide-react";
 import { useHealth } from "@/hooks/useHealth";
+import { useGoals } from "@/hooks/useGoals";
 import { val } from "@/lib/fmt";
 import LogSheet from "@/components/layout/LogSheet";
+import StreakMilestoneModal from "@/components/feedback/StreakMilestoneModal";
 
 export default function TopHeader() {
   const { health } = useHealth();
+  const { streak } = useGoals();
   const [logOpen, setLogOpen] = useState(false);
 
   const date = new Date();
@@ -43,10 +46,16 @@ export default function TopHeader() {
           {dayStr}&nbsp;&nbsp;{split.toUpperCase()} DAY
         </span>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Live</span>
-          </div>
+          {streak > 0 && (
+            <div
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md"
+              style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)" }}
+              title={`${streak}-day streak — keep it`}
+            >
+              <Flame size={11} className="text-amber-400" />
+              <span className="text-[11px] font-bold text-amber-300 tabular-nums">{streak}</span>
+            </div>
+          )}
           <button
             onClick={() => setLogOpen(true)}
             aria-label="Log something"
@@ -59,6 +68,8 @@ export default function TopHeader() {
           </Link>
         </div>
       </div>
+
+      <StreakMilestoneModal streak={streak} />
 
       <div className="flex items-center gap-3 pb-2 overflow-x-auto">
         <Stat label="SLEEP"     value={val(health.sleep_score, "%")} />
