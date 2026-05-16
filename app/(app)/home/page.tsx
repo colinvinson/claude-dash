@@ -26,6 +26,8 @@ import StreakCelebration from "@/components/home/StreakCelebration";
 import RightNowCard from "@/components/home/RightNowCard";
 import StreakForgivenessCard from "@/components/home/StreakForgivenessCard";
 import PushSubscriber from "@/components/home/PushSubscriber";
+import ActivityRings from "@/components/home/ActivityRings";
+import TodayWrap from "@/components/home/TodayWrap";
 
 export default function HomePage() {
   const { goals, streak, toggleGoal } = useGoals();
@@ -64,6 +66,13 @@ export default function HomePage() {
     }
     return () => { delete document.body.dataset.score; };
   }, [accent]);
+
+  // Surprise PB detector — fires once on mount. The server endpoint
+  // deduplicates per-day so a refresh doesn't spam new insights. Result
+  // surfaces via the existing jarvis_insights banner.
+  useEffect(() => {
+    void fetch("/api/jarvis/pb-insights", { method: "POST" }).catch(() => {});
+  }, []);
 
   // Streak at risk: after 8pm, streak > 2, zero goals done
   const now = new Date();
@@ -112,6 +121,14 @@ export default function HomePage() {
 
       {!hasCheckedIn && <div className="anim-fade-up stagger-2"><CheckInCard /></div>}
       {streakAtRisk && <div className="anim-fade-up stagger-2"><StreakAlert streak={streak} /></div>}
+
+      <div className="anim-fade-up stagger-2">
+        <ActivityRings />
+      </div>
+
+      <div className="anim-fade-up stagger-2">
+        <TodayWrap />
+      </div>
 
       <div className="anim-fade-up stagger-3">
         <ScoreHeadline score={score} accent={accent} headline={headline} />
