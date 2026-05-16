@@ -78,34 +78,50 @@ export default function DayBrief() {
               <span className="ml-auto text-[10px] text-zinc-600 truncate max-w-[65%]">{context.raw_text}</span>
             )}
           </div>
-          {planExpanded && context?.raw_text && (
-            <p className="text-sm text-zinc-300 leading-relaxed mt-2 whitespace-pre-line">{context.raw_text}</p>
-          )}
+          {/* Smooth height expand using the grid-template-rows trick.
+              0fr → 1fr animates cleanly via CSS; no height calc needed. */}
+          <div
+            className="grid transition-all duration-300 ease-out"
+            style={{ gridTemplateRows: planExpanded ? "1fr" : "0fr" }}
+          >
+            <div className="overflow-hidden">
+              {context?.raw_text && (
+                <p className="text-sm text-zinc-300 leading-relaxed mt-2 whitespace-pre-line">{context.raw_text}</p>
+              )}
+            </div>
+          </div>
         </button>
       )}
 
-      {/* — JARVIS'S BRIEFING — */}
-      {showBriefing && (
-        <div
-          className="relative rounded-xl mt-3 p-3"
-          style={{ background: TINT.celebration, border: `1px solid ${BORDER.celebration}` }}
-        >
-          <button
-            onClick={() => setBriefingDismissed(true)}
-            className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-200 transition-colors"
-            aria-label="Dismiss briefing"
-          >
-            <X size={12} />
-          </button>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Sun size={11} style={{ color: PALETTE.celebration }} />
-            <span className={`${TYPE.label}`} style={{ color: PALETTE.celebration }}>
-              Jarvis&apos;s read
-            </span>
-          </div>
-          <p className="text-xs text-zinc-200 leading-relaxed whitespace-pre-line">{briefingBody}</p>
+      {/* — JARVIS'S BRIEFING — same grid-rows trick for smooth dismiss */}
+      <div
+        className="grid transition-all duration-300 ease-out"
+        style={{ gridTemplateRows: showBriefing ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          {hasCheckedIn && briefingBody && (
+            <div
+              className="relative rounded-xl mt-3 p-3"
+              style={{ background: TINT.celebration, border: `1px solid ${BORDER.celebration}` }}
+            >
+              <button
+                onClick={() => setBriefingDismissed(true)}
+                className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-200 transition-colors"
+                aria-label="Dismiss briefing"
+              >
+                <X size={12} />
+              </button>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Sun size={11} style={{ color: PALETTE.celebration }} />
+                <span className={`${TYPE.label}`} style={{ color: PALETTE.celebration }}>
+                  Jarvis&apos;s read
+                </span>
+              </div>
+              <p className="text-xs text-zinc-200 leading-relaxed whitespace-pre-line">{briefingBody}</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </Card>
   );
 }

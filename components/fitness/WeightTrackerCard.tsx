@@ -72,6 +72,24 @@ export default function WeightTrackerCard() {
     delta7Lb < -0.25 ? "text-sky-400" :
                        "text-zinc-400";
 
+  // Loading skeleton — keeps card chrome stable, dims numbers + sparkline.
+  if (loading) {
+    return (
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500">— Body Weight</span>
+          <span className="text-[10px] text-zinc-700 tabular-nums">—</span>
+        </div>
+        <div className="flex items-baseline gap-3 mb-3">
+          <span className="text-4xl font-bold tabular-nums text-zinc-700">—</span>
+          <span className="text-base text-zinc-700">lb</span>
+        </div>
+        <div className="h-8 rounded mb-3" style={{ background: "rgba(255,255,255,0.03)" }} />
+        <div className="h-9 rounded" style={{ background: "rgba(255,255,255,0.03)" }} />
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="flex items-center justify-between mb-3">

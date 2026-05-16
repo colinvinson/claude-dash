@@ -41,14 +41,14 @@ export default function TopHeader() {
         paddingTop: "env(safe-area-inset-top)",
       }}
     >
-      <div className="flex items-center justify-between py-2">
+      <div className="flex items-center justify-between py-2.5">
         <span className="text-[11px] font-semibold tracking-[0.18em] text-zinc-300 uppercase">
           {dayStr}&nbsp;&nbsp;{split.toUpperCase()} DAY
         </span>
         <div className="flex items-center gap-3">
           {streak > 0 && (
             <div
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md"
+              className="flex items-center gap-1 px-2 py-1 rounded-md"
               style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)" }}
               title={`${streak}-day streak — keep it`}
             >
@@ -59,19 +59,19 @@ export default function TopHeader() {
           <button
             onClick={() => setLogOpen(true)}
             aria-label="Log something"
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-zinc-900 hover:opacity-90 transition-opacity"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-zinc-900 hover:opacity-90 transition-opacity"
           >
             <Plus size={14} strokeWidth={3} />
           </button>
           <Link href="/settings" className="text-zinc-500 hover:text-zinc-200 transition-colors">
-            <SettingsIcon size={14} />
+            <SettingsIcon size={16} />
           </Link>
         </div>
       </div>
 
       <StreakMilestoneModal streak={streak} />
 
-      <div className="flex items-center gap-3 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-3 pb-2.5 overflow-x-auto">
         <Stat label="SLEEP"     value={val(health.sleep_score, "%")} />
         <div className="w-px h-3 bg-zinc-700" />
         <Stat label="READINESS" value={val(health.readiness_score)} className={readinessColor} />

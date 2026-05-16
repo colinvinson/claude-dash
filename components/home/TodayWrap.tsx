@@ -56,13 +56,15 @@ function todayKey() {
 }
 
 export default function TodayWrap() {
-  const { goals } = useGoals();
-  const { items: stack } = useStack();
-  const { totalToday: pToday, target: pTarget } = useProtein();
+  const { goals, loading: goalsLoading } = useGoals();
+  const { items: stack, loading: stackLoading } = useStack();
+  const { totalToday: pToday, target: pTarget, loading: proteinLoading } = useProtein();
   const { todaySets } = useWorkout();
   const { health } = useHealth();
   const { baselines } = useHealthBaselines();
   const { hasCheckedIn } = useDailyContext();
+
+  const isLoading = goalsLoading || stackLoading || proteinLoading;
 
   const goalsTotal = goals.length;
   const goalsDone  = goals.filter((g) => g.is_complete).length;
@@ -164,6 +166,35 @@ export default function TodayWrap() {
     if (allClosed) return "All three rings closed. Sir owned the day.";
     return headline;
   }, [allClosed, headline]);
+
+  // Loading skeleton — keeps the card structure stable (no flash of empty,
+  // no layout jump when data arrives). Dim placeholder rings + "—" score.
+  if (isLoading) {
+    return (
+      <Card>
+        <div className="flex items-stretch gap-4">
+          <div className="relative flex-shrink-0">
+            <svg width={140} height={140} viewBox="0 0 140 140">
+              <circle cx={70} cy={70} r={55} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
+              <circle cx={70} cy={70} r={44} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
+              <circle cx={70} cy={70} r={33} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-black tabular-nums text-zinc-700">—</span>
+              <span className="text-[9px] uppercase tracking-widest text-zinc-700 mt-0.5">score</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className={TYPE.label}>— Today</span>
+            <div className="h-3 rounded mt-2 mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="h-2 rounded mb-1.5 w-2/3" style={{ background: "rgba(255,255,255,0.03)" }} />
+            <div className="h-2 rounded mb-1.5 w-1/2" style={{ background: "rgba(255,255,255,0.03)" }} />
+            <div className="h-2 rounded w-3/5" style={{ background: "rgba(255,255,255,0.03)" }} />
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card>
