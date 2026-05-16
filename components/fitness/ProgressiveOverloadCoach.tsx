@@ -13,6 +13,8 @@ import { kgToLb, lbToKg, roundToPlate } from "@/lib/units";
 import { haptic } from "@/lib/feedback/haptics";
 import { pick } from "@/lib/feedback/phrases";
 import ConfettiBurst from "@/components/ui/ConfettiBurst";
+import RestTimer from "@/components/fitness/RestTimer";
+import { recommendRest, formatRest } from "@/lib/fitness/rest-timer";
 
 const STATUS_STYLES: Record<CoachStatus, { pill: string; border: string; glow: string; label: string }> = {
   NEW:        { pill: "bg-zinc-800 text-zinc-300 border border-zinc-700",          border: "border-zinc-700",       glow: "",                             label: "NEW"        },
@@ -38,7 +40,7 @@ export default function ProgressiveOverloadCoach() {
     activeDay,   setActiveDay,
     activeExId,  setActiveExId,
     activeExercise, verdict, logSet, deleteSet,
-    muscleStatus,
+    muscleStatus, recovery, mesoState,
   } = useWorkout();
 
   // weight is in POUNDS for input + display. Convert to kg only at logSet time.
@@ -69,6 +71,14 @@ export default function ProgressiveOverloadCoach() {
 
   const [setBurst, setSetBurst] = useState(0);
   const [isPr,     setIsPr]     = useState(false);
+
+  // Rest-timer state — auto-arms after each set log. `restOpenKey` increments
+  // to re-open the RestTimer; the timer reads `restSeconds` + `restHint` from
+  // whatever was set just before the bump.
+  const [restOpenKey, setRestOpenKey] = useState(0);
+  const [restSeconds, setRestSeconds] = useState(120);
+  const [restHint,    setRestHint]    = useState<string>("");
+
   async function handleLog() {
     setLogging(true);
     const newEst1rm = Math.round(lbToKg(weight) * (1 + reps / 30));
@@ -88,6 +98,28 @@ export default function ProgressiveOverloadCoach() {
       setFlash(pick("setLogged", { n: todaySets.length + 1 }));
     }
     setTimeout(() => setFlash(null), 2500);
+
+    // Auto-start the rest timer with an adaptive target derived from the
+    // just-completed set's prescription.
+    if (activeExercise) {
+      const exType = activeExercise.exercise_type ?? "Secondary";
+      // The set we just completed corresponds to setProtocol[oldCount].
+      // todaySets hasn't repopulated yet — use length at call time.
+      const justCompletedIdx = todaySets.length;
+      const justCompleted = verdict?.setProtocol?.[justCompletedIdx];
+      const rec = recommendRest({
+        exerciseType: exType,
+        justCompletedProtocol: justCompleted,
+        recoveryBand: recovery?.band ?? null,
+        isDeloadWeek: mesoState?.isDeloadWeek ?? false,
+      });
+      const reasons = rec.adjustments.length > 0
+        ? rec.adjustments.map((a) => `${a.delta >= 0 ? "+" : ""}${a.delta}s ${a.reason}`).join(" · ")
+        : `${exType.toLowerCase()} baseline`;
+      setRestSeconds(rec.seconds);
+      setRestHint(`${formatRest(rec.seconds)} — ${reasons}`);
+      setRestOpenKey((n) => n + 1);
+    }
   }
 
   if (loading) {
@@ -271,6 +303,15 @@ export default function ProgressiveOverloadCoach() {
                     : isFailure
                       ? "bg-red-500/15 text-red-300 border-red-500/30"
                       : "bg-zinc-800 text-zinc-400 border-zinc-700";
+                  // Per-set rest hint — same adaptive math as the auto-timer.
+                  // Only the LAST set skips the hint (no rest needed after).
+                  const isLastSet = p.setNum === verdict.setProtocol.length;
+                  const restRec = !isLastSet ? recommendRest({
+                    exerciseType: activeExercise?.exercise_type ?? "Secondary",
+                    justCompletedProtocol: p,
+                    recoveryBand: recovery?.band ?? null,
+                    isDeloadWeek: mesoState?.isDeloadWeek ?? false,
+                  }) : null;
                   return (
                     <div
                       key={p.setNum}
@@ -290,6 +331,9 @@ export default function ProgressiveOverloadCoach() {
                           </span>
                           {upNext && (
                             <span className="text-[9px] uppercase tracking-widest text-zinc-500">Up next</span>
+                          )}
+                          {restRec && (
+                            <span className="text-[10px] text-zinc-600 tabular-nums">· rest {formatRest(restRec.seconds)}</span>
                           )}
                         </div>
                         <p className="text-[11px] text-zinc-400 leading-snug">{p.note}</p>
@@ -442,6 +486,14 @@ export default function ProgressiveOverloadCoach() {
                 {flash}
               </p>
             )}
+
+            {/* Adaptive rest timer — auto-opens after each set log */}
+            <RestTimer
+              initialSeconds={restSeconds}
+              hint={restHint}
+              openKey={restOpenKey}
+              onClose={() => { /* timer closes itself */ }}
+            />
           </Card>
 
           {/* Trend */}
