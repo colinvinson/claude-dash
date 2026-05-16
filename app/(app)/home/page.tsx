@@ -23,6 +23,7 @@ import DayRing from "@/components/health/DayRing";
 import QuickStatsStrip from "@/components/home/QuickStatsStrip";
 import StreakCelebration from "@/components/home/StreakCelebration";
 import PushSubscriber from "@/components/home/PushSubscriber";
+import LongTermGoalsCard from "@/components/home/LongTermGoalsCard";
 
 // Home tab — consolidated cohesion pass.
 //
@@ -117,6 +118,11 @@ export default function HomePage() {
 
         {/* HERO — score + 3 rings + recap */}
         <div className="col-span-2 anim-fade-up stagger-1"><TodayWrap /></div>
+
+        {/* Long-term goals — the dashboard's reason for existing.
+            Surfaces star-flagged "focus" goals (up to 3) so they're
+            visible from Home, not buried in /goals. */}
+        <div className="col-span-2 anim-fade-up stagger-1"><LongTermGoalsCard /></div>
 
         {/* Primary CTA — full width */}
         <div className="col-span-2 anim-fade-up stagger-2"><RightNowCard /></div>

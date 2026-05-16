@@ -58,6 +58,7 @@ export async function buildContext(userId: string) {
     recentArtifactsRes, recentMessagesRes,
     weight21dRes, protein21dRes,
     activeMesoRes,
+    goalMetricsRes, goalMilestonesRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -72,7 +73,7 @@ export async function buildContext(userId: string) {
     supabase.from("faith_logs").select("prayed, bible_min, church_attended").eq("user_id", userId).eq("log_date", today).single(),
     supabase.from("mood_logs").select("score").eq("user_id", userId).eq("log_date", today).order("logged_at", { ascending: false }).limit(1),
     supabase.from("journal_entries").select("content, ai_summary").eq("user_id", userId).order("created_at", { ascending: false }).limit(3),
-    supabase.from("long_term_goals").select("title, category, ai_action_plan").eq("user_id", userId).eq("is_active", true).limit(10),
+    supabase.from("long_term_goals").select("id, title, category, ai_action_plan, bucket, goal_type, target_value, starting_value, metric_unit, target_date, current_state, next_steps, is_focus, ai_summary").eq("user_id", userId).eq("is_active", true).limit(10),
     // Trend + correlation data
     supabase.from("health_logs").select("date, readiness_score, hrv, sleep_hours, deep_min").eq("user_id", userId).gte("date", dateDaysAgo(7)).order("date", { ascending: true }),
     supabase.from("supplement_logs").select("supplement_id, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
@@ -103,6 +104,12 @@ export async function buildContext(userId: string) {
     // Active mesocycle — drives whether Sir should be pushing for PRs or
     // deloading this week.
     supabase.from("mesocycles").select("id, user_id, start_date, planned_weeks, muscle_priorities, notes, ended_at, created_at").eq("user_id", userId).is("ended_at", null).order("start_date", { ascending: false }).limit(1).maybeSingle(),
+    // Last 90d of goal metric logs — Jarvis can spot trends + project
+    // arrival at target.
+    supabase.from("goal_metrics").select("goal_id, value, logged_at").eq("user_id", userId).gte("logged_at", `${dateDaysAgo(90)}T00:00:00`).order("logged_at", { ascending: true }),
+    // Open + completed milestones — gives Jarvis a structured view of
+    // progress toward each long-term goal.
+    supabase.from("goal_milestones").select("goal_id, title, target_date, is_complete, completed_at, target_value").eq("user_id", userId),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -662,7 +669,75 @@ export async function buildContext(userId: string) {
       .reverse()
       .map((m) => ({ role: m.role, content: m.content.length > 400 ? m.content.slice(0, 400) + "…" : m.content })),
     journal:       (journalRes.data ?? []) as Array<{ content: string; ai_summary: string | null }>,
-    longTermGoals: (ltGoalsRes.data ?? []) as Array<{ title: string; category: string; ai_action_plan: string | null }>,
+    longTermGoals: (() => {
+      type GoalRow = {
+        id: string; title: string; category: string | null; ai_action_plan: string | null;
+        bucket: string; goal_type: string; target_value: number | null; starting_value: number | null;
+        metric_unit: string | null; target_date: string | null; current_state: string | null;
+        next_steps: string | null; is_focus: boolean; ai_summary: string | null;
+      };
+      type MetricRow = { goal_id: string; value: number; logged_at: string };
+      type MilestoneRow = { goal_id: string; title: string; target_date: string | null; is_complete: boolean; completed_at: string | null; target_value: number | null };
+
+      const allGoals     = (ltGoalsRes.data ?? []) as GoalRow[];
+      const allMetrics   = (goalMetricsRes.data ?? []) as MetricRow[];
+      const allMilestones = (goalMilestonesRes.data ?? []) as MilestoneRow[];
+
+      return allGoals.map((g) => {
+        const goalMetrics = allMetrics.filter((m) => m.goal_id === g.id);
+        const latest      = goalMetrics.length > 0 ? goalMetrics[goalMetrics.length - 1].value : null;
+        // Rate-per-week via simple linear regression on the metric log.
+        let ratePerWeek = 0;
+        if (goalMetrics.length >= 2) {
+          const t0 = new Date(goalMetrics[0].logged_at).getTime();
+          const xs = goalMetrics.map((m) => (new Date(m.logged_at).getTime() - t0) / 86400000);
+          const ys = goalMetrics.map((m) => m.value);
+          const n = xs.length;
+          const sX  = xs.reduce((a, b) => a + b, 0);
+          const sY  = ys.reduce((a, b) => a + b, 0);
+          const sXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0);
+          const sXX = xs.reduce((acc, x) => acc + x * x, 0);
+          const denom = n * sXX - sX * sX;
+          ratePerWeek = denom === 0 ? 0 : ((n * sXY - sX * sY) / denom) * 7;
+        }
+        // Days to target — straight-line projection from latest at current rate.
+        let daysToTarget: number | null = null;
+        if (g.goal_type === "quantitative" && g.target_value != null && latest != null && Math.abs(ratePerWeek) > 0.0001) {
+          const delta = g.target_value - latest;
+          if (Math.sign(delta) === Math.sign(ratePerWeek)) {
+            daysToTarget = Math.round((delta / ratePerWeek) * 7);
+          }
+        }
+        const goalMilestones = allMilestones.filter((m) => m.goal_id === g.id);
+        const open  = goalMilestones.filter((m) => !m.is_complete).sort((a, b) => (a.target_date ?? "9999").localeCompare(b.target_date ?? "9999"));
+        const done  = goalMilestones.filter((m) => m.is_complete).length;
+        const next  = open[0] ?? null;
+        return {
+          title:          g.title,
+          bucket:         g.bucket,
+          type:           g.goal_type,
+          category:       g.category,
+          targetDate:     g.target_date,
+          isFocus:        g.is_focus,
+          currentState:   g.current_state,
+          nextSteps:      g.next_steps,
+          aiPlan:         g.ai_action_plan,
+          aiSummary:      g.ai_summary,
+          // Quantitative-only — null otherwise
+          currentValue:   g.goal_type === "quantitative" ? latest : null,
+          targetValue:    g.goal_type === "quantitative" ? g.target_value : null,
+          startingValue:  g.goal_type === "quantitative" ? g.starting_value : null,
+          metricUnit:     g.metric_unit,
+          ratePerWeek:    g.goal_type === "quantitative" ? Number(ratePerWeek.toFixed(3)) : null,
+          daysToTarget,
+          milestones: {
+            total:    goalMilestones.length,
+            done,
+            nextOpen: next ? { title: next.title, target_date: next.target_date } : null,
+          },
+        };
+      });
+    })(),
     dailyScore,
     trends,
     correlations,

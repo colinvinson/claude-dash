@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
 import { useStack } from "@/hooks/useStack";
-import type { GoalBucket, LongTermGoal } from "@/hooks/useLongTermGoals";
+import type { GoalBucket, LongTermGoal, GoalType } from "@/hooks/useLongTermGoals";
 import { PALETTE, TINT, BORDER, TYPE } from "@/lib/design-tokens";
 
 type Suggestion = {
@@ -28,13 +28,24 @@ type Phase = "fork" | "manual" | "research-loading" | "research-review";
 type Props = {
   bucket: GoalBucket;
   onCreate: (args: {
-    title: string;
-    bucket: GoalBucket;
-    category?: string;
-    target_date?: string;
+    title:           string;
+    bucket:          GoalBucket;
+    category?:       string;
+    target_date?:    string;
+    goal_type?:      GoalType;
+    target_value?:   number | null;
+    starting_value?: number | null;
+    metric_unit?:    string | null;
   }) => Promise<LongTermGoal | null>;
   onUpdate: (id: string, patch: Partial<LongTermGoal>) => Promise<void>;
 };
+
+const GOAL_TYPES: Array<{ id: GoalType; label: string; desc: string }> = [
+  { id: "project",      label: "Project",      desc: "Ship a thing, build a thing. Tracked by milestones." },
+  { id: "quantitative", label: "Quantitative", desc: "A number to hit. T level, body fat %, MRR, etc." },
+  { id: "behavioral",   label: "Behavioral",   desc: "Stay consistent at a routine. Tracked by adherence." },
+  { id: "aesthetic",    label: "Aesthetic",    desc: "Look a way by a date. Tracked by milestones + photos." },
+];
 
 // Add-a-goal sheet with a two-path onboarding fork.
 //   "I know my protocol" → standard fields, save immediately.
@@ -50,6 +61,10 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
   const [title, setTitle]       = useState("");
   const [category, setCategory] = useState("");
   const [date, setDate]         = useState("");
+  const [goalType, setGoalType] = useState<GoalType>("project");
+  const [targetValue,   setTargetValue]   = useState("");
+  const [startingValue, setStartingValue] = useState("");
+  const [metricUnit,    setMetricUnit]    = useState("");
   const [busy, setBusy]         = useState(false);
   const [error, setError]       = useState<string | null>(null);
 
@@ -59,13 +74,28 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
 
   function reset() {
     setPhase("fork"); setTitle(""); setCategory(""); setDate("");
+    setGoalType("project"); setTargetValue(""); setStartingValue(""); setMetricUnit("");
     setDraft(null); setAccepted({}); setEditingPlan(""); setError(null);
+  }
+
+  // Build the create args including type-specific fields when relevant.
+  function buildCreateArgs() {
+    return {
+      title,
+      bucket,
+      category:       category.trim() || undefined,
+      target_date:    date || undefined,
+      goal_type:      goalType,
+      target_value:   goalType === "quantitative" && targetValue   ? parseFloat(targetValue)   : null,
+      starting_value: goalType === "quantitative" && startingValue ? parseFloat(startingValue) : null,
+      metric_unit:    goalType === "quantitative" ? metricUnit.trim() || null : null,
+    };
   }
 
   async function handleManualSave() {
     if (!title.trim()) return;
     setBusy(true);
-    await onCreate({ title, bucket, category: category.trim() || undefined, target_date: date || undefined });
+    await onCreate(buildCreateArgs());
     setBusy(false);
     reset();
   }
@@ -105,7 +135,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
 
   async function handleResearchSave() {
     setBusy(true);
-    const goal = await onCreate({ title, bucket, category: category.trim() || undefined, target_date: date || undefined });
+    const goal = await onCreate(buildCreateArgs());
     if (!goal) { setBusy(false); return; }
 
     // Save the plan + create accepted stack items linked to the new goal.
@@ -145,6 +175,62 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
               placeholder={bucket === "business" ? "e.g. Ship SaaS v1" : "e.g. Boost testosterone"}
             />
           </div>
+
+          {/* Goal type — drives how progress is computed + which fields show */}
+          <div>
+            <FormLabel>Type</FormLabel>
+            <div className="grid grid-cols-2 gap-1.5">
+              {GOAL_TYPES.map((t) => {
+                const on = goalType === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setGoalType(t.id)}
+                    className={`text-left px-2.5 py-2 rounded-lg border transition-colors ${
+                      on ? "border-zinc-500 bg-zinc-800/80"
+                         : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="text-[11px] font-semibold text-zinc-100">{t.label}</div>
+                    <div className="text-[10px] text-zinc-500 leading-snug">{t.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quantitative-only fields */}
+          {goalType === "quantitative" && (
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <FormLabel optional>Starting</FormLabel>
+                <FormInput
+                  type="number" inputMode="decimal" step="0.01"
+                  value={startingValue}
+                  onChange={(e) => setStartingValue(e.target.value)}
+                  placeholder="540"
+                />
+              </div>
+              <div>
+                <FormLabel>Target</FormLabel>
+                <FormInput
+                  type="number" inputMode="decimal" step="0.01"
+                  value={targetValue}
+                  onChange={(e) => setTargetValue(e.target.value)}
+                  placeholder="800"
+                />
+              </div>
+              <div>
+                <FormLabel optional>Unit</FormLabel>
+                <FormInput
+                  value={metricUnit}
+                  onChange={(e) => setMetricUnit(e.target.value)}
+                  placeholder="ng/dL"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <div className="flex-1">
               <FormLabel optional>Tag</FormLabel>
