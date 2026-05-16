@@ -55,6 +55,18 @@ export type DaySnapshot = {
   protein_g:         number | null;
   meal_score_avg:    number | null;
   meals_logged:      number | null;
+  // 9 new dimensions (migration 0024) — per-day aggregates feed the
+  // autonomous correlation engine. Missing here = invisible to Jarvis's
+  // 21-day pattern-discovery scan.
+  focus_min:         number | null;
+  social_count:      number | null;
+  cardio_min:        number | null;
+  libido_rating:     number | null;
+  aesthetic_rating:  number | null;
+  caffeine_mg:       number | null;
+  sun_min:           number | null;
+  learning_min:      number | null;
+  money_net:         number | null;
   // per-supplement booleans (dynamically added in buildDailySnapshot)
   [supKey: `supp_${string}`]: 0 | 1 | null | undefined;
 };
@@ -86,6 +98,7 @@ export async function buildDailySnapshot(
     healthRes, suppStackRes, suppLogsRes, medLogsRes,
     waterRes, meditRes, moodRes, alcRes, weightRes, faithRes,
     setsRes, goalsRes, proteinRes,
+    focusRes, socialRes, cardioRes, libidoRes, aestheticRes, caffeineRes, sunRes, learningRes, moneyRes,
   ] = await Promise.all([
     supabase.from("health_logs").select("*").eq("user_id", userId).gte("date", cutoff).order("date", { ascending: true }),
     supabase.from("supplement_stack").select("id, name").eq("user_id", userId).eq("is_active", true),
@@ -100,6 +113,16 @@ export async function buildDailySnapshot(
     supabase.from("workout_sets").select("weight_kg, reps, rpe, est_1rm, log_date, split_day").eq("user_id", userId).gte("log_date", cutoff),
     supabase.from("goals").select("is_complete, goal_date").eq("user_id", userId).gte("goal_date", cutoff),
     supabase.from("protein_logs").select("protein_g, ai_score, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    // 9 new dimensions — same time window, ready for per-day aggregation below.
+    supabase.from("focus_sessions").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("social_logs").select("kind, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("cardio_logs").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("libido_logs").select("rating, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("aesthetic_logs").select("rating, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("caffeine_logs").select("mg, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("sun_logs").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("learning_logs").select("duration_min, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    supabase.from("money_logs").select("amount, kind, log_date").eq("user_id", userId).gte("log_date", cutoff),
   ]);
 
   type HealthRow = Record<string, unknown> & { date: string };
@@ -186,6 +209,43 @@ export async function buildDailySnapshot(
     proteinByDate.set(p.log_date, e);
   }
 
+  // 9 new dimensions — per-day aggregates for the correlation engine.
+  const sumByDate = (rows: Array<Record<string, unknown> & { log_date: string }>, field: string) => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const v = Number(r[field]) || 0;
+      m.set(r.log_date, (m.get(r.log_date) ?? 0) + v);
+    }
+    return m;
+  };
+  const focusMinByDate    = sumByDate((focusRes.data ?? []) as Array<{ duration_min: number; log_date: string }>, "duration_min");
+  const cardioMinByDate   = sumByDate((cardioRes.data ?? []) as Array<{ duration_min: number; log_date: string }>, "duration_min");
+  const caffeineMgByDate  = sumByDate((caffeineRes.data ?? []) as Array<{ mg: number; log_date: string }>, "mg");
+  const sunMinByDate      = sumByDate((sunRes.data ?? []) as Array<{ duration_min: number; log_date: string }>, "duration_min");
+  const learningMinByDate = sumByDate((learningRes.data ?? []) as Array<{ duration_min: number; log_date: string }>, "duration_min");
+
+  const socialCountByDate = new Map<string, number>();
+  for (const r of ((socialRes.data ?? []) as Array<{ kind: string; log_date: string }>)) {
+    socialCountByDate.set(r.log_date, (socialCountByDate.get(r.log_date) ?? 0) + 1);
+  }
+
+  // Libido + aesthetic — latest rating that day (one entry typical, but be defensive)
+  const libidoByDate = new Map<string, number>();
+  for (const r of ((libidoRes.data ?? []) as Array<{ rating: number; log_date: string }>)) {
+    libidoByDate.set(r.log_date, r.rating); // last write wins, fine for daily snapshot
+  }
+  const aestheticByDate = new Map<string, number>();
+  for (const r of ((aestheticRes.data ?? []) as Array<{ rating: number | null; log_date: string }>)) {
+    if (r.rating != null) aestheticByDate.set(r.log_date, r.rating);
+  }
+
+  // Money net (income + business_revenue) - expenses + savings reads as positive contribution
+  const moneyNetByDate = new Map<string, number>();
+  for (const r of ((moneyRes.data ?? []) as Array<{ amount: number; kind: string; log_date: string }>)) {
+    const sign = (r.kind === "income" || r.kind === "business_revenue") ? 1 : (r.kind === "expense" ? -1 : 0);
+    moneyNetByDate.set(r.log_date, (moneyNetByDate.get(r.log_date) ?? 0) + sign * Number(r.amount));
+  }
+
   // Build rows
   const rows: DaySnapshot[] = listDates(daysBack).map((date) => {
     const h = healthByDate.get(date);
@@ -238,6 +298,16 @@ export async function buildDailySnapshot(
         ? Math.round(protein.scores.reduce((a, b) => a + b, 0) / protein.scores.length)
         : null,
       meals_logged:      protein ? protein.count : null,
+      // 9 new dimensions — daily aggregates
+      focus_min:         focusMinByDate.get(date)    ?? null,
+      social_count:      socialCountByDate.get(date) ?? null,
+      cardio_min:        cardioMinByDate.get(date)   ?? null,
+      libido_rating:     libidoByDate.get(date)      ?? null,
+      aesthetic_rating:  aestheticByDate.get(date)   ?? null,
+      caffeine_mg:       caffeineMgByDate.get(date)  ?? null,
+      sun_min:           sunMinByDate.get(date)      ?? null,
+      learning_min:      learningMinByDate.get(date) ?? null,
+      money_net:         moneyNetByDate.get(date)    ?? null,
     };
 
     // Per-supplement boolean

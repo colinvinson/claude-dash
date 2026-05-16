@@ -59,6 +59,11 @@ export async function buildContext(userId: string) {
     weight21dRes, protein21dRes,
     activeMesoRes,
     goalMetricsRes, goalMilestonesRes,
+    // 9 dimension expansion (migration 0024). 14d window — enough for trend
+    // signal without ballooning context. Per AGENTS.md these MUST flow into
+    // Jarvis's awareness.
+    focus14dRes, social14dRes, cardio14dRes, libido14dRes, aesthetic14dRes,
+    caffeine14dRes, sun14dRes, learning14dRes, money14dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -110,6 +115,16 @@ export async function buildContext(userId: string) {
     // Open + completed milestones — gives Jarvis a structured view of
     // progress toward each long-term goal.
     supabase.from("goal_milestones").select("goal_id, title, target_date, is_complete, completed_at, target_value").eq("user_id", userId),
+    // 9 new dimension tables (migration 0024). 14d each.
+    supabase.from("focus_sessions").select("duration_min, project, rating, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("social_logs").select("contact_name, kind, quality, duration_min, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("cardio_logs").select("kind, duration_min, hr_avg, rpe, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("libido_logs").select("rating, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("aesthetic_logs").select("angle, rating, notes, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("caffeine_logs").select("mg, source, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("sun_logs").select("duration_min, with_sunscreen, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("learning_logs").select("kind, source, duration_min, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
+    supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(14)),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -634,6 +649,75 @@ export async function buildContext(userId: string) {
       headline: compositionVerdict.headline,
       detail:   compositionVerdict.detail,
     },
+    // 9 new dimensions (focus, social, cardio, libido, aesthetic, caffeine,
+    // sun, learning, money). Each block summarizes the last 14 days: total
+    // entries, per-day average where applicable, days-active count. Lets
+    // Jarvis spot drift ("you haven't logged a social interaction in 6
+    // days") and ground recommendations in actual behavior.
+    dimensions: (() => {
+      type Row = Record<string, unknown> & { log_date: string };
+      const summarize = (rows: Row[]) => ({
+        entries:        rows.length,
+        daysActive:     new Set(rows.map((r) => r.log_date)).size,
+      });
+      const focusRows = (focus14dRes.data ?? []) as Row[];
+      const socialRows = (social14dRes.data ?? []) as Row[];
+      const cardioRows = (cardio14dRes.data ?? []) as Row[];
+      const libidoRows = (libido14dRes.data ?? []) as Row[];
+      const aestheticRows = (aesthetic14dRes.data ?? []) as Row[];
+      const caffeineRows = (caffeine14dRes.data ?? []) as Row[];
+      const sunRows = (sun14dRes.data ?? []) as Row[];
+      const learningRows = (learning14dRes.data ?? []) as Row[];
+      const moneyRows = (money14dRes.data ?? []) as Row[];
+
+      const sumMin = (rows: Row[]) => rows.reduce((s, r) => s + (Number(r.duration_min) || 0), 0);
+      const avgRating = (rows: Row[]) => rows.length === 0 ? null : Number((rows.reduce((s, r) => s + (Number(r.rating) || 0), 0) / rows.length).toFixed(1));
+
+      return {
+        focus: {
+          ...summarize(focusRows),
+          totalMin14d:  sumMin(focusRows),
+          avgPerActiveDay: focusRows.length === 0 ? 0 : Math.round(sumMin(focusRows) / Math.max(1, new Set(focusRows.map((r) => r.log_date)).size)),
+        },
+        social: {
+          ...summarize(socialRows),
+          // If avg-quality is set on entries, surface it; otherwise rely on count
+          avgQuality:  avgRating(socialRows.map((r) => ({ ...r, rating: r.quality }))),
+        },
+        cardio: {
+          ...summarize(cardioRows),
+          totalMin14d:  sumMin(cardioRows),
+        },
+        libido: {
+          ...summarize(libidoRows),
+          latest:   libidoRows[libidoRows.length - 1]?.rating ?? null,
+          avg14d:   avgRating(libidoRows),
+        },
+        aesthetic: {
+          ...summarize(aestheticRows),
+          avg14d:   avgRating(aestheticRows),
+        },
+        caffeine: {
+          ...summarize(caffeineRows),
+          totalMg14d:   caffeineRows.reduce((s, r) => s + (Number(r.mg) || 0), 0),
+          avgPerDay:    caffeineRows.length === 0 ? 0 : Math.round(caffeineRows.reduce((s, r) => s + (Number(r.mg) || 0), 0) / 14),
+        },
+        sun: {
+          ...summarize(sunRows),
+          totalMin14d:  sumMin(sunRows),
+        },
+        learning: {
+          ...summarize(learningRows),
+          totalMin14d:  sumMin(learningRows),
+        },
+        money: {
+          ...summarize(moneyRows),
+          incomeTotal:  moneyRows.filter((r) => r.kind === "income" || r.kind === "business_revenue").reduce((s, r) => s + (Number(r.amount) || 0), 0),
+          expenseTotal: moneyRows.filter((r) => r.kind === "expense").reduce((s, r) => s + (Number(r.amount) || 0), 0),
+          savingsTotal: moneyRows.filter((r) => r.kind === "savings").reduce((s, r) => s + (Number(r.amount) || 0), 0),
+        },
+      };
+    })(),
     behavioralContext,
     recentWorkoutToday: sets.slice(0, 3).map((s) => {
       const ex = s.exercises as unknown as { name: string; split_day: string } | null;
