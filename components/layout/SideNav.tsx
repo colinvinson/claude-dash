@@ -95,16 +95,22 @@ export default function SideNav() {
         />
 
         {/* Left-edge active-indicator pill. Sits at the capsule's left=0
-            so it tracks with the floating capsule rather than the viewport
-            edge. Slides on top transition between active items. */}
+            so it tracks with the floating capsule. Right edge uses an
+            alpha-gradient so it fades into the sidebar background instead
+            of terminating in a hard line — the "molded physical key"
+            bridge that integrates pill into button. Slides on top
+            transition between active items. */}
         {activeIndex >= 0 && (
           <span
             aria-hidden="true"
-            className="absolute left-0 rounded-r-full bg-white pointer-events-none"
+            className="absolute left-0 rounded-r-full pointer-events-none"
             style={{
               width:  4,
               height: PILL_HEIGHT,
               top:    PILL_OFFSET_Y + activeIndex * ITEM_STRIDE,
+              // Alpha-gradient on the right edge: solid white 0-50%, fading
+              // to 50% by 100% so the terminus blends into the background.
+              background: "linear-gradient(to right, #FFFFFF 0%, #FFFFFF 50%, rgba(255,255,255,0.50) 100%)",
               transition: "top 200ms ease-in-out",
               transform:  "translateZ(0)",
               willChange: "transform, top",
@@ -126,20 +132,32 @@ export default function SideNav() {
                 href={tab.href}
                 aria-label={tab.label}
                 className={
-                  "relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ease-in-out border " +
-                  (active
-                    ? "border-white/[0.06] hover:border-white/[0.10]"
-                    : "border-transparent hover:bg-white/[0.04]")
+                  "relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ease-in-out " +
+                  (active ? "" : "border border-transparent hover:bg-white/[0.04]")
                 }
-                style={{
-                  background: active ? "#171324" : undefined,
-                  color:      active ? "#FFFFFF" : "rgba(255,255,255,0.40)",
-                }}
+                style={
+                  active
+                    ? {
+                        // Compound morphological active state — translucent
+                        // smoke fill + blur + integrated inset bevels +
+                        // localized ambient outer glow that bridges into
+                        // the pill on the left.
+                        background:           "rgba(255, 255, 255, 0.05)",
+                        backdropFilter:       "blur(16px)",
+                        WebkitBackdropFilter: "blur(16px)",
+                        boxShadow:
+                          "inset 0 1px 1px rgba(255, 255, 255, 0.10), " +
+                          "inset 0 -1px 1px rgba(0, 0, 0, 0.20), " +
+                          "0 0 10px rgba(255, 255, 255, 0.10)",
+                        color: "rgba(255, 255, 255, 0.80)",
+                      }
+                    : { color: "rgba(255,255,255,0.40)" }
+                }
               >
                 <Icon
                   size={22}
                   color="currentColor"
-                  weight={active ? "fill" : "regular"}
+                  weight="regular"
                 />
               </Link>
             );
