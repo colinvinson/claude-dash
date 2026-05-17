@@ -157,14 +157,17 @@ export function buildLifestyleContext(inputs: LifestyleInputs): LifestyleContext
   }
 
   // Driver text — speak to Sir's reality, not a sober-default template.
+  // Surfaces SPECIFIC tactics from the hypertrophy + drinking playbook
+  // (cluster nights, drink-after-training, pre-bed casein) instead of
+  // generic "alcohol bad" warnings that get tuned out.
   if (alcoholDragTier === "heavy") {
     drivers.push({
-      text: `${drinks7dTotal} drinks last 7d (vs ${drinksPerWeekBaseline.toFixed(0)}/wk baseline) — that's a spike. Coach trims this week's volume target ~15% and caps PR attempts for 48h after any session.`,
+      text: `${drinks7dTotal} drinks last 7d (vs ${drinksPerWeekBaseline.toFixed(0)}/wk baseline) — spike above norm. Volume target trimmed ~15%, no PR push 48h after any drink. Highest-leverage recovery move: drink AFTER training only + 30g casein pre-bed.`,
       severity: "warn",
     });
   } else if (alcoholDragTier === "normal" && drinksPerWeekBaseline >= 6) {
     drivers.push({
-      text: `Drinking at baseline (~${Math.round(drinksPerWeekBaseline)}/wk). Volume target already shaded down ${Math.round((1 - mrvScaleFactor) * 100)}% to fit. Protein 2.2g/kg and pre-bed casein matter more than the supplement stack for getting around this.`,
+      text: `Drinking at baseline (~${Math.round(drinksPerWeekBaseline)}/wk). Volume target shaded ${Math.round((1 - mrvScaleFactor) * 100)}% to fit. Biggest single move: cluster into 1-2 consecutive nights (not spread across 3-4) — same drinks, but 5 sober days restores MPS fully. Then 30g casein pre-bed on drinking nights.`,
       severity: "info",
     });
   } else if (alcoholDragTier === "low") {
