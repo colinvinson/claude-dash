@@ -91,16 +91,23 @@ export default function SideNav() {
                 aria-label={tab.label}
                 className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
                 style={{
-                  // Active = DARK recessed squircle, like the screenshot
-                  // reference. A subtle translucent-black fill darker than
-                  // the rail bg + an INSET shadow at the top to read as
-                  // "pressed into the surface" instead of "raised above it."
+                  // Active = neumorphic pressed-in squircle. Diagonal dark
+                  // gradient (deepest at top-left where "light" would be
+                  // blocked) + a STRONG inset shadow at the top-left + a
+                  // subtle inner highlight on the bottom-right rim where
+                  // the recessed surface catches ambient light + a thin
+                  // outer bottom highlight so the squircle sits in the
+                  // sidebar surface, not just sits on top of it.
                   background: active
-                    ? "linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.20) 100%)"
+                    ? "linear-gradient(155deg, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0.18) 100%)"
                     : "transparent",
                   color:      active ? "#fafafa" : "#a1a1aa",
                   boxShadow:  active
-                    ? "inset 0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.04)"
+                    ? [
+                        "inset 3px 3px 8px rgba(0,0,0,0.60)",
+                        "inset -2px -2px 5px rgba(255,255,255,0.05)",
+                        "0 1px 1px rgba(255,255,255,0.05)",
+                      ].join(", ")
                     : undefined,
                   transition: "background 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}

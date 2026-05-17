@@ -98,10 +98,16 @@ export default function BottomNav() {
                 width: TAB_W,
                 height: 48,
                 borderRadius: 16,
-                // Recessed dark squircle to match SideNav active state.
-                // Inset shadow gives the pressed-into-surface look.
-                background: "linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.20) 100%)",
-                boxShadow: "inset 0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.04)",
+                // Neumorphic pressed squircle matching SideNav. Diagonal
+                // dark gradient + strong inset top-left shadow + soft
+                // inner highlight on bottom-right rim = pressed into
+                // the pill surface.
+                background: "linear-gradient(155deg, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0.18) 100%)",
+                boxShadow: [
+                  "inset 3px 3px 8px rgba(0,0,0,0.60)",
+                  "inset -2px -2px 5px rgba(255,255,255,0.05)",
+                  "0 1px 1px rgba(255,255,255,0.05)",
+                ].join(", "),
                 transition: "left 320ms cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             />
