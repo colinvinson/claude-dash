@@ -43,22 +43,29 @@ export function useBusinesses() {
     if (!user) { setLoading(false); return; }
     setUserId(user.id);
 
+    // Each query wrapped in a per-table Promise.resolve so a missing
+    // table (migration not applied yet) returns empty instead of
+    // poisoning the whole load via Promise.all rejection. Defensive
+    // against the deploy-ahead-of-migrations scenario.
+    const safe = <T,>(p: PromiseLike<{ data: T[] | null }>) =>
+      Promise.resolve(p).then((r) => r).catch(() => ({ data: [] as T[] }));
+
     const [bizRes, revRes, agentRes, doneTaskRes, openTaskRes] = await Promise.all([
-      supabase
+      safe(supabase
         .from("businesses")
         .select("*")
         .eq("user_id", user.id)
         .is("archived_at", null)
         .order("monthly_revenue", { ascending: false })
-        .order("created_at",      { ascending: false }),
+        .order("created_at",      { ascending: false })),
       // Three sources feed the "is this stale" check — most recent of each
       // per business is enough.
-      supabase.from("business_revenue_log").select("business_id, log_date").eq("user_id", user.id).order("log_date", { ascending: false }),
-      supabase.from("business_agents").select("business_id, last_run_at").eq("user_id", user.id).not("last_run_at", "is", null),
-      supabase.from("business_tasks").select("business_id, completed_at").eq("user_id", user.id).eq("is_complete", true).not("completed_at", "is", null),
+      safe(supabase.from("business_revenue_log").select("business_id, log_date").eq("user_id", user.id).order("log_date", { ascending: false })),
+      safe(supabase.from("business_agents").select("business_id, last_run_at").eq("user_id", user.id).not("last_run_at", "is", null)),
+      safe(supabase.from("business_tasks").select("business_id, completed_at").eq("user_id", user.id).eq("is_complete", true).not("completed_at", "is", null)),
       // Open tasks — sorted same way the per-business hook sorts so the
       // first row per business is what the card should display.
-      supabase.from("business_tasks").select("business_id, title, priority, created_at").eq("user_id", user.id).eq("is_complete", false).order("priority", { ascending: false }).order("created_at", { ascending: true }),
+      safe(supabase.from("business_tasks").select("business_id, title, priority, created_at").eq("user_id", user.id).eq("is_complete", false).order("priority", { ascending: false }).order("created_at", { ascending: true })),
     ]);
 
     const rows = ((bizRes.data ?? []) as Business[]).map((b) => ({
