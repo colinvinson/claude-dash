@@ -64,11 +64,14 @@ export default function SideNav() {
       )}
 
       <aside
-        className="hidden lg:flex z-50 flex-col items-center antialiased subpixel-antialiased"
+        className="hidden lg:flex z-[60] flex-col items-center antialiased subpixel-antialiased"
         style={{
           position:             "fixed",
+          // top: 96 clears the TopHeader (date/stats strip is ~80-90px tall);
+          // 64 from the spec puts the capsule under the header. z-[60] keeps
+          // it above the z-50 TopHeader if the heights ever overlap.
           left:                 16,
-          top:                  64,
+          top:                  96,
           bottom:               64,
           width:                SIDE_NAV_W,
           background:           "rgba(13, 11, 20, 0.70)",
