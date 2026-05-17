@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "@tauri-apps/api": "^2",
@@ -33,14 +34,14 @@
     "@tailwindcss/postcss": "^4",
     "@tauri-apps/cli": "^2",
     "@types/node": "^20",
-    "dotenv": "^16",
-    "tsx": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
+    "dotenv": "^16",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "@types/web-push": "^3.6.4",
+    "tsx": "^4",
     "typescript": "^5"
   }
 }
