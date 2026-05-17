@@ -23,10 +23,14 @@ export default function HouseRounded({
   ...rest
 }: Props) {
   const filled = weight === "fill";
-  // Path: peak at top-center, sides curve smoothly into rounded bottom
-  // corners. Stroke-linejoin="round" softens the apex.
+  // Path with explicit quadratic-Bezier rounding at EVERY corner:
+  //   • apex (top peak)
+  //   • top-left + top-right (where roof slopes meet walls)
+  //   • bottom-left + bottom-right (where walls meet base)
+  // The Z closes from (11, 5) back to (5, 11) — that straight segment
+  // is the left roof slope.
   const d =
-    "M12 3.5 L4.5 10 a2 2 0 0 0 -0.7 1.5 V19 a3 3 0 0 0 3 3 h10.4 a3 3 0 0 0 3 -3 V11.5 a2 2 0 0 0 -0.7 -1.5 Z";
+    "M5 11 Q4 11 4 12 V19 Q4 21 6 21 H18 Q20 21 20 19 V12 Q20 11 19 11 L13 5 Q12 4 11 5 Z";
 
   return (
     <svg
