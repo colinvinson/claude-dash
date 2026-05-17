@@ -2,31 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarClock, Dumbbell, Target, Briefcase, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
+import { NAV_TABS } from "@/lib/nav";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
-// 7-tab nav (6 icon tabs + center Jarvis orb). Finances earns its slot
-// because wealth-building is one of Sir's primary stated goals — the
-// surface where money decisions actually happen.
-const tabs = [
-  { href: "/home",       label: "Home",       icon: Home },
-  { href: "/schedule",   label: "Schedule",   icon: CalendarClock },
-  { href: "/gym",        label: "Gym",        icon: Dumbbell },
-  { center: true,        label: "Jarvis" },
-  { href: "/life",       label: "Life",       icon: Target },
-  { href: "/businesses", label: "Biz",        icon: Briefcase },
-  { href: "/finances",   label: "Money",      icon: Wallet },
-] as const;
+// Mobile floating-pill nav (hidden ≥lg, SideNav takes over there). Tabs
+// come from the shared NAV_TABS (Phosphor icons, regular weight inactive
+// / fill weight active so the look matches the launcher reference and
+// stays consistent with the desktop SideNav).
+//
+// The center Jarvis orb sits between the third + fourth tabs (Gym +
+// Life) as a separate inline element so it doesn't need a slot in the
+// shared NAV_TABS array.
 
-// Tabs slimmed 50 → 44 (still Apple HIG floor with padding) to fit 6
-// icon tabs + orb on a 375px-wide phone. Width math:
-//   6 × 44 (icons) + 1 × 48 (orb) + 6 × 3 (gaps) + 2 × 5 (padding) = 340px.
-// Fits inside a 375px viewport with 14px margins both sides (347px usable).
+// Width math at 375px viewport with 14px side margins (347px usable):
+//   6 × 44 (tabs) + 1 × 48 (orb) + 6 × 3 (gaps) + 2 × 5 (padding) = 340px.
 const TAB_W    = 44;
 const GAP      = 3;
 const CENTER_W = 48;
 const PILL_PAD = 5;
+
+// Index of the tab AFTER which the Jarvis orb appears (i.e. orb sits
+// between NAV_TABS[ORB_AFTER_TAB] and NAV_TABS[ORB_AFTER_TAB + 1]).
+// 3 = Gym, so orb sits between Gym and Life.
+const ORB_AFTER_TAB = 3;
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -46,27 +45,21 @@ export default function BottomNav() {
     return () => window.removeEventListener("jarvis:open", onOpen as EventListener);
   }, []);
 
-  const activeIndex = (() => {
-    for (let i = 0; i < tabs.length; i++) {
-      const t = tabs[i];
-      if ("center" in t && t.center) continue;
-      const href = (t as { href: string }).href;
-      if (pathname === href || pathname.startsWith(href + "/")) return i;
-    }
-    return -1;
-  })();
+  const activeTabIndex = NAV_TABS.findIndex(
+    (t) => pathname === t.href || pathname.startsWith(t.href + "/"),
+  );
 
-  function offsetFor(index: number): number {
+  // Convert tab index → visual x offset, accounting for the inline orb.
+  function offsetForTab(tabIndex: number): number {
     let x = PILL_PAD;
-    for (let i = 0; i < index; i++) {
-      const t = tabs[i];
-      const w = ("center" in t && t.center) ? CENTER_W : TAB_W;
-      x += w + GAP;
+    for (let i = 0; i < tabIndex; i++) {
+      x += TAB_W + GAP;
+      if (i === ORB_AFTER_TAB) x += CENTER_W + GAP;
     }
     return x;
   }
 
-  const highlightX = activeIndex >= 0 ? offsetFor(activeIndex) : 0;
+  const highlightX = activeTabIndex >= 0 ? offsetForTab(activeTabIndex) : 0;
 
   return (
     <>
@@ -96,7 +89,7 @@ export default function BottomNav() {
             borderRadius: 9999,
           }}
         >
-          {activeIndex >= 0 && (
+          {activeTabIndex >= 0 && (
             <div
               className="absolute pointer-events-none"
               style={{
@@ -112,41 +105,38 @@ export default function BottomNav() {
             />
           )}
 
-          {tabs.map((tab, i) => {
-            if ("center" in tab && tab.center) {
-              return (
-                <button
-                  key="jarvis"
-                  onClick={() => setJarvisOpen(true)}
-                  className="relative flex items-center justify-center w-12 h-12 rounded-full transition-transform active:scale-95"
-                  style={{
-                    background: "radial-gradient(circle at 35% 30%, rgba(220,235,255,0.95) 0%, rgba(96,165,250,0.55) 50%, rgba(59,130,246,0.20) 100%)",
-                    boxShadow: "0 0 22px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
-                    animation: "jarvisOrbPulse 4s ease-in-out infinite",
-                  }}
-                  aria-label="Open Jarvis"
-                />
-              );
-            }
-
-            const tabWithHref = tab as { href: string; label: string; icon: typeof Home };
-            const { href, label, icon: Icon } = tabWithHref;
-            const active = activeIndex === i;
-
+          {NAV_TABS.map((tab, i) => {
+            const active = activeTabIndex === i;
+            const Icon   = tab.icon;
+            const renderOrbAfter = i === ORB_AFTER_TAB;
             return (
-              <Link
-                key={href}
-                href={href}
-                aria-label={label}
-                className="tap relative flex flex-col items-center justify-center h-12 rounded-2xl"
-                style={{
-                  width: TAB_W,
-                  color: active ? "#0b0716" : "#a1a1aa",
-                  transition: "color 200ms ease, transform 120ms cubic-bezier(0.22,1,0.36,1)",
-                }}
-              >
-                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
-              </Link>
+              <span key={tab.href} className="flex items-center gap-1">
+                <Link
+                  href={tab.href}
+                  aria-label={tab.label}
+                  className="tap relative flex flex-col items-center justify-center h-12 rounded-2xl"
+                  style={{
+                    width: TAB_W,
+                    color: active ? "#0b0716" : "#a1a1aa",
+                    transition: "color 200ms ease, transform 120ms cubic-bezier(0.22,1,0.36,1)",
+                  }}
+                >
+                  <Icon size={22} weight={active ? "fill" : "regular"} />
+                </Link>
+                {renderOrbAfter && (
+                  <button
+                    key="jarvis"
+                    onClick={() => setJarvisOpen(true)}
+                    className="relative flex items-center justify-center w-12 h-12 rounded-full transition-transform active:scale-95"
+                    style={{
+                      background: "radial-gradient(circle at 35% 30%, rgba(220,235,255,0.95) 0%, rgba(96,165,250,0.55) 50%, rgba(59,130,246,0.20) 100%)",
+                      boxShadow: "0 0 22px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
+                      animation: "jarvisOrbPulse 4s ease-in-out infinite",
+                    }}
+                    aria-label="Open Jarvis"
+                  />
+                )}
+              </span>
             );
           })}
         </nav>

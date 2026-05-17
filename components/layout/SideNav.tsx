@@ -97,7 +97,7 @@ export default function SideNav() {
                   transition: "background-color 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}
               >
-                <Icon size={28} strokeWidth={active ? 2.4 : 2} />
+                <Icon size={28} weight={active ? "fill" : "regular"} />
               </Link>
             );
           })}
