@@ -32,7 +32,7 @@ export default function TopHeader() {
 
   return (
     <div
-      className="sticky top-0 z-50 px-4 lg:pl-[120px]"
+      className="sticky top-0 z-50 px-4 lg:pl-[112px]"
       style={{
         background: "rgba(5,5,6,0.85)",
         backdropFilter: "blur(24px) saturate(1.2)",

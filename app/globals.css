@@ -44,11 +44,12 @@ html, body {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  /* Deep violet base — shifts the whole app's vibe from "near-black tech"
-     toward "premium game-launcher / visionOS." The ambient wash below
-     does most of the visible color work; this base just kills the
-     blue-cold tone the old #050506 carried. */
-  background: #0b0716;
+  /* Canvas: linear-gradient top-left → bottom-right per the launcher
+     spec. Deep muted violet/indigo top-left → matte velvet-black
+     bottom-right. background-attachment: fixed so it doesn't scroll
+     with content. */
+  background: linear-gradient(135deg, #1D172A 0%, #0C0A12 100%);
+  background-attachment: fixed;
   color: #FAFAFA;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
