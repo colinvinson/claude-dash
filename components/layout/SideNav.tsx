@@ -16,9 +16,9 @@ import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 // not part of the chrome). Width 68px + 12px gap on each side = the
 // content's left padding is 92px on lg.
 
-export const SIDE_NAV_W   = 68;
+export const SIDE_NAV_W   = 88;
 export const SIDE_NAV_GAP = 12;
-export const SIDE_NAV_OFFSET = SIDE_NAV_W + SIDE_NAV_GAP * 2;  // 92px
+export const SIDE_NAV_OFFSET = SIDE_NAV_W + SIDE_NAV_GAP * 2;  // 112px
 
 export default function SideNav() {
   const pathname = usePathname();
@@ -67,19 +67,20 @@ export default function SideNav() {
         <button
           onClick={() => setJarvisOpen(true)}
           aria-label="Open Jarvis"
-          className="relative w-12 h-12 rounded-full transition-transform active:scale-95 mb-6 flex-shrink-0"
+          className="relative w-14 h-14 rounded-full transition-transform active:scale-95 mb-7 flex-shrink-0"
           style={{
             background: "radial-gradient(circle at 35% 30%, rgba(220,235,255,0.95) 0%, rgba(96,165,250,0.55) 50%, rgba(59,130,246,0.20) 100%)",
-            boxShadow:  "0 0 22px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
+            boxShadow:  "0 0 24px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
             animation:  "jarvisOrbPulse 4s ease-in-out infinite",
           }}
         />
 
         {/* Tabs — vertical stack. Active item gets a SOLID white squircle
             fill with a DARK icon inside, matching the premium-launcher
-            screenshot's active state. Inactive icons are translucent
-            zinc on transparent background. */}
-        <nav className="flex flex-col gap-2 flex-1 w-full items-center">
+            screenshot. Inactive icons are translucent zinc on
+            transparent background. Bigger items (w-16 h-16, 28px icons)
+            to give the rail visual weight matching the reference. */}
+        <nav className="flex flex-col gap-2.5 flex-1 w-full items-center">
           {NAV_TABS.map((tab) => {
             const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
             const Icon   = tab.icon;
@@ -88,7 +89,7 @@ export default function SideNav() {
                 key={tab.href}
                 href={tab.href}
                 aria-label={tab.label}
-                className="relative flex items-center justify-center w-12 h-12 rounded-2xl"
+                className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
                 style={{
                   background: active ? "#fafafa" : "transparent",
                   color:      active ? "#0b0716" : "#a1a1aa",
@@ -96,7 +97,7 @@ export default function SideNav() {
                   transition: "background-color 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}
               >
-                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+                <Icon size={28} strokeWidth={active ? 2.4 : 2} />
               </Link>
             );
           })}
