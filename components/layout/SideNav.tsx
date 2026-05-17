@@ -91,22 +91,21 @@ export default function SideNav() {
                 aria-label={tab.label}
                 className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
                 style={{
-                  // Active = neumorphic pressed-in squircle. Diagonal dark
-                  // gradient (deepest at top-left where "light" would be
-                  // blocked) + a STRONG inset shadow at the top-left + a
-                  // subtle inner highlight on the bottom-right rim where
-                  // the recessed surface catches ambient light + a thin
-                  // outer bottom highlight so the squircle sits in the
-                  // sidebar surface, not just sits on top of it.
+                  // Active = RAISED dark squircle that floats above the
+                  // rail surface. Gradient slightly brighter at the top
+                  // (catches light) → darker at the bottom (recedes).
+                  // Drop shadow underneath plus a thin lit edge at the
+                  // top reads as physically lifted above the surface.
                   background: active
-                    ? "linear-gradient(155deg, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0.18) 100%)"
+                    ? "linear-gradient(180deg, rgba(35,35,50,0.95) 0%, rgba(15,15,25,0.95) 100%)"
                     : "transparent",
                   color:      active ? "#fafafa" : "#a1a1aa",
                   boxShadow:  active
                     ? [
-                        "inset 3px 3px 8px rgba(0,0,0,0.60)",
-                        "inset -2px -2px 5px rgba(255,255,255,0.05)",
-                        "0 1px 1px rgba(255,255,255,0.05)",
+                        "0 8px 18px rgba(0,0,0,0.55)",          // main drop shadow
+                        "0 2px 5px rgba(0,0,0,0.40)",           // tight cast shadow
+                        "inset 0 1px 0 rgba(255,255,255,0.12)", // lit top edge
+                        "inset 0 -1px 0 rgba(0,0,0,0.30)",      // dark bottom rim
                       ].join(", ")
                     : undefined,
                   transition: "background 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
