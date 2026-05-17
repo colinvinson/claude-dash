@@ -6,41 +6,34 @@ import { useEffect, useState } from "react";
 import { NAV_TABS } from "@/lib/nav";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
-// Edge-anchored, full-height left sidebar. Pixel-perfect spec:
+// Floating-island sidebar. Per the geometry correction:
 //
-//   width                  72px
-//   bg                     #0D0B14 (deep matte dark violet-black)
-//   border-right           1px solid rgba(255,255,255,0.04)
-//   top padding            64px before first item
-//   item bounding box      48×48px
-//   item radius            12px (rounded-xl)
-//   icon size              22×22
-//   inter-item gap         16px (space-y-4)
-//   active bg              #171324
-//   active border tint     1px solid rgba(255,255,255,0.06)
-//   active+hover border    rgba(255,255,255,0.10)
-//   active icon            #FFFFFF (100% opacity)
-//   inactive icon          rgba(255,255,255,0.40)
-//   hover bg               rgba(255,255,255,0.04)
-//   hover icon             rgba(255,255,255,0.85)
-//   transition             all 200ms ease-in-out
+//   Positioning:           fixed, left=16, top=64, bottom=64
+//   Width:                 72px
+//   Height:                calc(100vh - 128px) (implicit via top+bottom)
+//   Border radius:         20px on all corners (capsule)
+//   Background:            rgba(13, 11, 20, 0.70) + backdrop-filter blur(24px)
+//   Border:                1px solid rgba(255, 255, 255, 0.08)
+//   Box shadow:            0 12px 32px 4px rgba(0,0,0,0.5),
+//                          0 4px 12px 0 rgba(0,0,0,0.3)
 //
-// Left-edge indicator pill:
-//   4×24px, rounded-r-full, anchored to viewport-left (sidebar x=0).
-//   Slides via `top` transition on active-index change.
-//   will-change-transform for fluid GPU-accelerated motion.
+// Content layer runs full-width UNDERNEATH this floating capsule — no
+// left-padding offset. The max-w-2xl centered content has its own
+// margins, so on typical desktop widths the sidebar floats over empty
+// whitespace, not over content.
 //
-// Hidden < lg (1024px) — mobile uses BottomNav instead.
+// Item geometry stays per the earlier pixel spec:
+//   48×48 box, 12px radius, 22px icons, 16px gaps, 64px top padding
+//   to first item (Jarvis orb fits inside that zone).
 
 export const SIDE_NAV_W = 72;
 
-// Geometry constants — kept named so the pill-position math reads.
-const TOP_PAD       = 64;   // matches spec: 64px from top to first nav item
-const ITEM_BOX      = 48;   // item bounding box
-const ITEM_GAP      = 16;   // inter-item gap
-const ITEM_STRIDE   = ITEM_BOX + ITEM_GAP;  // 64px from item-top to next item-top
+const TOP_PAD       = 64;
+const ITEM_BOX      = 48;
+const ITEM_GAP      = 16;
+const ITEM_STRIDE   = ITEM_BOX + ITEM_GAP;
 const PILL_HEIGHT   = 24;
-const PILL_OFFSET_Y = TOP_PAD + (ITEM_BOX - PILL_HEIGHT) / 2;  // y of pill for index 0 = 76
+const PILL_OFFSET_Y = TOP_PAD + (ITEM_BOX - PILL_HEIGHT) / 2;
 
 export default function SideNav() {
   const pathname = usePathname();
@@ -71,16 +64,22 @@ export default function SideNav() {
       )}
 
       <aside
-        className="hidden lg:flex fixed left-0 top-0 bottom-0 z-50 flex-col items-center antialiased subpixel-antialiased"
+        className="hidden lg:flex z-50 flex-col items-center antialiased subpixel-antialiased"
         style={{
-          width: SIDE_NAV_W,
-          background:  "#0D0B14",
-          borderRight: "1px solid rgba(255, 255, 255, 0.04)",
+          position:             "fixed",
+          left:                 16,
+          top:                  64,
+          bottom:               64,
+          width:                SIDE_NAV_W,
+          background:           "rgba(13, 11, 20, 0.70)",
+          backdropFilter:       "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border:               "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius:         20,
+          boxShadow:            "0 12px 32px 4px rgba(0, 0, 0, 0.5), 0 4px 12px 0 rgba(0, 0, 0, 0.3)",
         }}
       >
-        {/* Jarvis orb — sits inside the 64px top zone, centered horizontally
-            in the rail. Same 48×48 + 12px radius as nav items so it slots
-            into the visual rhythm. */}
+        {/* Jarvis orb — sits inside the 64px top padding zone */}
         <button
           onClick={() => setJarvisOpen(true)}
           aria-label="Open Jarvis"
@@ -92,8 +91,9 @@ export default function SideNav() {
           }}
         />
 
-        {/* Left-edge active-indicator pill. Anchored to the viewport's left
-            margin (sidebar's left=0). Slides via top transition. */}
+        {/* Left-edge active-indicator pill. Sits at the capsule's left=0
+            so it tracks with the floating capsule rather than the viewport
+            edge. Slides on top transition between active items. */}
         {activeIndex >= 0 && (
           <span
             aria-hidden="true"
@@ -109,10 +109,10 @@ export default function SideNav() {
           />
         )}
 
-        {/* Nav items — vertical stack starting at TOP_PAD with 16px gaps */}
+        {/* Nav items — vertical stack at the 64px top padding mark */}
         <nav
           className="flex flex-col items-center space-y-4"
-          style={{ marginTop: TOP_PAD - 48 - 8 /* orb height (48) + its mt-2 (8) consumed already; remaining gap before first item */ }}
+          style={{ marginTop: TOP_PAD - 48 - 8 /* orb (48) + mt-2 (8) consumed already */ }}
         >
           {NAV_TABS.map((tab, i) => {
             const active = activeIndex === i;
@@ -133,8 +133,6 @@ export default function SideNav() {
                   color:      active ? "#FFFFFF" : "rgba(255,255,255,0.40)",
                 }}
               >
-                {/* Icon picks up color via currentColor. Active = fill weight
-                    (solid filled glyph in white); inactive = regular outline. */}
                 <Icon
                   size={22}
                   color="currentColor"
@@ -151,9 +149,6 @@ export default function SideNav() {
           0%, 100% { transform: scale(1);    filter: brightness(1); }
           50%      { transform: scale(1.06); filter: brightness(1.12); }
         }
-        /* Inactive-icon hover brightness lift. Tailwind hover:text-white/[0.85]
-           doesn't reliably override inline-style color, so we drive it via
-           a CSS rule scoped to the inactive (no #171324 bg) links. */
         aside [href]:not([style*="background"]):hover {
           color: rgba(255, 255, 255, 0.85) !important;
         }
