@@ -80,9 +80,9 @@ export function useStack() {
       supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
     ]);
 
-    const logs = logsRes.data ?? [];
+    const logs = (logsRes.data ?? []) as Array<{ id: string; supplement_id: string }>;
     const merged = (stackRes.data ?? []).map((s: Record<string, unknown>) => {
-      const log = logs.find((l) => l.supplement_id === (s.id as string));
+      const log = logs.find((l: { supplement_id: string }) => l.supplement_id === (s.id as string));
       return {
         ...s,
         // Defaults for columns that may not exist in the user's DB yet.

@@ -55,7 +55,7 @@ async function dispatchViaSupabase<T extends Record<string, unknown>>(
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "jarvis_cc_dispatches", filter: `id=eq.${rowId}` },
-        (payload) => {
+        (payload: { new: Record<string, unknown> }) => {
           const updated = payload.new as { status: string; result: T | null; error: string | null };
           if (updated.status === "done") {
             clearTimeout(timer);

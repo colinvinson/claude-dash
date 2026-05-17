@@ -56,7 +56,7 @@ export function useGoals() {
     const templates = (templatesRes.data ?? []) as Array<{ title: string; priority: number }>;
 
     // Auto-populate today's goal list from recurring templates if those titles aren't already present
-    const existingTitles = new Set(todayGoals.map((g) => g.title));
+    const existingTitles = new Set(todayGoals.map((g: { title: string }) => g.title));
     const missing = templates.filter((t) => !existingTitles.has(t.title));
     if (missing.length > 0) {
       await supabase.from("goals").insert(
