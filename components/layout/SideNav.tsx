@@ -144,14 +144,14 @@ export default function SideNav() {
                         // the pill on the left. Fill opacity doubled
                         // (0.05 → 0.10) so the active state actually
                         // stands out against the capsule background.
-                        background:           "rgba(255, 255, 255, 0.14)",
+                        background:           "rgba(255, 255, 255, 0.20)",
                         backdropFilter:       "blur(16px)",
                         WebkitBackdropFilter: "blur(16px)",
                         boxShadow:
-                          "inset 0 1px 1px rgba(255, 255, 255, 0.15), " +
+                          "inset 0 1px 1px rgba(255, 255, 255, 0.18), " +
                           "inset 0 -1px 1px rgba(0, 0, 0, 0.20), " +
-                          "0 0 12px rgba(255, 255, 255, 0.12)",
-                        color: "rgba(255, 255, 255, 0.95)",
+                          "0 0 14px rgba(255, 255, 255, 0.14)",
+                        color: "#FFFFFF",
                       }
                     : { color: "rgba(255,255,255,0.40)" }
                 }
