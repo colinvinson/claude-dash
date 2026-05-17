@@ -7,16 +7,18 @@ import { NAV_TABS } from "@/lib/nav";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
 // Desktop-only left rail nav. Mirrors BottomNav's tabs in a vertical
-// stack, with the Jarvis orb at the top as the centerpiece (instead
-// of in the middle of a pill, since vertical stacks don't have an
-// obvious "center"). Hidden on screens < lg (1024px) — phones get
-// BottomNav instead.
+// stack with the Jarvis orb at the top. Hidden on screens < lg
+// (1024px); phones get BottomNav instead.
 //
-// Width 76px, full viewport height, glass background matching the
-// BottomNav pill aesthetic. Active tab gets the same translucent-
-// white highlight + label appears under the icon.
+// FLOATING SQUIRCLE — not edge-to-edge. Sits inside the viewport with
+// equal margins on the left, top, and bottom (matches the premium
+// game-launcher reference where the sidebar reads as its own object,
+// not part of the chrome). Width 68px + 12px gap on each side = the
+// content's left padding is 92px on lg.
 
-export const SIDE_NAV_W = 76;
+export const SIDE_NAV_W   = 68;
+export const SIDE_NAV_GAP = 12;
+export const SIDE_NAV_OFFSET = SIDE_NAV_W + SIDE_NAV_GAP * 2;  // 92px
 
 export default function SideNav() {
   const pathname = usePathname();
@@ -47,14 +49,18 @@ export default function SideNav() {
       )}
 
       <aside
-        className="hidden lg:flex fixed left-0 top-0 bottom-0 z-50 flex-col items-center py-5"
+        className="hidden lg:flex fixed z-50 flex-col items-center py-5"
         style={{
-          width: SIDE_NAV_W,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%), rgba(18,18,24,0.65)",
+          left:   SIDE_NAV_GAP,
+          top:    SIDE_NAV_GAP,
+          bottom: SIDE_NAV_GAP,
+          width:  SIDE_NAV_W,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%), rgba(18,18,28,0.62)",
           backdropFilter: "blur(40px) saturate(180%)",
           WebkitBackdropFilter: "blur(40px) saturate(180%)",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
-          paddingTop: "calc(env(safe-area-inset-top) + 20px)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          borderRadius: 28,
+          boxShadow: "0 18px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.10)",
         }}
       >
         {/* Jarvis orb — top of the rail, the brand-defining centerpiece. */}

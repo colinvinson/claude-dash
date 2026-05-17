@@ -3,8 +3,7 @@
 @theme inline {
   --color-background: #050506;
   --color-foreground: #FAFAFA;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
 
   --text-primary:    #FAFAFA;
   --text-secondary:  #B8B6B0;
@@ -262,23 +261,11 @@ body::after {
 
 ::-webkit-scrollbar { width: 0; height: 0; }
 
-/* ── Dynamic accent system (driven by daily score from Home page) —
-   when the score drives the mood, the wash shifts away from the
-   default violet to match. Keeps the bottom-left blue layer for
-   continuity. ── */
-body[data-score="red"]::before {
-  background:
-    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(220, 38, 38, 0.22) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 60, 60, 0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(217, 70, 239, 0.04) 0%, transparent 100%);
-}
-
-body[data-score="emerald"]::before {
-  background:
-    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(16, 185, 129, 0.20) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(96, 165, 250, 0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(167, 139, 250, 0.05) 0%, transparent 100%);
-}
+/* Dynamic-color [data-score] body washes were removed — the score-
+   driven palette swap was polluting the violet base. The base wash
+   in body::before above is the only atmosphere now. Can be added
+   back later as a separate accent layer that doesn't override the
+   primary palette. */
 
 /* ── Goal completion flash animation ── */
 @keyframes goal-complete-flash {

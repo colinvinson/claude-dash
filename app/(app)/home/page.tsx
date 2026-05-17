@@ -66,11 +66,10 @@ export default function HomePage() {
     proteinTarget: proteinTarget,
   });
 
-  useEffect(() => {
-    if (accent !== "amber") document.body.dataset.score = accent;
-    else delete document.body.dataset.score;
-    return () => { delete document.body.dataset.score; };
-  }, [accent]);
+  // Dynamic body-accent based on daily score was removed — it was
+  // overriding the violet base palette. Score is still rendered on
+  // TodayWrap with its own color treatment; the page-wide wash stays
+  // consistent.
 
   // PB detector — fires once per day server-side. Insights surface via
   // WhatMattersCard's "Insight" section.

@@ -15,7 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <SideNav />
-      <div className="flex flex-col h-full lg:pl-[76px]" style={{ background: "transparent" }}>
+      <div className="flex flex-col h-full lg:pl-[92px]" style={{ background: "transparent" }}>
         <TopHeader />
         <ProactiveCheck />
         <PullToRefresh>

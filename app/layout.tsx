@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+// Inter — the de-facto modern app-UI font. Matches the premium
+// game-launcher look Sir referenced (cleaner geometric letterforms
+// than Geist, especially at display sizes).
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display:  "swap",
+});
 
 export const metadata: Metadata = {
   // Title template — sub-routes set their own; this composes them as
@@ -37,8 +44,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={geist.variable}>
-      <body className="text-[#FAFAFA] antialiased" style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}>
+    <html lang="en" className={inter.variable}>
+      <body className="text-[#FAFAFA] antialiased" style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}>
         {children}
       </body>
     </html>
