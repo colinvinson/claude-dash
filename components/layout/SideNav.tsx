@@ -132,7 +132,7 @@ export default function SideNav() {
                 href={tab.href}
                 aria-label={tab.label}
                 className={
-                  "relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ease-in-out " +
+                  "relative flex items-center justify-center w-12 h-12 rounded-[14px] transition-all duration-200 ease-in-out " +
                   (active ? "" : "border border-transparent hover:bg-white/[0.04]")
                 }
                 style={
@@ -141,15 +141,17 @@ export default function SideNav() {
                         // Compound morphological active state — translucent
                         // smoke fill + blur + integrated inset bevels +
                         // localized ambient outer glow that bridges into
-                        // the pill on the left.
-                        background:           "rgba(255, 255, 255, 0.05)",
+                        // the pill on the left. Fill opacity doubled
+                        // (0.05 → 0.10) so the active state actually
+                        // stands out against the capsule background.
+                        background:           "rgba(255, 255, 255, 0.10)",
                         backdropFilter:       "blur(16px)",
                         WebkitBackdropFilter: "blur(16px)",
                         boxShadow:
-                          "inset 0 1px 1px rgba(255, 255, 255, 0.10), " +
+                          "inset 0 1px 1px rgba(255, 255, 255, 0.12), " +
                           "inset 0 -1px 1px rgba(0, 0, 0, 0.20), " +
                           "0 0 10px rgba(255, 255, 255, 0.10)",
-                        color: "rgba(255, 255, 255, 0.80)",
+                        color: "rgba(255, 255, 255, 0.90)",
                       }
                     : { color: "rgba(255,255,255,0.40)" }
                 }
