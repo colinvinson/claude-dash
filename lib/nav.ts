@@ -10,22 +10,24 @@
 
 import type { Icon } from "@phosphor-icons/react";
 import {
-  HouseSimple,
   CalendarBlank,
   Barbell,
   Target,
   Briefcase,
   Wallet,
 } from "@phosphor-icons/react";
+import HouseRounded from "@/components/icons/HouseRounded";
 
 export type NavTab = {
   href:  string;
   label: string;
+  // Phosphor Icon type — covers both Phosphor's icons and our custom
+  // HouseRounded which implements the same prop shape.
   icon:  Icon;
 };
 
 export const NAV_TABS: readonly NavTab[] = [
-  { href: "/home",       label: "Home",     icon: HouseSimple },
+  { href: "/home",       label: "Home",     icon: HouseRounded as unknown as Icon },
   { href: "/schedule",   label: "Schedule", icon: CalendarBlank },
   { href: "/gym",        label: "Gym",      icon: Barbell },
   { href: "/life",       label: "Life",     icon: Target },
