@@ -78,7 +78,7 @@ export default function BottomNav() {
       )}
 
       <div
-        className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none"
+        className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none lg:hidden"
         style={{
           paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)",
           paddingLeft: 14,
