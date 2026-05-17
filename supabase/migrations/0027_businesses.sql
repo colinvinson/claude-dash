@@ -52,6 +52,9 @@ create policy "own businesses" on public.businesses
 create policy "own business revenue" on public.business_revenue_log
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Realtime so UI tiles update across tabs / devices live.
-alter publication supabase_realtime add table public.businesses;
-alter publication supabase_realtime add table public.business_revenue_log;
+-- Realtime so UI tiles update across tabs / devices live. Wrapped in
+-- exception-handling DO blocks because ALTER PUBLICATION ADD TABLE
+-- lacks IF NOT EXISTS — without this the second run errors with
+-- "42710: relation already member of publication."
+do $$ begin alter publication supabase_realtime add table public.businesses;           exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.business_revenue_log; exception when duplicate_object then null; end $$;

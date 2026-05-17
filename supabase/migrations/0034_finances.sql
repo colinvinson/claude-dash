@@ -61,7 +61,7 @@ alter table public.wishlist_items enable row level security;
 drop policy if exists "own wishlist items" on public.wishlist_items;
 create policy "own wishlist items" on public.wishlist_items
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-alter publication supabase_realtime add table public.wishlist_items;
+do $$ begin alter publication supabase_realtime add table public.wishlist_items; exception when duplicate_object then null; end $$;
 
 create table if not exists public.net_worth_snapshots (
   id              uuid primary key default gen_random_uuid(),
@@ -83,4 +83,4 @@ alter table public.net_worth_snapshots enable row level security;
 drop policy if exists "own net worth" on public.net_worth_snapshots;
 create policy "own net worth" on public.net_worth_snapshots
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-alter publication supabase_realtime add table public.net_worth_snapshots;
+do $$ begin alter publication supabase_realtime add table public.net_worth_snapshots; exception when duplicate_object then null; end $$;

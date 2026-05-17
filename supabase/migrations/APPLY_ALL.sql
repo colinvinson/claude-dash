@@ -5,8 +5,9 @@
 -- Concatenation of every migration after the 0018 catch-up.
 -- Each underlying migration is idempotent (CREATE TABLE IF NOT
 -- EXISTS, ADD COLUMN IF NOT EXISTS, DROP POLICY IF EXISTS
--- before CREATE POLICY, etc), so running this file is safe at
--- any point — already-applied changes no-op.
+-- before CREATE POLICY, ALTER PUBLICATION wrapped in
+-- duplicate_object exception handlers, etc), so running this
+-- file is safe at any point — already-applied changes no-op.
 --
 -- Workflow:
 --   1. Open Supabase SQL Editor
@@ -17,7 +18,6 @@
 -- appended to this file so a single paste stays sufficient.
 -- See AGENTS.md for the rule.
 -- ============================================================
-
 
 -- ──────────────────────────────────────────────────────────
 -- 0019_mesocycles.sql
@@ -528,9 +528,12 @@ create policy "own businesses" on public.businesses
 create policy "own business revenue" on public.business_revenue_log
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Realtime so UI tiles update across tabs / devices live.
-alter publication supabase_realtime add table public.businesses;
-alter publication supabase_realtime add table public.business_revenue_log;
+-- Realtime so UI tiles update across tabs / devices live. Wrapped in
+-- exception-handling DO blocks because ALTER PUBLICATION ADD TABLE
+-- lacks IF NOT EXISTS — without this the second run errors with
+-- "42710: relation already member of publication."
+do $$ begin alter publication supabase_realtime add table public.businesses;           exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.business_revenue_log; exception when duplicate_object then null; end $$;
 
 -- ──────────────────────────────────────────────────────────
 -- 0028_business_agents.sql
@@ -568,7 +571,7 @@ drop policy if exists "own business agents" on public.business_agents;
 create policy "own business agents" on public.business_agents
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.business_agents;
+do $$ begin alter publication supabase_realtime add table public.business_agents; exception when duplicate_object then null; end $$;
 
 -- ──────────────────────────────────────────────────────────
 -- 0029_artifacts_to_businesses.sql
@@ -633,7 +636,7 @@ drop policy if exists "own business tasks" on public.business_tasks;
 create policy "own business tasks" on public.business_tasks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.business_tasks;
+do $$ begin alter publication supabase_realtime add table public.business_tasks; exception when duplicate_object then null; end $$;
 
 -- Auto-import existing next_action text into a first task per business.
 -- Idempotent: skips businesses that already have any task rows.
@@ -734,7 +737,7 @@ drop policy if exists "own marketing experiments" on public.marketing_experiment
 create policy "own marketing experiments" on public.marketing_experiments
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.marketing_experiments;
+do $$ begin alter publication supabase_realtime add table public.marketing_experiments; exception when duplicate_object then null; end $$;
 
 -- ──────────────────────────────────────────────────────────
 -- 0033_linked_chats.sql
@@ -782,7 +785,7 @@ drop policy if exists "own linked chats" on public.linked_chats;
 create policy "own linked chats" on public.linked_chats
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.linked_chats;
+do $$ begin alter publication supabase_realtime add table public.linked_chats; exception when duplicate_object then null; end $$;
 
 -- ──────────────────────────────────────────────────────────
 -- 0034_finances.sql
@@ -850,7 +853,7 @@ alter table public.wishlist_items enable row level security;
 drop policy if exists "own wishlist items" on public.wishlist_items;
 create policy "own wishlist items" on public.wishlist_items
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-alter publication supabase_realtime add table public.wishlist_items;
+do $$ begin alter publication supabase_realtime add table public.wishlist_items; exception when duplicate_object then null; end $$;
 
 create table if not exists public.net_worth_snapshots (
   id              uuid primary key default gen_random_uuid(),
@@ -872,4 +875,4 @@ alter table public.net_worth_snapshots enable row level security;
 drop policy if exists "own net worth" on public.net_worth_snapshots;
 create policy "own net worth" on public.net_worth_snapshots
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-alter publication supabase_realtime add table public.net_worth_snapshots;
+do $$ begin alter publication supabase_realtime add table public.net_worth_snapshots; exception when duplicate_object then null; end $$;

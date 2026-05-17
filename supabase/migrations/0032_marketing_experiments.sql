@@ -42,4 +42,4 @@ drop policy if exists "own marketing experiments" on public.marketing_experiment
 create policy "own marketing experiments" on public.marketing_experiments
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.marketing_experiments;
+do $$ begin alter publication supabase_realtime add table public.marketing_experiments; exception when duplicate_object then null; end $$;

@@ -41,4 +41,4 @@ drop policy if exists "own linked chats" on public.linked_chats;
 create policy "own linked chats" on public.linked_chats
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.linked_chats;
+do $$ begin alter publication supabase_realtime add table public.linked_chats; exception when duplicate_object then null; end $$;

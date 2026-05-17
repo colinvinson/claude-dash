@@ -31,7 +31,7 @@ drop policy if exists "own business tasks" on public.business_tasks;
 create policy "own business tasks" on public.business_tasks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.business_tasks;
+do $$ begin alter publication supabase_realtime add table public.business_tasks; exception when duplicate_object then null; end $$;
 
 -- Auto-import existing next_action text into a first task per business.
 -- Idempotent: skips businesses that already have any task rows.

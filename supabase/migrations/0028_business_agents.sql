@@ -31,4 +31,4 @@ drop policy if exists "own business agents" on public.business_agents;
 create policy "own business agents" on public.business_agents
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-alter publication supabase_realtime add table public.business_agents;
+do $$ begin alter publication supabase_realtime add table public.business_agents; exception when duplicate_object then null; end $$;
