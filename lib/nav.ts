@@ -10,7 +10,7 @@
 
 import type { Icon } from "@phosphor-icons/react";
 import {
-  House,
+  HouseSimple,
   CalendarBlank,
   Barbell,
   Target,
@@ -25,7 +25,7 @@ export type NavTab = {
 };
 
 export const NAV_TABS: readonly NavTab[] = [
-  { href: "/home",       label: "Home",     icon: House },
+  { href: "/home",       label: "Home",     icon: HouseSimple },
   { href: "/schedule",   label: "Schedule", icon: CalendarBlank },
   { href: "/gym",        label: "Gym",      icon: Barbell },
   { href: "/life",       label: "Life",     icon: Target },
