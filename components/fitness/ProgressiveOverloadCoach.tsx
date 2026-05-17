@@ -581,7 +581,7 @@ export default function ProgressiveOverloadCoach() {
 
       {/* Live workout view — full-screen overlay portal-style. Reads its
           own state from useWorkout so logging stays consistent. */}
-      <LiveWorkoutView open={liveOpen} onClose={() => setLiveOpen(false)} />
+      <LiveWorkoutView open={liveOpen} onClose={() => setLiveOpen(false)} activeExId={activeExId} />
     </div>
   );
 }
