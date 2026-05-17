@@ -45,7 +45,11 @@ html, body {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  background: #050506;
+  /* Deep violet base — shifts the whole app's vibe from "near-black tech"
+     toward "premium game-launcher / visionOS." The ambient wash below
+     does most of the visible color work; this base just kills the
+     blue-cold tone the old #050506 carried. */
+  background: #0b0716;
   color: #FAFAFA;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -217,8 +221,9 @@ button:not(.no-tap):not(:disabled):active {
 
 /* ── Radial washes — atmospheric ambient. Three layered radials at low
    opacity give the dark bg subtle depth so the surface doesn't read as
-   flat black. Drifts on a 36s loop. Score-driven accent overrides the
-   warm top wash via [data-score] below. ── */
+   flat. The default palette is violet-leaning (premium game-launcher
+   look); score-driven accents below override the top wash via
+   [data-score]. Drifts on a 36s loop. ── */
 body::before {
   content: '';
   position: fixed;
@@ -226,9 +231,12 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 90% 55% at 82% 12%, rgba(224, 118, 88, 0.20) 0%, transparent 100%),
-    radial-gradient(ellipse 70% 55% at 18% 92%, rgba(96, 165, 250, 0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.025) 0%, transparent 100%);
+    /* top-right: deep violet glow */
+    radial-gradient(ellipse 90% 55% at 82% 12%, rgba(139, 92, 246, 0.28) 0%, transparent 100%),
+    /* bottom-left: cool indigo/blue accent */
+    radial-gradient(ellipse 70% 55% at 18% 92%, rgba(96, 165, 250, 0.14) 0%, transparent 100%),
+    /* center: faint magenta lift */
+    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(217, 70, 239, 0.06) 0%, transparent 100%);
   filter: blur(40px);
   animation: wash-drift 36s ease-in-out infinite alternate;
 }
@@ -254,17 +262,22 @@ body::after {
 
 ::-webkit-scrollbar { width: 0; height: 0; }
 
-/* ── Dynamic accent system (driven by daily score from Home page) ── */
+/* ── Dynamic accent system (driven by daily score from Home page) —
+   when the score drives the mood, the wash shifts away from the
+   default violet to match. Keeps the bottom-left blue layer for
+   continuity. ── */
 body[data-score="red"]::before {
   background:
-    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(220, 38, 38, 0.18) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 60, 60, 0.08) 0%, transparent 100%);
+    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(220, 38, 38, 0.22) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(180, 60, 60, 0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(217, 70, 239, 0.04) 0%, transparent 100%);
 }
 
 body[data-score="emerald"]::before {
   background:
-    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(16, 185, 129, 0.16) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(52, 211, 153, 0.06) 0%, transparent 100%);
+    radial-gradient(ellipse 82% 50% at 82% 14%, rgba(16, 185, 129, 0.20) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 18% 90%, rgba(96, 165, 250, 0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(167, 139, 250, 0.05) 0%, transparent 100%);
 }
 
 /* ── Goal completion flash animation ── */

@@ -104,8 +104,9 @@ export default function BottomNav() {
                 top: PILL_PAD,
                 width: TAB_W,
                 height: 48,
-                borderRadius: 9999,
-                background: "rgba(255,255,255,0.12)",
+                borderRadius: 16,
+                background: "#fafafa",
+                boxShadow: "0 4px 14px rgba(255,255,255,0.18)",
                 transition: "left 320ms cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             />
@@ -137,17 +138,14 @@ export default function BottomNav() {
                 key={href}
                 href={href}
                 aria-label={label}
-                className="tap relative flex flex-col items-center justify-center h-12 rounded-full"
+                className="tap relative flex flex-col items-center justify-center h-12 rounded-2xl"
                 style={{
                   width: TAB_W,
-                  color: active ? "#fafafa" : "#a1a1aa",
+                  color: active ? "#0b0716" : "#a1a1aa",
                   transition: "color 200ms ease, transform 120ms cubic-bezier(0.22,1,0.36,1)",
                 }}
               >
-                <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
-                {active && (
-                  <span className="text-[9px] font-semibold uppercase tracking-widest mt-0.5 anim-fade">{label}</span>
-                )}
+                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
               </Link>
             );
           })}

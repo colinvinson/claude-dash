@@ -120,7 +120,10 @@ export const TYPE = {
 // multiple cards inside a parent already lifted off the bg.
 
 export const SHADOW = {
-  hero:    "0 24px 60px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.10)",
+  // Hero cards get a deeper outer shadow + a stronger inner highlight at
+  // the top edge — that "lit from above" gloss the premium game-launcher
+  // aesthetic relies on. Subtle violet-tinted glow under the card too.
+  hero:    "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 24px rgba(139, 92, 246, 0.10), 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14)",
   primary: "0 12px 40px rgba(0, 0, 0, 0.45)",
   inline:  "none",
 } as const;

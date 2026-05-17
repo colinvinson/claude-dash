@@ -18,11 +18,14 @@ type Variant = "hero" | "primary" | "inline";
 
 const STYLES: Record<Variant, CSSProperties> = {
   hero: {
-    background:           "rgba(255, 255, 255, 0.055)",
-    backdropFilter:       "blur(32px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(32px) saturate(1.4)",
+    // Denser glass + warmer saturation (1.5) for the premium-launcher
+    // look. Border slightly brighter than the everyday hair so the lit
+    // edge reads at a glance.
+    background:           "rgba(255, 255, 255, 0.065)",
+    backdropFilter:       "blur(40px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
     boxShadow:            SHADOW.hero,
-    border:               `1px solid ${BORDER.hair}`,
+    border:               "1px solid rgba(255, 255, 255, 0.10)",
     borderRadius:         `${RADIUS.lg}px`,
     padding:              `${SPACING.lg}px`,
   },

@@ -4,8 +4,8 @@
   "description": "Personal performance dashboard",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#0b0716",
+  "theme_color": "#0b0716",
   "start_url": "/home",
   "scope": "/",
   "icons": [

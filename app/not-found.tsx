@@ -8,7 +8,7 @@ export const metadata = { title: "Not found" };
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: "#050506" }}>
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: "#0b0716" }}>
       <div className="max-w-sm w-full text-center anim-fade-up">
         <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2">— 404</div>
         <h1 className="text-2xl font-bold text-zinc-100 mb-2">Nothing here.</h1>

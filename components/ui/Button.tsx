@@ -24,9 +24,12 @@ const VARIANT: Record<Variant, string> = {
 
 const SIZE: Record<Size, string> = {
   // 44pt tall — Apple HIG fingertip floor. Default for any standalone CTA.
-  md: "h-11 px-4 text-sm font-semibold rounded-xl",
+  // Pill-rounded (rounded-full) so it matches the premium launcher CTA
+  // language ("Daily Recommend" reference). Wider horizontal padding so
+  // text doesn't crowd the radius.
+  md: "h-11 px-5 text-sm font-semibold rounded-full",
   // 36pt — used INSIDE a card row where the button isn't the main action.
-  sm: "h-9 px-3 text-xs font-semibold rounded-lg",
+  sm: "h-9 px-4 text-xs font-semibold rounded-full",
 };
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {

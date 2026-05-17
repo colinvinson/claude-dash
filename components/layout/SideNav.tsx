@@ -69,7 +69,10 @@ export default function SideNav() {
           }}
         />
 
-        {/* Tabs — vertical stack, rounded-square highlight on active */}
+        {/* Tabs — vertical stack. Active item gets a SOLID white squircle
+            fill with a DARK icon inside, matching the premium-launcher
+            screenshot's active state. Inactive icons are translucent
+            zinc on transparent background. */}
         <nav className="flex flex-col gap-2 flex-1 w-full items-center">
           {NAV_TABS.map((tab) => {
             const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
@@ -79,20 +82,15 @@ export default function SideNav() {
                 key={tab.href}
                 href={tab.href}
                 aria-label={tab.label}
-                className="relative flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-colors"
+                className="relative flex items-center justify-center w-12 h-12 rounded-2xl"
                 style={{
-                  background: active ? "rgba(255,255,255,0.12)" : "transparent",
-                  color:      active ? "#fafafa" : "#a1a1aa",
-                  transition: "background-color 200ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
+                  background: active ? "#fafafa" : "transparent",
+                  color:      active ? "#0b0716" : "#a1a1aa",
+                  boxShadow:  active ? "0 6px 18px rgba(255,255,255,0.12)" : undefined,
+                  transition: "background-color 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}
               >
-                <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
-                <span
-                  className="text-[8px] font-semibold uppercase tracking-widest mt-1"
-                  style={{ color: active ? "#fafafa" : "#71717a" }}
-                >
-                  {tab.label}
-                </span>
+                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
               </Link>
             );
           })}
