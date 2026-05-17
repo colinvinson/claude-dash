@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Archive, Trash2, TrendingUp, Plus } from "lucide-react";
+import { X, Archive, Trash2, TrendingUp, Plus, Pencil } from "lucide-react";
 import { FormInput, FormSelect, FormTextarea } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { useBusinesses, type Business, type BusinessStatus } from "@/hooks/useBusinesses";
 import { useBusinessRevenue } from "@/hooks/useBusinessRevenue";
+import { useBusinessTasks } from "@/hooks/useBusinessTasks";
+import { useBusinessAgents } from "@/hooks/useBusinessAgents";
+import { useBusinessActivity } from "@/hooks/useBusinessActivity";
 import { PALETTE, TYPE, ICON } from "@/lib/design-tokens";
 import BusinessAgents from "./BusinessAgents";
 import BusinessTasks from "./BusinessTasks";
@@ -18,18 +21,18 @@ import LinkedChats from "./LinkedChats";
 import GoalsList from "@/components/goals/GoalsList";
 import AddToWantsButton from "@/components/finances/AddToWantsButton";
 
-// Per-business control panel. Layout flows top-down by what Sir needs to
-// SEE first vs ACT on first vs reference occasionally:
+// Per-business dashboard. Reframed from edit-form-y to read/act-first:
 //
-//   1. HERO       — name (inline edit) + stage chip + MRR + sparkline + MoM%
-//   2. LOG REV    — one-row "log this month's revenue" inline (collapsed
-//                   into a button so it doesn't dominate)
-//   3. TASKS      — the main work surface
-//   4. AGENTS     — workforce with inline artifact feedback
-//   5. ACTIVITY   — chronological feed of revenue / agents / artifacts / tasks
-//   6. STATS      — collapsed: revenue history table, customers
-//   7. NOTES      — collapsed: free-form notes
-//   8. ARCHIVE    — danger zone at the bottom
+//   - Title is a big display H1, tap-to-edit (not always-input)
+//   - Stage + Category sit as static chips, click to edit inline
+//   - HERO: MRR + sparkline + MoM%
+//   - QUICK STATS strip: customers / tasks open / agents / last activity
+//   - LOG REVENUE: dashed-pill quick action
+//   - TASKS / GOALS / AGENTS / EXPERIMENTS / CHATS / WANTS / ACTIVITY
+//   - STATS (revenue history) — collapsed
+//   - SETTINGS — collapsed bin for the edit-form fields: customers,
+//     notes, archive. Read-only-by-default surfaces stay on the dashboard;
+//     the rarely-edited stuff disappears into the drawer.
 
 const STATUSES: BusinessStatus[] = ["idea", "building", "live", "growing", "paused"];
 
@@ -47,6 +50,17 @@ function fmtMoney(n: number): string {
   return `$${Math.round(n)}`;
 }
 
+function fmtRecency(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 60)  return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24)   return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  return `${day}d`;
+}
+
 export default function BusinessDetail({
   business,
   onClose,
@@ -56,9 +70,13 @@ export default function BusinessDetail({
 }) {
   const { updateBusiness, archiveBusiness } = useBusinesses();
   const { logs, momPct, logRevenue, deleteRevenue } = useBusinessRevenue(business.id);
+  const { openTasks }     = useBusinessTasks(business.id);
+  const { agents }        = useBusinessAgents(business.id);
+  const { entries }       = useBusinessActivity(business.id, 1);
+  const lastActivityAt    = entries[0]?.at ?? null;
 
-  // Local mirrors — debounce-free, push on blur / button tap.
   const [name, setName]             = useState(business.name);
+  const [editingName, setEditingName] = useState(false);
   const [status, setStatus]         = useState<BusinessStatus>(business.status);
   const [category, setCategory]     = useState(business.category ?? "");
   const [customers, setCustomers]   = useState(String(business.customer_count));
@@ -67,8 +85,6 @@ export default function BusinessDetail({
   const [newNote, setNewNote]       = useState("");
   const [revOpen, setRevOpen]       = useState(false);
 
-  // Reset local state when the displayed business changes (parent reuses
-  // the same sheet for different rows).
   useEffect(() => {
     setName(business.name);
     setStatus(business.status);
@@ -94,6 +110,15 @@ export default function BusinessDetail({
     onClose();
   }
 
+  function commitName() {
+    setEditingName(false);
+    if (name.trim() && name !== business.name) {
+      void saveField("name", name.trim());
+    } else {
+      setName(business.name);
+    }
+  }
+
   const statusColor = STATUS_COLOR[status];
 
   return (
@@ -106,42 +131,64 @@ export default function BusinessDetail({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 space-y-5">
-          {/* ── HERO ── */}
+
+          {/* ── HERO ────────────────────────────────────────────── */}
           <div>
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <FormInput
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => name.trim() && name !== business.name && saveField("name", name.trim())}
-                className="text-base font-semibold"
-              />
+            <div className="flex items-start justify-between gap-3">
+              {editingName ? (
+                <FormInput
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={commitName}
+                  onKeyDown={(e) => { if (e.key === "Enter") commitName(); if (e.key === "Escape") { setName(business.name); setEditingName(false); } }}
+                  className="text-xl font-bold"
+                />
+              ) : (
+                <button
+                  onClick={() => setEditingName(true)}
+                  className="group flex items-center gap-2 text-left flex-1 min-w-0"
+                  aria-label="Edit name"
+                >
+                  <h1 className={`${TYPE.headline} truncate`}>{business.name}</h1>
+                  <Pencil size={ICON.xs} className="text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </button>
+              )}
               <button onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-zinc-200 -m-2 p-2 flex-shrink-0">
                 <X size={ICON.md} />
               </button>
             </div>
 
-            {/* Stage + Category chips, tap to edit */}
-            <div className="flex items-center gap-3 mb-4">
-              <select
-                value={status}
-                onChange={(e) => { const s = e.target.value as BusinessStatus; setStatus(s); void saveField("status", s); }}
-                className="text-[10px] uppercase tracking-widest font-bold bg-transparent border-0 outline-none cursor-pointer"
-                style={{ color: statusColor }}
+            {/* Stage + Category — chip-styled, edit inline via select / input */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <span
+                className="text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full"
+                style={{ background: `${statusColor}20`, color: statusColor }}
               >
-                {STATUSES.map((s) => (<option key={s} value={s} className="bg-zinc-950 text-zinc-100">{s}</option>))}
-              </select>
-              <span className="text-zinc-700">·</span>
-              <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                onBlur={() => category !== (business.category ?? "") && saveField("category", category || null)}
-                placeholder="add category"
-                className="text-[10px] uppercase tracking-widest text-zinc-500 bg-transparent border-0 outline-none flex-1 min-w-0 placeholder:text-zinc-700"
-              />
+                <select
+                  value={status}
+                  onChange={(e) => { const s = e.target.value as BusinessStatus; setStatus(s); void saveField("status", s); }}
+                  className="bg-transparent border-0 outline-none cursor-pointer appearance-none pr-0"
+                  style={{ color: statusColor }}
+                >
+                  {STATUSES.map((s) => (<option key={s} value={s} className="bg-zinc-950 text-zinc-100">{s}</option>))}
+                </select>
+              </span>
+              <span
+                className="text-[10px] uppercase tracking-widest text-zinc-500 px-2.5 py-1 rounded-full bg-zinc-800/60"
+              >
+                <input
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  onBlur={() => category !== (business.category ?? "") && saveField("category", category || null)}
+                  placeholder="add category"
+                  className="bg-transparent border-0 outline-none placeholder:text-zinc-700 w-[120px]"
+                />
+              </span>
             </div>
 
             {/* MRR + sparkline + MoM */}
-            <div className="flex items-end gap-4">
+            <div className="flex items-end gap-4 mt-5">
               <div className="flex-shrink-0">
                 <div className="flex items-baseline gap-1.5">
                   <span className={TYPE.display} style={{ color: business.monthly_revenue > 0 ? PALETTE.success : PALETTE.dim }}>
@@ -162,14 +209,22 @@ export default function BusinessDetail({
             </div>
           </div>
 
-          {/* ── LOG REVENUE — collapsed into a button until tapped ── */}
+          {/* ── QUICK STATS — glanceable numbers ─────────────────── */}
+          <div className="grid grid-cols-4 gap-2">
+            <Stat label="Customers"  value={business.customer_count > 0 ? String(business.customer_count) : "—"} />
+            <Stat label="Tasks"      value={openTasks.length > 0 ? String(openTasks.length) : "—"} />
+            <Stat label="Agents"     value={agents.length      > 0 ? String(agents.length)      : "—"} />
+            <Stat label="Last"       value={fmtRecency(lastActivityAt)} />
+          </div>
+
+          {/* ── LOG REVENUE — primary quick action ──────────────── */}
           {!revOpen ? (
             <button
               onClick={() => setRevOpen(true)}
               className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-zinc-800 text-zinc-500 text-xs font-semibold hover:border-zinc-700 hover:text-zinc-300 transition-colors"
             >
               <Plus size={ICON.sm} />
-              Log this month's revenue
+              Log this month&apos;s revenue
             </button>
           ) : (
             <div className="p-3 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-2">
@@ -202,35 +257,54 @@ export default function BusinessDetail({
             </div>
           )}
 
-          {/* ── TASKS — the main work surface ── */}
+          {/* ── TASKS ────────────────────────────────────────────── */}
           <BusinessTasks businessId={business.id} />
 
-          {/* ── GOALS — long-term objectives tied to this specific business.
-              Each goal lives UNDER its business, not in a generic
-              business-bucket pool. Adding from here auto-links to
-              business.id via the AddGoalFlow pass-through. ── */}
+          {/* ── GOALS — nested per-business ──────────────────────── */}
           <div>
             <FormLabel>Goals</FormLabel>
             <GoalsList bucket="business" businessId={business.id} />
           </div>
 
-          {/* ── AGENTS — workforce + artifact feedback ── */}
+          {/* ── AGENTS ───────────────────────────────────────────── */}
           <BusinessAgents business={business} />
 
-          {/* ── MARKETING EXPERIMENTS — closed-loop variant + outcome log ── */}
+          {/* ── MARKETING EXPERIMENTS ────────────────────────────── */}
           <MarketingExperiments businessId={business.id} />
 
-          {/* ── LINKED CHATS — Claude.ai / external conversations about this business ── */}
+          {/* ── LINKED CHATS ─────────────────────────────────────── */}
           <LinkedChats businessId={business.id} />
 
-          {/* ── ADD TO WANTS — assigns a product to the Finances wishlist tagged to this business ── */}
+          {/* ── ADD TO WANTS ─────────────────────────────────────── */}
           <AddToWantsButton businessId={business.id} />
 
-          {/* ── ACTIVITY — chronological feed of everything that happened ── */}
+          {/* ── ACTIVITY — chronological feed ────────────────────── */}
           <BusinessActivity businessId={business.id} />
 
-          {/* ── STATS — revenue history table + customers, collapsed by default ── */}
-          <CollapsibleSection label="Stats" count={logs.length}>
+          {/* ── REVENUE HISTORY — collapsed reference data ──────── */}
+          {logs.length > 0 && (
+            <CollapsibleSection label="Revenue history" count={logs.length}>
+              <div className="space-y-1">
+                {[...logs].reverse().slice(0, 24).map((r) => (
+                  <div key={r.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-900/60 group">
+                    <span className="text-[11px] text-zinc-500 w-20 tabular-nums">{r.log_date}</span>
+                    <span className="text-sm font-semibold text-zinc-100 tabular-nums">{fmtMoney(r.amount)}</span>
+                    {r.note && <span className="text-[11px] text-zinc-500 truncate flex-1">{r.note}</span>}
+                    <button
+                      onClick={() => deleteRevenue(r.id)}
+                      aria-label="Delete entry"
+                      className="text-zinc-700 hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity -m-2 p-2"
+                    >
+                      <Trash2 size={ICON.xs} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* ── SETTINGS — everything edit-form-y lives here ───── */}
+          <CollapsibleSection label="Settings">
             <div className="space-y-3">
               <div>
                 <FormLabel>Customers</FormLabel>
@@ -245,49 +319,33 @@ export default function BusinessDetail({
                   }}
                 />
               </div>
-              {logs.length > 0 && (
-                <div>
-                  <FormLabel>Revenue history</FormLabel>
-                  <div className="space-y-1">
-                    {[...logs].reverse().slice(0, 12).map((r) => (
-                      <div key={r.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-900/60 group">
-                        <span className="text-[11px] text-zinc-500 w-20 tabular-nums">{r.log_date}</span>
-                        <span className="text-sm font-semibold text-zinc-100 tabular-nums">{fmtMoney(r.amount)}</span>
-                        {r.note && <span className="text-[11px] text-zinc-500 truncate flex-1">{r.note}</span>}
-                        <button
-                          onClick={() => deleteRevenue(r.id)}
-                          aria-label="Delete entry"
-                          className="text-zinc-700 hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity -m-2 p-2"
-                        >
-                          <Trash2 size={ICON.xs} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <FormLabel>Notes</FormLabel>
+                <FormTextarea
+                  rows={4}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onBlur={() => notes !== (business.notes ?? "") && saveField("notes", notes || null)}
+                  placeholder="Stack, decisions, links, ideas..."
+                />
+              </div>
+              <Button variant="danger" size="sm" fullWidth onClick={handleArchive}>
+                <Archive size={ICON.sm} /> Archive business
+              </Button>
             </div>
           </CollapsibleSection>
 
-          {/* ── NOTES — free-form, collapsed by default ── */}
-          <CollapsibleSection label="Notes" defaultOpen={!!business.notes}>
-            <FormTextarea
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={() => notes !== (business.notes ?? "") && saveField("notes", notes || null)}
-              placeholder="Stack, decisions, links, ideas..."
-            />
-          </CollapsibleSection>
-
-          {/* ── ARCHIVE — danger zone ── */}
-          <div className="pt-2">
-            <Button variant="danger" size="sm" fullWidth onClick={handleArchive}>
-              <Archive size={ICON.sm} /> Archive business
-            </Button>
-          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-2 py-2 text-center">
+      <div className="text-base font-bold tabular-nums text-zinc-100 leading-none">{value}</div>
+      <div className="text-[9px] uppercase tracking-widest text-zinc-500 mt-1">{label}</div>
     </div>
   );
 }
