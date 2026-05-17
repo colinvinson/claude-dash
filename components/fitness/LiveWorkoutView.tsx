@@ -42,10 +42,31 @@ function ping(freqHz: number, durationMs: number, gain = 0.2) {
   } catch {}
 }
 
-export default function LiveWorkoutView({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function LiveWorkoutView({
+  open,
+  onClose,
+  activeExId,
+}: {
+  open:    boolean;
+  onClose: () => void;
+  // The exercise the parent coach has selected. useWorkout's internal
+  // activeExId state is per-instance (separate React state per hook
+  // call), so the coach's selection wouldn't propagate to this view
+  // without an explicit prop sync.
+  activeExId: string | null;
+}) {
   const {
     activeExercise, verdict, todaySets, logSet, recovery, mesoState, pastSessions,
+    setActiveExId,
   } = useWorkout();
+
+  // Sync the prop into this hook instance's local state so derived
+  // values (activeExercise lookup, verdict, todaySets-for-this-exercise)
+  // all match what the parent coach is showing.
+  useEffect(() => {
+    if (open && activeExId) setActiveExId(activeExId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeExId]);
 
   // Input state — initialized from the coach's prescription on first open.
   const [weight, setWeight] = useState(45);
