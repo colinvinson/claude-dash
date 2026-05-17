@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type BusinessStatus = "idea" | "building" | "live" | "growing" | "paused";
 
@@ -116,15 +117,15 @@ export function useBusinesses() {
   useEffect(() => { load(); }, [load]);
 
   // Realtime — UI tiles update when revenue logged on another surface.
-  useEffect(() => {
-    if (!userId) return;
-    const ch = supabase
-      .channel(`businesses:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "businesses", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, load]);
+  // Helper gives each hook instance a unique channel suffix so multiple
+  // components calling this hook on the same page don't collide.
+  useRealtimeSubscription({
+    channelBase: userId ? `businesses:${userId}` : "",
+    table:       "businesses",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId,
+    onChange:    load,
+  });
 
   const addBusiness = useCallback(async (args: AddBusinessArgs): Promise<Business | null> => {
     if (!userId || !args.name.trim()) return null;

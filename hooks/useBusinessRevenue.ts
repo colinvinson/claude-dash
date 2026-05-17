@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type RevenueLog = {
   id:          string;
@@ -39,15 +40,13 @@ export function useBusinessRevenue(businessId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId || !businessId) return;
-    const ch = supabase
-      .channel(`biz-rev:${businessId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "business_revenue_log", filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  useRealtimeSubscription({
+    channelBase: businessId ? `biz-rev:${businessId}` : "",
+    table:       "business_revenue_log",
+    filter:      businessId ? `business_id=eq.${businessId}` : undefined,
+    enabled:     !!userId && !!businessId,
+    onChange:    load,
+  });
 
   const logRevenue = useCallback(async (amount: number, note?: string) => {
     if (!userId || !businessId) return;

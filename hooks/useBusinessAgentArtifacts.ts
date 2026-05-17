@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type BusinessArtifact = {
   id:                string;
@@ -42,15 +43,13 @@ export function useBusinessAgentArtifacts(businessId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId || !businessId) return;
-    const ch = supabase
-      .channel(`biz-artifacts:${businessId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "jarvis_artifacts", filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  useRealtimeSubscription({
+    channelBase: businessId ? `biz-artifacts:${businessId}` : "",
+    table:       "jarvis_artifacts",
+    filter:      businessId ? `business_id=eq.${businessId}` : undefined,
+    enabled:     !!userId && !!businessId,
+    onChange:    load,
+  });
 
   // Latest artifact per business_agent_id. Used by the BusinessAgents UI
   // to show one inline preview per role.

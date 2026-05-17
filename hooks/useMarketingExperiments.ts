@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type MarketingExperiment = {
   id:                 string;
@@ -69,15 +70,13 @@ export function useMarketingExperiments(businessId: string | null | undefined) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId || businessId === null) return;
-    const ch = supabase
-      .channel(`mkt-exp:${businessId ?? "all"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "marketing_experiments", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  useRealtimeSubscription({
+    channelBase: userId ? `mkt-exp:${userId}:${businessId ?? "all"}` : "",
+    table:       "marketing_experiments",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId && businessId !== null,
+    onChange:    load,
+  });
 
   const addExperiment = useCallback(async (args: AddExperimentArgs): Promise<MarketingExperiment | null> => {
     if (!userId || !args.variant_text.trim() || !args.channel.trim()) return null;

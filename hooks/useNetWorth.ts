@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type NetWorthSnapshot = {
   id:              string;
@@ -56,15 +57,13 @@ export function useNetWorth() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const ch = supabase
-      .channel(`net-worth:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "net_worth_snapshots", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, load]);
+  useRealtimeSubscription({
+    channelBase: userId ? `net-worth:${userId}` : "",
+    table:       "net_worth_snapshots",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId,
+    onChange:    load,
+  });
 
   // Upsert by (user_id, snapshot_date) — re-entering "this month" updates
   // the existing row instead of creating a duplicate.

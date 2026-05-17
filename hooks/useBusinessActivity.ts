@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type ActivityKind = "revenue" | "agent_run" | "artifact" | "task_done";
 
@@ -80,16 +81,15 @@ export function useBusinessActivity(businessId: string | null, limit = 20) {
   useEffect(() => { load(); }, [load]);
 
   // Realtime across all four sources — any insert/update should re-pull.
-  useEffect(() => {
-    if (!userId || !businessId) return;
-    const ch = supabase.channel(`biz-activity:${businessId}`);
-    for (const table of ["business_revenue_log", "business_agents", "jarvis_artifacts", "business_tasks"]) {
-      ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `business_id=eq.${businessId}` }, () => { void load(); });
-    }
-    ch.subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  // Each call to the helper gets its own useId-stable channel so they
+  // don't collide with each other or with other components.
+  const enabled = !!userId && !!businessId;
+  const filter  = businessId ? `business_id=eq.${businessId}` : undefined;
+  const base    = businessId ? `biz-activity:${businessId}` : "";
+  useRealtimeSubscription({ channelBase: base, table: "business_revenue_log", filter, enabled, onChange: load });
+  useRealtimeSubscription({ channelBase: base, table: "business_agents",      filter, enabled, onChange: load });
+  useRealtimeSubscription({ channelBase: base, table: "jarvis_artifacts",     filter, enabled, onChange: load });
+  useRealtimeSubscription({ channelBase: base, table: "business_tasks",       filter, enabled, onChange: load });
 
   return { entries, loading };
 }

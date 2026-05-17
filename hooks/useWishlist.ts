@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type WishlistStatus = "wanted" | "bought" | "dismissed";
 export type WishlistKind   = "leverage" | "consumption";
@@ -94,15 +95,13 @@ export function useWishlist(scope: {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const ch = supabase
-      .channel(`wishlist:${userId}:${scope.businessId ?? "x"}:${scope.goalId ?? "x"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "wishlist_items", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, scope.businessId, scope.goalId, load]);
+  useRealtimeSubscription({
+    channelBase: userId ? `wishlist:${userId}:${scope.businessId ?? "x"}:${scope.goalId ?? "x"}` : "",
+    table:       "wishlist_items",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId,
+    onChange:    load,
+  });
 
   const addItem = useCallback(async (args: AddWishlistArgs): Promise<WishlistItem | null> => {
     if (!userId || !args.title.trim()) return null;

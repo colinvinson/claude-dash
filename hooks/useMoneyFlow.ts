@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 type MoneyLog = {
   amount:    number;
@@ -48,15 +49,13 @@ export function useMoneyFlow() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const ch = supabase
-      .channel(`money-flow:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "money_logs", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, load]);
+  useRealtimeSubscription({
+    channelBase: userId ? `money-flow:${userId}` : "",
+    table:       "money_logs",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId,
+    onChange:    load,
+  });
 
   const summary: MoneyFlowSummary = useMemo(() => {
     const now = Date.now();

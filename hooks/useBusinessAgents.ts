@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 import type { ScheduleKind } from "@/lib/businesses/schedule";
 import { nextRunAfter } from "@/lib/businesses/schedule";
@@ -71,15 +72,13 @@ export function useBusinessAgents(businessId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId || !businessId) return;
-    const ch = supabase
-      .channel(`biz-agents:${businessId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "business_agents", filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  useRealtimeSubscription({
+    channelBase: businessId ? `biz-agents:${businessId}` : "",
+    table:       "business_agents",
+    filter:      businessId ? `business_id=eq.${businessId}` : undefined,
+    enabled:     !!userId && !!businessId,
+    onChange:    load,
+  });
 
   const assignAgent = useCallback(async (args: AssignAgentArgs): Promise<BusinessAgent | null> => {
     if (!userId || !businessId || !args.role_label.trim()) return null;

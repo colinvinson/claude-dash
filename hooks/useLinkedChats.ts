@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type ChatSource = "claude" | "chatgpt" | "jarvis" | "other";
 
@@ -63,15 +64,13 @@ export function useLinkedChats(args: {
 
   // Realtime — keep the per-business or per-goal list fresh as Sir
   // adds chats from other surfaces.
-  useEffect(() => {
-    if (!userId || paused) return;
-    const ch = supabase
-      .channel(`linked-chats:${businessId ?? "-"}:${goalId ?? "-"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "linked_chats", filter: `user_id=eq.${userId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, goalId, paused, load]);
+  useRealtimeSubscription({
+    channelBase: userId ? `linked-chats:${userId}:${businessId ?? "-"}:${goalId ?? "-"}` : "",
+    table:       "linked_chats",
+    filter:      userId ? `user_id=eq.${userId}` : undefined,
+    enabled:     !!userId && !paused,
+    onChange:    load,
+  });
 
   const addChat = useCallback(async (a: AddChatArgs): Promise<LinkedChat | null> => {
     if (!userId || !a.title.trim()) return null;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 export type BusinessTask = {
   id:           string;
@@ -48,15 +49,13 @@ export function useBusinessTasks(businessId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (!userId || !businessId) return;
-    const ch = supabase
-      .channel(`biz-tasks:${businessId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "business_tasks", filter: `business_id=eq.${businessId}` }, () => { void load(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, businessId, load]);
+  useRealtimeSubscription({
+    channelBase: businessId ? `biz-tasks:${businessId}` : "",
+    table:       "business_tasks",
+    filter:      businessId ? `business_id=eq.${businessId}` : undefined,
+    enabled:     !!userId && !!businessId,
+    onChange:    load,
+  });
 
   const addTask = useCallback(async (args: AddTaskArgs): Promise<BusinessTask | null> => {
     if (!userId || !businessId || !args.title.trim()) return null;
