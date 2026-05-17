@@ -91,22 +91,18 @@ export default function SideNav() {
                 aria-label={tab.label}
                 className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
                 style={{
-                  // Active = RAISED dark squircle that floats above the
-                  // rail surface. Gradient slightly brighter at the top
-                  // (catches light) → darker at the bottom (recedes).
-                  // Drop shadow underneath plus a thin lit edge at the
-                  // top reads as physically lifted above the surface.
+                  // Active = floating dark squircle. Outer drop shadows
+                  // only (no insets) so the depth reads as the squircle
+                  // sitting above the surface, not as detailing painted
+                  // inside it. Thin 1px border at low opacity defines
+                  // the edge cleanly.
                   background: active
-                    ? "linear-gradient(180deg, rgba(35,35,50,0.95) 0%, rgba(15,15,25,0.95) 100%)"
+                    ? "linear-gradient(180deg, rgba(28,28,40,0.95) 0%, rgba(14,14,22,0.95) 100%)"
                     : "transparent",
                   color:      active ? "#fafafa" : "#a1a1aa",
+                  border:     active ? "1px solid rgba(255,255,255,0.06)" : "1px solid transparent",
                   boxShadow:  active
-                    ? [
-                        "0 8px 18px rgba(0,0,0,0.55)",          // main drop shadow
-                        "0 2px 5px rgba(0,0,0,0.40)",           // tight cast shadow
-                        "inset 0 1px 0 rgba(255,255,255,0.12)", // lit top edge
-                        "inset 0 -1px 0 rgba(0,0,0,0.30)",      // dark bottom rim
-                      ].join(", ")
+                    ? "0 8px 20px rgba(0,0,0,0.55), 0 2px 5px rgba(0,0,0,0.35)"
                     : undefined,
                   transition: "background 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}

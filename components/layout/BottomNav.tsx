@@ -98,16 +98,12 @@ export default function BottomNav() {
                 width: TAB_W,
                 height: 48,
                 borderRadius: 16,
-                // Raised dark squircle matching SideNav. Drop shadow
-                // underneath + lit top edge + dark bottom rim reads as
-                // floating above the pill surface.
-                background: "linear-gradient(180deg, rgba(35,35,50,0.95) 0%, rgba(15,15,25,0.95) 100%)",
-                boxShadow: [
-                  "0 8px 18px rgba(0,0,0,0.55)",
-                  "0 2px 5px rgba(0,0,0,0.40)",
-                  "inset 0 1px 0 rgba(255,255,255,0.12)",
-                  "inset 0 -1px 0 rgba(0,0,0,0.30)",
-                ].join(", "),
+                // Floating dark squircle matching SideNav. Outer drop
+                // shadows only — depth lives OUTSIDE the squircle, not
+                // inside it. Thin edge border for clean definition.
+                background: "linear-gradient(180deg, rgba(28,28,40,0.95) 0%, rgba(14,14,22,0.95) 100%)",
+                border:     "1px solid rgba(255,255,255,0.06)",
+                boxShadow:  "0 8px 20px rgba(0,0,0,0.55), 0 2px 5px rgba(0,0,0,0.35)",
                 transition: "left 320ms cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             />
