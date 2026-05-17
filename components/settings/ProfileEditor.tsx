@@ -11,6 +11,7 @@ export default function ProfileEditor() {
   const [name, setName]               = useState("");
   const [goalKg, setGoalKg]           = useState("");
   const [trainingGoal, setTrainingGoal] = useState("lean muscle");
+  const [wakeTarget, setWakeTarget]   = useState("07:30");
   const [currentKg, setCurrentKg]     = useState("");
   const [saving, setSaving]           = useState(false);
   const [savedKey, setSavedKey]       = useState<string | null>(null);
@@ -19,14 +20,16 @@ export default function ProfileEditor() {
     setName(profile.full_name ?? "");
     setGoalKg(profile.goal_weight_kg?.toString() ?? "");
     setTrainingGoal(profile.training_goal ?? "lean muscle");
+    setWakeTarget((profile.wake_target_time ?? "07:30:00").slice(0, 5));
   }, [profile]);
 
   async function saveProfileFields() {
     setSaving(true);
     await saveProfile({
-      full_name:      name.trim() || null,
-      goal_weight_kg: goalKg ? Number(goalKg) : null,
-      training_goal:  trainingGoal,
+      full_name:        name.trim() || null,
+      goal_weight_kg:   goalKg ? Number(goalKg) : null,
+      training_goal:    trainingGoal,
+      wake_target_time: wakeTarget ? `${wakeTarget}:00` : null,
     });
     setSaving(false);
     setSavedKey("profile");
@@ -69,6 +72,17 @@ export default function ProfileEditor() {
             placeholder="e.g. 75"
             className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
           />
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-zinc-500 block mb-1.5">Wake target</label>
+          <input
+            type="time"
+            value={wakeTarget}
+            onChange={(e) => setWakeTarget(e.target.value)}
+            className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
+          />
+          <p className="text-[10px] text-zinc-600 mt-1">NFC-tap by this time counts as on-time wake.</p>
         </div>
 
         <div>

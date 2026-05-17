@@ -71,6 +71,11 @@ export type DaySnapshot = {
   // from business_revenue_log, so the correlation engine can spot
   // "MRR climbs when focus_min climbs" etc.
   business_mrr_total: number | null;
+  // wake-confirm (migration 0037) — was today's NFC-tap on time vs the
+  // profile's wake_target_time? 1 = on-time, 0 = late, null = no confirm.
+  // Behavioral signal, not biometric (so the correlation engine can tie
+  // wake-on-time to mood / focus / drinks / etc.).
+  wake_on_time:       0 | 1 | null;
   // per-supplement booleans (dynamically added in buildDailySnapshot)
   [supKey: `supp_${string}`]: 0 | 1 | null | undefined;
 };
@@ -104,6 +109,7 @@ export async function buildDailySnapshot(
     setsRes, goalsRes, proteinRes,
     focusRes, socialRes, cardioRes, libidoRes, aestheticRes, caffeineRes, sunRes, learningRes, moneyRes,
     businessRevRes,
+    wakeRes,
   ] = await Promise.all([
     supabase.from("health_logs").select("*").eq("user_id", userId).gte("date", cutoff).order("date", { ascending: true }),
     supabase.from("supplement_stack").select("id, name").eq("user_id", userId).eq("is_active", true),
@@ -132,6 +138,10 @@ export async function buildDailySnapshot(
     // that business on that day; summing across businesses per date gives
     // total portfolio MRR over time.
     supabase.from("business_revenue_log").select("amount, log_date").eq("user_id", userId).gte("log_date", cutoff),
+    // Wake-confirm (migration 0037). Behavioral signal — feeds the 21d
+    // correlation engine so it can spot e.g. "wake_on_time correlates
+    // -0.6 with alcohol_drinks the night before."
+    supabase.from("wake_logs").select("date, on_time").eq("user_id", userId).gte("date", cutoff),
   ]);
 
   type HealthRow = Record<string, unknown> & { date: string };
@@ -256,6 +266,12 @@ export async function buildDailySnapshot(
     businessMRRByDate.set(r.log_date, (businessMRRByDate.get(r.log_date) ?? 0) + Number(r.amount));
   }
 
+  const wakeOnTimeByDate = new Map<string, 0 | 1>();
+  for (const r of ((wakeRes.data ?? []) as Array<{ date: string; on_time: boolean | null }>)) {
+    if (r.on_time == null) continue;
+    wakeOnTimeByDate.set(r.date, r.on_time ? 1 : 0);
+  }
+
   // Money net (income + business_revenue) - expenses + savings reads as positive contribution
   const moneyNetByDate = new Map<string, number>();
   for (const r of ((moneyRes.data ?? []) as Array<{ amount: number; kind: string; log_date: string }>)) {
@@ -326,6 +342,7 @@ export async function buildDailySnapshot(
       learning_min:      learningMinByDate.get(date) ?? null,
       money_net:         moneyNetByDate.get(date)    ?? null,
       business_mrr_total: businessMRRByDate.get(date) ?? null,
+      wake_on_time:       wakeOnTimeByDate.get(date) ?? null,
     };
 
     // Per-supplement boolean

@@ -8,6 +8,7 @@ import { useWorkout } from "@/hooks/useWorkout";
 import { useHealth } from "@/hooks/useHealth";
 import { useHealthBaselines } from "@/hooks/useHealthBaselines";
 import { useDailyContext } from "@/hooks/useDailyContext";
+import { useWakeConfirm } from "@/hooks/useWakeConfirm";
 import { computeDailyScore } from "@/lib/scoring";
 import Card from "@/components/ui/Card";
 import { Sparkles, Volume2 } from "lucide-react";
@@ -63,6 +64,7 @@ export default function TodayWrap() {
   const { health } = useHealth();
   const { baselines } = useHealthBaselines();
   const { hasCheckedIn } = useDailyContext();
+  const { today: wakeToday } = useWakeConfirm();
 
   const isLoading = goalsLoading || stackLoading || proteinLoading;
 
@@ -90,6 +92,7 @@ export default function TodayWrap() {
     checkedIn:         hasCheckedIn,
     proteinPct:        pTarget > 0 ? pToday / pTarget : null,
     proteinTarget:     pTarget,
+    wakeOnTime:        wakeToday?.on_time ?? null,
   });
 
   // Confetti + haptic on all-closed transition (once per day).

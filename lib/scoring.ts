@@ -22,6 +22,7 @@ export type ScoreInputs = {
   checkedIn: boolean;                     // morning check-in submitted
   proteinPct?: number | null;             // 0..(>=1); 1.0 = at target. Null = no entries yet.
   proteinTarget?: number | null;          // null/0 = no target configured → component excluded
+  wakeOnTime?: boolean | null;            // true=on-time, false=late, null=no wake_log today (component excluded)
 };
 
 export type ScoreResult = {
@@ -38,6 +39,7 @@ const W = {
   adherence:    25,    // any routine items: supps + meds + habits + skincare + exercise + meals
   protein:      15,
   checkin:      10,
+  wakeOnTime:   10,    // NFC-tap by wake target. Volitional, scoring-eligible.
 } as const;
 
 export function computeDailyScore(inputs: ScoreInputs): ScoreResult {
@@ -91,6 +93,16 @@ export function computeDailyScore(inputs: ScoreInputs): ScoreResult {
     earned: inputs.checkedIn ? W.checkin : 0,
     max:    W.checkin,
   });
+
+  // Wake-on-time — excluded when no wake_log for today (no NFC tap yet,
+  // no manual confirm). Self-excludes rather than penalizing — Sir might
+  // simply not have walked to the kitchen yet at 6am.
+  if (inputs.wakeOnTime != null) {
+    components.push({
+      earned: inputs.wakeOnTime ? W.wakeOnTime : 0,
+      max:    W.wakeOnTime,
+    });
+  }
 
   const totalEarned = components.reduce((s, c) => s + c.earned, 0);
   const totalMax    = components.reduce((s, c) => s + c.max,    0);

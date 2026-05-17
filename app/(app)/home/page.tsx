@@ -9,6 +9,7 @@ import { useDailyContext } from "@/hooks/useDailyContext";
 import { useLog } from "@/hooks/useLog";
 import { useProtein } from "@/hooks/useProtein";
 import { useHealthBaselines } from "@/hooks/useHealthBaselines";
+import { useWakeConfirm } from "@/hooks/useWakeConfirm";
 import { computeDailyScore } from "@/lib/scoring";
 
 import WelcomeCard from "@/components/home/WelcomeCard";
@@ -45,6 +46,7 @@ export default function HomePage() {
   const { state: logState } = useLog();
   const { totalToday: proteinToday, target: proteinTarget, pctOfTarget: proteinPct } = useProtein();
   const { baselines } = useHealthBaselines();
+  const { today: wakeToday } = useWakeConfirm();
 
   const supplementsTaken = stackItems.filter((s) => s.taken).length;
   const supplementsTotal = stackItems.length;
@@ -64,6 +66,7 @@ export default function HomePage() {
     checkedIn: hasCheckedIn,
     proteinPct:    proteinTarget > 0 ? proteinToday / proteinTarget : null,
     proteinTarget: proteinTarget,
+    wakeOnTime:    wakeToday?.on_time ?? null,
   });
 
   // Dynamic body-accent based on daily score was removed — it was

@@ -4,14 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export type Profile = {
-  full_name:      string | null;
-  goal_weight_kg: number | null;
-  training_goal:  string | null;
+  full_name:        string | null;
+  goal_weight_kg:   number | null;
+  training_goal:    string | null;
+  wake_target_time: string | null;
 };
 
 export function useSettings() {
   const supabase = createClient();
-  const [profile,  setProfile]  = useState<Profile>({ full_name: null, goal_weight_kg: null, training_goal: null });
+  const [profile,  setProfile]  = useState<Profile>({ full_name: null, goal_weight_kg: null, training_goal: null, wake_target_time: null });
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [userId,   setUserId]   = useState<string | null>(null);
@@ -22,7 +23,7 @@ export function useSettings() {
     setUserId(user.id);
 
     const [profileRes, weightRes] = await Promise.all([
-      supabase.from("profiles").select("full_name, goal_weight_kg, training_goal").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, goal_weight_kg, training_goal, wake_target_time").eq("id", user.id).single(),
       supabase.from("weight_logs").select("weight_kg").eq("user_id", user.id).order("logged_at", { ascending: false }).limit(1),
     ]);
 

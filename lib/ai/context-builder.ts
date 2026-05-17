@@ -85,6 +85,10 @@ export async function buildContext(userId: string) {
     // snapshot + 30d money flow. Jarvis uses these to ground the
     // "highest-EV move with what you have right now" advisory.
     wishlistRes, netWorthRes, moneyFlow30dRes,
+    // Wake-confirm (migration 0037). Today's wake_log + profile's wake
+    // target. NFC-tap dismisses Alarmy AND writes here, so this is
+    // tamper-resistant "did Sir actually get out of bed by target."
+    wakeTodayRes, wakeProfileRes, wake14dRes,
   ] = await Promise.all([
     supabase.from("goals").select("title, is_complete, priority").eq("user_id", userId).eq("goal_date", today),
     supabase.from("supplement_stack").select("id, name, timing").eq("user_id", userId).eq("is_active", true),
@@ -172,6 +176,9 @@ export async function buildContext(userId: string) {
     supabase.from("wishlist_items").select("title, price, kind, status, goal_id, business_id, priority").eq("user_id", userId).is("archived_at", null).neq("status", "dismissed").order("status", { ascending: true }).order("priority", { ascending: false }).limit(40),
     supabase.from("net_worth_snapshots").select("snapshot_date, cash, investments, business_equity, debts").eq("user_id", userId).order("snapshot_date", { ascending: false }).limit(2),
     supabase.from("money_logs").select("amount, kind, category, log_date").eq("user_id", userId).gte("log_date", dateDaysAgo(30)),
+    supabase.from("wake_logs").select("date, wake_at, target_at, on_time, source").eq("user_id", userId).eq("date", today).maybeSingle(),
+    supabase.from("profiles").select("wake_target_time").eq("id", userId).single(),
+    supabase.from("wake_logs").select("date, on_time").eq("user_id", userId).gte("date", dateDaysAgo(14)).order("date", { ascending: false }),
   ]);
 
   const goals         = goalsRes.data ?? [];
@@ -661,6 +668,8 @@ export async function buildContext(userId: string) {
     };
   })() : null;
 
+  const wakeToday = wakeTodayRes.data as { wake_at: string; target_at: string | null; on_time: boolean | null; source: string } | null;
+
   const dailyScore = computeDailyScore({
     goalsComplete,
     goalsTotal: goals.length,
@@ -672,6 +681,7 @@ export async function buildContext(userId: string) {
     checkedIn: !!dailyCtxRes.data?.raw_text,
     proteinPct:    proteinTargetG > 0 ? proteinTodayG / proteinTargetG : null,
     proteinTarget: proteinTargetG,
+    wakeOnTime:    wakeToday?.on_time ?? null,
   });
 
   return {
@@ -779,6 +789,25 @@ export async function buildContext(userId: string) {
       const meditationRows = (meditationTodayRes.data ?? []) as Array<{ duration_min: number }>;
       const drinksToday = alcoholRows.reduce((s, r) => s + Number(r.drink_count ?? 1), 0);
       const meditationMinToday = meditationRows.reduce((s, r) => s + Number(r.duration_min ?? 0), 0);
+      const wakeTargetTime = (wakeProfileRes.data?.wake_target_time as string | undefined) ?? "07:30:00";
+      const wake14d = (wake14dRes.data ?? []) as Array<{ date: string; on_time: boolean | null }>;
+      let wakeStreak = 0;
+      for (let i = 0; i < 14; i += 1) {
+        const d = dateDaysAgo(i);
+        const log = wake14d.find((r) => r.date === d);
+        if (log?.on_time) wakeStreak += 1;
+        else break;
+      }
+      const wakeBlock = {
+        target:        wakeTargetTime.slice(0, 5),
+        confirmedToday: !!wakeToday,
+        wakeAt:        wakeToday?.wake_at
+          ? new Date(wakeToday.wake_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+          : null,
+        onTime:        wakeToday?.on_time ?? null,
+        source:        wakeToday?.source ?? null,
+        streak14d:     wakeStreak,
+      };
       return {
         dailyPlan:        dailyCtxRes.data?.raw_text ?? null,
         waterGlasses:     waterRes.data?.glasses ?? 0,
@@ -791,6 +820,7 @@ export async function buildContext(userId: string) {
         drinksToday,
         drinkTypes:       Array.from(new Set(alcoholRows.map((r) => r.drink_type).filter(Boolean))),
         meditationMinToday,
+        wake:             wakeBlock,
       };
     })(),
     recentArtifacts: (recentArtifactsRes.data ?? []) as Array<{ id: string; name: string; type: string; created_at: string }>,
