@@ -30,6 +30,8 @@ These are the individual files that `APPLY_ALL.sql` bundles. Listed for referenc
 | 0032 | `0032_marketing_experiments.sql` | `marketing_experiments` table — variant text + channel + outcome metrics | Closed-loop learning: agents see what's been tried + what converted before drafting new variants |
 | 0033 | `0033_linked_chats.sql` | `linked_chats` table — external Claude.ai / ChatGPT conversation references attached to a business or goal | Linked Chats section in BusinessDetail + GoalWidget |
 | 0034 | `0034_finances.sql` | `wishlist_items` + `net_worth_snapshots` tables | Finances tab — Wants list + Net worth snapshots + Cash flow aggregate + Strategy Jarvis surface |
+| 0035 | `0035_goals_business_link.sql` | `business_id` column on `long_term_goals` | Goals nested under a specific business in BusinessDetail |
+| 0036 | `0036_supplement_skipped.sql` | `skipped` boolean on `supplement_logs` | Skip-today affordance on Schedule items (distinct from done/undone) |
 
 ## After running, verify
 

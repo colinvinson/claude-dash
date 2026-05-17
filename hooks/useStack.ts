@@ -29,6 +29,11 @@ export type StackItem = {
   category: StackCategory;
   sort_order: number;
   taken: boolean;
+  // Explicit "not doing this today" acknowledgement. Distinct from `taken`:
+  // taken means done, skipped means deliberately not done. Both insert a
+  // supplement_logs row (so they're visible to adherence math); skipped
+  // sets the new `skipped` column to true and leaves taken_at null.
+  skipped: boolean;
   log_id: string | null;
   // New: real clock time + duration. Both nullable.
   scheduled_at: string | null;   // "HH:MM:SS" or null
@@ -77,15 +82,15 @@ export function useStack() {
     // default to false/null at the merge step below.
     const [stackRes, logsRes] = await Promise.all([
       supabase.from("supplement_stack").select("*").eq("user_id", user.id).eq("is_active", true).order("sort_order"),
-      supabase.from("supplement_logs").select("id, supplement_id").eq("user_id", user.id).eq("log_date", today),
+      supabase.from("supplement_logs").select("id, supplement_id, skipped").eq("user_id", user.id).eq("log_date", today),
     ]);
 
-    const logs = (logsRes.data ?? []) as Array<{ id: string; supplement_id: string }>;
+    const logs = (logsRes.data ?? []) as Array<{ id: string; supplement_id: string; skipped?: boolean | null }>;
     const merged = (stackRes.data ?? []).map((s: Record<string, unknown>) => {
       const log = logs.find((l: { supplement_id: string }) => l.supplement_id === (s.id as string));
+      const isSkipped = !!log?.skipped;
       return {
         ...s,
-        // Defaults for columns that may not exist in the user's DB yet.
         is_running_low: (s.is_running_low as boolean | undefined) ?? false,
         linked_goal_id: (s.linked_goal_id as string | null | undefined) ?? null,
         icon:           (s.icon as string | null | undefined) ?? null,
@@ -93,7 +98,9 @@ export function useStack() {
         days_of_week:   (s.days_of_week as number[] | null | undefined) ?? null,
         scheduled_at:   (s.scheduled_at as string | null | undefined) ?? null,
         duration_min:   (s.duration_min as number | null | undefined) ?? null,
-        taken:          !!log,
+        // taken = log row exists AND not skipped (skipped is a third state)
+        taken:          !!log && !isSkipped,
+        skipped:        isSkipped,
         log_id:         log?.id ?? null,
       } as StackItem;
     });
@@ -118,7 +125,7 @@ export function useStack() {
     // Optimistic flip in local state
     setItems((prev) => prev.map((item) =>
       item.id === supplementId
-        ? { ...item, taken: !taken, log_id: !taken ? "optimistic" : null }
+        ? { ...item, taken: !taken, skipped: false, log_id: !taken ? "optimistic" : null }
         : item
     ));
 
@@ -126,14 +133,60 @@ export function useStack() {
       if (taken && logId) {
         await supabase.from("supplement_logs").delete().eq("id", logId);
       } else {
+        // If there's an existing log row (e.g. from skip), upgrade it to
+        // taken=true / skipped=false. Otherwise insert a fresh taken row.
+        if (logId) {
+          await supabase.from("supplement_logs").update({
+            skipped:  false,
+            taken_at: new Date().toISOString(),
+          }).eq("id", logId);
+        } else {
+          await supabase.from("supplement_logs").insert({
+            user_id: userId, supplement_id: supplementId,
+            log_date: today, taken_at: new Date().toISOString(),
+          });
+        }
+      }
+      await load();
+    } catch {
+      await load();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Toggle skip state. If currently skipped → remove the log row entirely
+  // (back to undone). If currently undone or taken → write a row with
+  // skipped=true, taken_at=null. Distinct from toggle so callers can wire
+  // a separate "Skip" affordance.
+  const skip = useCallback(async (supplementId: string, currentlySkipped: boolean, logId: string | null) => {
+    if (!userId) return;
+    const today = getLogDate();
+
+    setItems((prev) => prev.map((item) =>
+      item.id === supplementId
+        ? { ...item, skipped: !currentlySkipped, taken: false, log_id: !currentlySkipped ? "optimistic" : null }
+        : item
+    ));
+
+    try {
+      if (currentlySkipped && logId) {
+        // Un-skip → delete the row, item returns to undone.
+        await supabase.from("supplement_logs").delete().eq("id", logId);
+      } else if (logId) {
+        // Existing row (was taken) → flip to skipped.
+        await supabase.from("supplement_logs").update({
+          skipped:  true,
+          taken_at: null,
+        }).eq("id", logId);
+      } else {
+        // No existing row → insert a skipped row.
         await supabase.from("supplement_logs").insert({
           user_id: userId, supplement_id: supplementId,
-          log_date: today, taken_at: new Date().toISOString(),
+          log_date: today, skipped: true,
         });
       }
       await load();
     } catch {
-      // Roll back on error
       await load();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,5 +283,5 @@ export function useStack() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, items]);
 
-  return { items, loading, toggle, addToStack, createItem, updateItem, archiveItem, toggleRunningLow };
+  return { items, loading, toggle, skip, addToStack, createItem, updateItem, archiveItem, toggleRunningLow };
 }

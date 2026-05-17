@@ -66,6 +66,7 @@ const SECTION_META: Array<{ key: Section; label: string; emoji: string; range: s
 function ItemRow({
   item,
   onToggle,
+  onSkip,
   onEdit,
   onToggleRunningLow,
   onArchive,
@@ -73,24 +74,23 @@ function ItemRow({
   item: StackItem;
   insight?: StackInsight;
   onToggle: () => void;
+  onSkip?: () => void;
   onEdit?: () => void;
   onToggleRunningLow?: (id: string) => void;
   onArchive?: (id: string) => void;
 }) {
   const isSupply = SUPPLY_CATEGORIES.has(item.category);
   const canShowRunningLow = isSupply && onToggleRunningLow;
-  // Per-item icon + color (pill, syringe, sun, dumbbell, etc.) so each row
-  // is glanceable. CompletionToggle handles the check / burst / haptic.
   const { Icon, color } = resolveItemStyle(item);
 
+  // Three visual states: taken (emerald) > skipped (dimmed zinc) > undone
+  const containerClasses =
+    item.taken   ? "bg-emerald-500/5 border-emerald-500/15"
+  : item.skipped ? "bg-zinc-900/30 border-zinc-800/60 opacity-60"
+  :                "bg-zinc-900/40 border-zinc-800/60";
+
   return (
-    <div
-      className={`relative flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${
-        item.taken
-          ? "bg-emerald-500/5 border-emerald-500/15"
-          : "bg-zinc-900/40 border-zinc-800/60"
-      }`}
-    >
+    <div className={`relative flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${containerClasses}`}>
       <CompletionToggle
         done={item.taken}
         onToggle={onToggle}
@@ -99,12 +99,19 @@ function ItemRow({
         accent={color}
       />
 
-      {/* Title + subtitle (tap to edit) */}
       <button onClick={onEdit} className="flex-1 min-w-0 text-left" aria-label="Edit item">
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold truncate ${item.taken ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
+          <span className={`text-sm font-semibold truncate ${item.taken ? "text-zinc-500 line-through" : item.skipped ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
             {item.name}
           </span>
+          {item.skipped && (
+            <span
+              className="text-[9px] font-semibold uppercase tracking-wider rounded px-1.5 py-px"
+              style={{ color: PALETTE.dim, background: "rgba(113,113,122,0.15)", border: `1px solid ${PALETTE.dim}55` }}
+            >
+              skipped
+            </span>
+          )}
           {item.is_running_low && (
             <span
               className="text-[9px] font-semibold uppercase tracking-wider rounded px-1.5 py-px"
@@ -120,6 +127,22 @@ function ItemRow({
           </div>
         )}
       </button>
+
+      {/* Skip button — explicit "not doing this today" acknowledgement,
+          distinct from done/undone. Only renders when not already taken. */}
+      {onSkip && !item.taken && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onSkip(); }}
+          aria-label={item.skipped ? "Unskip" : "Skip today"}
+          className={`flex-shrink-0 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+            item.skipped
+              ? "bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-zinc-600"
+              : "bg-transparent border border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+          }`}
+        >
+          {item.skipped ? "Skipped" : "Skip"}
+        </button>
+      )}
 
       {/* Running low pill (supplies only) */}
       {canShowRunningLow && (
@@ -155,6 +178,7 @@ export default function TimelineSchedule({
   items,
   insights,
   onToggle,
+  onSkip,
   onEdit,
   onToggleRunningLow,
   onArchive,
@@ -162,6 +186,7 @@ export default function TimelineSchedule({
   items: StackItem[];
   insights?: Record<string, StackInsight>;
   onToggle: (id: string, taken: boolean, logId: string | null) => void;
+  onSkip?:  (id: string, currentlySkipped: boolean, logId: string | null) => void;
   onEdit?: (item: StackItem) => void;
   onToggleRunningLow?: (id: string) => void;
   onArchive?: (id: string) => void;
@@ -204,6 +229,7 @@ export default function TimelineSchedule({
                   item={item}
                   insight={insights?.[item.id]}
                   onToggle={() => onToggle(item.id, item.taken, item.log_id)}
+                  onSkip={onSkip ? () => onSkip(item.id, item.skipped, item.log_id) : undefined}
                   onEdit={onEdit ? () => onEdit(item) : undefined}
                   onToggleRunningLow={onToggleRunningLow}
                   onArchive={onArchive}

@@ -26,7 +26,7 @@ const BUCKET_OPTIONS: Array<{ value: string; label: string }> = [
 
 export default function SchedulePage() {
   const {
-    items, toggle, createItem, updateItem, archiveItem, toggleRunningLow,
+    items, toggle, skip, createItem, updateItem, archiveItem, toggleRunningLow,
   } = useStack();
   const [editingItem, setEditingItem] = useState<StackItem | null>(null);
   // Separate "add new" sheet flag so opening the rich add path doesn't
@@ -88,6 +88,7 @@ export default function SchedulePage() {
             items={todayItems}
             insights={insights}
             onToggle={toggle}
+            onSkip={skip}
             onEdit={(item) => setEditingItem(item)}
             onToggleRunningLow={toggleRunningLow}
             onArchive={archiveItem}
