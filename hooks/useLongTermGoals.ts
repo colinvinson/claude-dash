@@ -34,6 +34,9 @@ export type LongTermGoal = {
   starting_value:         number | null;
   metric_unit:            string | null;
   is_focus:               boolean;
+  // New (migration 0035) — optional link to a specific business.
+  // Personal-bucket goals always have null here.
+  business_id:            string | null;
 };
 
 export type AddGoalArgs = {
@@ -45,9 +48,18 @@ export type AddGoalArgs = {
   target_value?:  number | null;
   starting_value?: number | null;
   metric_unit?:   string | null;
+  business_id?:   string | null;
 };
 
-export function useLongTermGoals(bucket?: GoalBucket) {
+// Pass `businessId` to scope to a specific business's goals. Bucket is
+// optional and ignored when businessId is set (business_id implies
+// bucket = "business"). Pass businessId=null explicitly to filter to
+// business-bucket goals that have NO business assigned yet (the
+// "unassigned" set, useful for a re-home flow).
+export function useLongTermGoals(
+  bucket?: GoalBucket,
+  businessId?: string | null,
+) {
   const [goals, setGoals]     = useState<LongTermGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId]   = useState<string | null>(null);
@@ -66,6 +78,9 @@ export function useLongTermGoals(bucket?: GoalBucket) {
       .eq("user_id", user.id)
       .eq("is_active", true);
     if (bucket) q = q.eq("bucket", bucket);
+    // businessId: undefined = no filter. null = only unassigned. string = exact match.
+    if (businessId === null)         q = q.is("business_id", null).eq("bucket", "business");
+    else if (businessId !== undefined) q = q.eq("business_id", businessId);
     const { data } = await q.order("sort_order").order("created_at", { ascending: false });
     const rows = ((data ?? []) as Array<Record<string, unknown>>).map((g) => ({
       ...g,
@@ -74,11 +89,12 @@ export function useLongTermGoals(bucket?: GoalBucket) {
       starting_value: (g.starting_value as number | null | undefined) ?? null,
       metric_unit:    (g.metric_unit as string | null | undefined)    ?? null,
       is_focus:       (g.is_focus as boolean | undefined)             ?? false,
+      business_id:    (g.business_id as string | null | undefined)    ?? null,
     })) as LongTermGoal[];
     setGoals(rows);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bucket]);
+  }, [bucket, businessId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -96,6 +112,10 @@ export function useLongTermGoals(bucket?: GoalBucket) {
         target_value:   args.target_value ?? null,
         starting_value: args.starting_value ?? null,
         metric_unit:    args.metric_unit?.trim() || null,
+        // business_id only takes effect when bucket=business. UI is
+        // expected to pass businessId explicitly when adding from a
+        // business context (BusinessDetail) and pass null otherwise.
+        business_id:    args.bucket === "business" ? (args.business_id ?? null) : null,
         is_active:      true,
       })
       .select()
@@ -114,6 +134,7 @@ export function useLongTermGoals(bucket?: GoalBucket) {
       | "title" | "bucket" | "category" | "target_date" | "current_state"
       | "next_steps" | "metrics" | "sort_order" | "ai_action_plan"
       | "goal_type" | "target_value" | "starting_value" | "metric_unit" | "is_focus"
+      | "business_id"
     >>,
   ) => {
     await supabase.from("long_term_goals").update(patch).eq("id", id);
