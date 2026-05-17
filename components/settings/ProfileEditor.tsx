@@ -82,7 +82,7 @@ export default function ProfileEditor() {
             onChange={(e) => setWakeTarget(e.target.value)}
             className="w-full bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2.5 text-sm outline-none border border-zinc-800 focus:border-zinc-700"
           />
-          <p className="text-[10px] text-zinc-600 mt-1">NFC-tap by this time counts as on-time wake.</p>
+          <p className="text-[10px] text-zinc-600 mt-1">Waking by this time (per Oura) counts as on-time.</p>
         </div>
 
         <div>

@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     const [
       readinessData, sleepData, activityData,
       spo2Data, stressData, resilienceData, vo2Data, workoutsData,
+      sleepSessionsData,
     ] = await Promise.all([
       ouraGet("daily_readiness",  startDate, endDate),
       ouraGet("daily_sleep",      startDate, endDate),
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
       ouraGet("daily_resilience", startDate, endDate),
       ouraGet("vO2_max",          startDate, endDate),
       ouraGet("workout",          weekStartDate, endDate),
+      // Detailed sleep sessions — needed for bedtime_end (= wake timestamp).
+      // daily_sleep doesn't carry it; only the session-level endpoint does.
+      ouraGet("sleep",            startDate, endDate),
     ]);
 
     const service = createServiceClient();
@@ -89,6 +93,7 @@ export async function POST(req: NextRequest) {
     type ResilienceItem = { day: string; level?: string };
     type Vo2Item       = { day: string; vo2_max?: number };
     type WorkoutItem   = { day: string; activity?: string; intensity?: string; duration?: number; calories?: number; start_datetime?: string };
+    type SleepSession  = { day: string; bedtime_start?: string; bedtime_end?: string; type?: string; total_sleep_duration?: number };
 
     const readinessByDate  = new Map<string, ReadinessItem>(((readinessData?.data  ?? []) as ReadinessItem[]).map((r) => [r.day, r]));
     const sleepByDate      = new Map<string, SleepItem>(((sleepData?.data         ?? []) as SleepItem[]).map((s) => [s.day, s]));
@@ -105,6 +110,26 @@ export async function POST(req: NextRequest) {
       arr.push(w);
       workoutsByDate.set(w.day, arr);
     }
+
+    // Pick the longest 'long_sleep' session per day — that's the main
+    // night's sleep. Short naps + interrupted sessions can sit on the
+    // same day; we want the bedtime_end of the canonical sleep.
+    const wakeByDate = new Map<string, string>();
+    const sessions = ((sleepSessionsData?.data ?? []) as SleepSession[])
+      .filter((s) => s.type === "long_sleep" && s.bedtime_end);
+    sessions.sort((a, b) => (b.total_sleep_duration ?? 0) - (a.total_sleep_duration ?? 0));
+    for (const s of sessions) {
+      if (!wakeByDate.has(s.day)) wakeByDate.set(s.day, s.bedtime_end as string);
+    }
+
+    // Pull the user's wake target once — used to mark on_time as we
+    // write wake_logs below.
+    const { data: profileRow } = await service
+      .from("profiles")
+      .select("wake_target_time")
+      .eq("id", user.id)
+      .single();
+    const wakeTargetStr: string = (profileRow?.wake_target_time as string) ?? "07:30:00";
 
     const dates = new Set([
       ...readinessByDate.keys(),
@@ -177,6 +202,25 @@ export async function POST(req: NextRequest) {
       }, { onConflict: "user_id,date" });
 
       if (!error) upserted.push(date);
+
+      // Wake-on-time signal — when Oura recorded a wake timestamp for this
+      // date, upsert a wake_logs row. on_time is wake <= target on the
+      // calendar day of `date`. Idempotent so re-polling doesn't double-write.
+      const wakeIso = wakeByDate.get(date);
+      if (wakeIso) {
+        const wakeAt = new Date(wakeIso);
+        const [hh, mm, ss] = wakeTargetStr.split(":").map(Number);
+        const targetAt = new Date(`${date}T00:00:00`);
+        targetAt.setHours(hh ?? 7, mm ?? 30, ss ?? 0, 0);
+        await service.from("wake_logs").upsert({
+          user_id:   user.id,
+          date,
+          wake_at:   wakeAt.toISOString(),
+          target_at: targetAt.toISOString(),
+          on_time:   wakeAt.getTime() <= targetAt.getTime(),
+          source:    "oura",
+        }, { onConflict: "user_id,date" });
+      }
     }
 
     return NextResponse.json({ synced: true, dates: upserted });

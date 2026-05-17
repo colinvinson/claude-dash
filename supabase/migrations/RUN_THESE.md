@@ -32,7 +32,7 @@ These are the individual files that `APPLY_ALL.sql` bundles. Listed for referenc
 | 0034 | `0034_finances.sql` | `wishlist_items` + `net_worth_snapshots` tables | Finances tab — Wants list + Net worth snapshots + Cash flow aggregate + Strategy Jarvis surface |
 | 0035 | `0035_goals_business_link.sql` | `business_id` column on `long_term_goals` | Goals nested under a specific business in BusinessDetail |
 | 0036 | `0036_supplement_skipped.sql` | `skipped` boolean on `supplement_logs` | Skip-today affordance on Schedule items (distinct from done/undone) |
-| 0037 | `0037_wake_logs.sql` | `wake_logs` table + `wake_target_time` column on `profiles` | NFC-tap wake-confirm signal — Alarmy dismiss + Rowan wake-by-target scoring |
+| 0037 | `0037_wake_logs.sql` | `wake_logs` table + `wake_target_time` column on `profiles` | Wake-on-time scoring — Oura `bedtime_end` extracted nightly, scored vs profile.wake_target_time |
 
 ## After running, verify
 

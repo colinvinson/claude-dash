@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 // Wake-confirm: today's status + 14-day streak of on-time wake-ups.
-// Hits `wake_logs`, which is written either by /api/wake-confirm (NFC
-// tap from Alarmy dismiss) or by the manual confirm button below.
+// Hits `wake_logs`, which is written by /api/oura/poll (extracts
+// bedtime_end from Oura's /sleep sessions) or by confirmNow() below
+// as a manual fallback when Oura hasn't synced yet.
 
 export type WakeLog = {
   id:        string;
