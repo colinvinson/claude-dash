@@ -67,12 +67,13 @@ export default function SideNav() {
         className="hidden lg:flex z-[60] flex-col items-center antialiased subpixel-antialiased"
         style={{
           position:             "fixed",
-          // top: 96 clears the TopHeader (date/stats strip is ~80-90px tall);
-          // 64 from the spec puts the capsule under the header. z-[60] keeps
-          // it above the z-50 TopHeader if the heights ever overlap.
-          left:                 16,
-          top:                  96,
-          bottom:               64,
+          // Equal padding from all viewport edges. TopHeader's content is
+          // padded right (lg:pl-[112px]) so its date/stats clear the sidebar
+          // zone; the header background stays full-width behind the
+          // capsule (which has higher z-index + its own translucent fill).
+          left:                 24,
+          top:                  24,
+          bottom:               24,
           width:                SIDE_NAV_W,
           background:           "rgba(32, 26, 48, 0.80)",
           backdropFilter:       "blur(24px)",
