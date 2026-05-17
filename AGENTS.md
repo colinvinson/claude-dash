@@ -78,6 +78,32 @@ You are operating on Sir's metered Claude budget. Every input + output token is 
 These rules apply to every CC agent run from this repository, regardless of what its agent definition says.
 <!-- END:token-discipline -->
 
+# Migrations stay paste-once (mandatory)
+
+Every new SQL migration added under `supabase/migrations/` must also be appended to **`supabase/migrations/APPLY_ALL.sql`** in the same commit. That file is Sir's one-paste catch-up — he opens Supabase SQL Editor, pastes its contents, runs, done. Splitting changes across multiple files Sir has to track individually is exactly the friction that gets migrations skipped and pages fail to load.
+
+When adding a new migration:
+1. Write the new file as usual (`00XX_<topic>.sql`) — must be idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`, etc.).
+2. Append it to `APPLY_ALL.sql` with the standard section header — see existing entries for the format.
+3. Add a row to the table in `supabase/migrations/RUN_THESE.md` for the changelog.
+
+Rebuilding `APPLY_ALL.sql` from scratch when in doubt:
+
+```bash
+cd supabase/migrations
+{
+  echo "-- header text here"
+  for f in 00[1-9]*.sql; do
+    [[ "$f" < "0019" ]] && continue
+    echo ""
+    echo "-- ──────────────────────────────────────────────────────────"
+    echo "-- $f"
+    echo "-- ──────────────────────────────────────────────────────────"
+    cat "$f"
+  done
+} > APPLY_ALL.sql
+```
+
 <!-- BEGIN:design-system-reuse -->
 # Design system reuse (mandatory before any UI work)
 

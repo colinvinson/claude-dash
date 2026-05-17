@@ -1,13 +1,16 @@
 # Migrations checklist
 
-Run these in your Supabase project's SQL editor in **order**. Each is idempotent — safe to re-run; nothing breaks if it's already been applied. The catch-up migration (`0018_catch_up.sql`) is the safety-net that re-runs everything in `0001`-`0017` as `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, so if you've never run any migrations, just apply `0018` once and you're caught up through that point.
+## Fastest path (recommended)
 
-## What to do right now if you've fallen behind
+Open Supabase SQL Editor → paste the entire contents of **`APPLY_ALL.sql`** → Run. Done.
 
-1. **First time setting up / nuked DB:** run `0018_catch_up.sql`, then `0019` → `0034` in order.
-2. **You've been keeping up but might've missed recent ones:** run the post-0018 list below; idempotent guards skip the ones already applied.
+It concatenates every migration after `0018_catch_up.sql` in order. Every statement inside is idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`, etc.), so running it again later — or partway through — is always safe; already-applied changes no-op.
 
-## Migrations after the catch-up (0018) — apply these in order
+If you've never run any migrations at all, run `0018_catch_up.sql` first (it covers `0001`-`0017`), then `APPLY_ALL.sql` for everything since.
+
+## Migrations after the 0018 catch-up
+
+These are the individual files that `APPLY_ALL.sql` bundles. Listed for reference + so the changelog has a single source of truth.
 
 | # | File | What it adds | Required by |
 |---|------|--------------|-------------|
@@ -50,6 +53,12 @@ SELECT kind FROM jarvis_insights GROUP BY kind;
 -- 4. Storage bucket exists
 SELECT id, public FROM storage.buckets WHERE id = 'aesthetic-photos';
 -- Expect: ('aesthetic-photos', false)
+
+-- 5. Finances tables exist (0034)
+SELECT count(*) FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name IN ('wishlist_items', 'net_worth_snapshots');
+-- Expect: 2
 ```
 
 ## Push notifications (separate from SQL migrations)
