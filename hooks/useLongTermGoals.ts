@@ -175,6 +175,15 @@ export function useLongTermGoals(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
+  // Hard delete — removes the row entirely. FK cascades on
+  // goal_milestones + goal_metrics; linked_chats.goal_id + wishlist_items.goal_id
+  // are set null (so attached chats/wants don't get deleted, just unlinked).
+  const deleteGoal = useCallback(async (id: string) => {
+    await supabase.from("long_term_goals").delete().eq("id", id);
+    await load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load]);
+
   // Link a routine item (supplement_stack row) to this goal.
   const linkItem = useCallback(async (itemId: string, goalId: string | null) => {
     await supabase.from("supplement_stack").update({ linked_goal_id: goalId }).eq("id", itemId);
@@ -199,7 +208,7 @@ export function useLongTermGoals(
 
   return {
     goals, loading,
-    addGoal, updateGoal, archiveGoal,
+    addGoal, updateGoal, archiveGoal, deleteGoal,
     linkItem, refreshAiSummary, suggestPlan,
     toggleFocus,
   };

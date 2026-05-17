@@ -22,7 +22,7 @@ export default function GoalsList({
   bucket:      GoalBucket;
   businessId?: string | null;
 }) {
-  const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan, toggleFocus } = useLongTermGoals(bucket, businessId);
+  const { goals, loading, addGoal, updateGoal, archiveGoal, deleteGoal, linkItem, refreshAiSummary, suggestPlan, toggleFocus } = useLongTermGoals(bucket, businessId);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +73,7 @@ export default function GoalsList({
           onToggleExpand={() => setExpandedId((cur) => cur === g.id ? null : g.id)}
           onUpdate={updateGoal}
           onArchive={archiveGoal}
+          onDelete={deleteGoal}
           onLinkItem={linkItem}
           onRefreshSummary={refreshAiSummary}
           onSuggestPlan={suggestPlan}

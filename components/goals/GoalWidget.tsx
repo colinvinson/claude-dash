@@ -23,6 +23,7 @@ type Props = {
   onToggleExpand: () => void;
   onUpdate: (id: string, patch: Partial<LongTermGoal>) => Promise<void>;
   onArchive: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onLinkItem: (itemId: string, goalId: string | null) => Promise<void>;
   onRefreshSummary: (id: string, force?: boolean) => Promise<string | null>;
   onSuggestPlan: (id: string) => Promise<string | null>;
@@ -90,7 +91,7 @@ function timeSince(iso: string): string {
 }
 
 export default function GoalWidget({
-  goal, isExpanded, onToggleExpand, onUpdate, onArchive, onLinkItem, onRefreshSummary, onSuggestPlan, onToggleFocus,
+  goal, isExpanded, onToggleExpand, onUpdate, onArchive, onDelete, onLinkItem, onRefreshSummary, onSuggestPlan, onToggleFocus,
 }: Props) {
   const { items, toggle } = useStack();
   const { insights } = useStackInsights(items);
@@ -558,7 +559,7 @@ export default function GoalWidget({
             />
           )}
 
-          {/* Footer actions */}
+          {/* Footer actions: move bucket · archive (soft) · delete (hard) */}
           <div className="flex items-center justify-between pt-2 border-t border-zinc-900">
             <button
               onClick={() => onUpdate(goal.id, { bucket: goal.bucket === "personal" ? "business" : "personal" })}
@@ -567,12 +568,26 @@ export default function GoalWidget({
               <ArrowRightLeft size={11} />
               Move to {goal.bucket === "personal" ? "Businesses" : "Life"}
             </button>
-            <button
-              onClick={() => onArchive(goal.id)}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-red-400"
-            >
-              <Archive size={11} /> Archive
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => onArchive(goal.id)}
+                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300"
+                title="Hide this goal but keep its history. Reversible."
+              >
+                <Archive size={11} /> Archive
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Delete "${goal.title}"? This permanently removes the goal and its milestones / metrics. Linked chats and wants stay (just unlinked).`)) {
+                    void onDelete(goal.id);
+                  }
+                }}
+                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-red-400"
+                title="Permanently delete this goal"
+              >
+                <Trash2 size={11} /> Delete
+              </button>
+            </div>
           </div>
 
           {/* Linked chats — external Claude.ai / ChatGPT conversations
