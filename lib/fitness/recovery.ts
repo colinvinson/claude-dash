@@ -198,11 +198,24 @@ export type ProteinDeficit = {
   avgG:            number;  // avg daily intake over last 7
 };
 
+// Acute alcohol hedge — drinks within the last ~36h tank force output,
+// CNS readiness, and short-term MPS. Even when autonomic recovery
+// metrics look OK, the prescription should NOT push for PRs. Hours
+// since last drink lets us scale the hedge: <24h = strong cap, 24-36h
+// = mild cap, >36h = no effect.
+export type AlcoholHedge = {
+  hoursSinceLastDrink: number | null;  // null = no recent drinks
+  // "heavy" tier from lifestyle-drivers — chronic spike means even
+  // outside the 36h window we don't push for PRs this week.
+  weeklySpike: boolean;
+};
+
 export function adjustForRecovery(
   base: Prescription,
   recovery: RecoveryResult,
   muscle: MuscleFatigueResult,
   proteinDeficit?: ProteinDeficit | null,
+  alcohol?: AlcoholHedge | null,
 ): Adjustment {
   const original = { ...base };
   const adjusted: Prescription = { ...base };
@@ -257,6 +270,31 @@ export function adjustForRecovery(
       }
     }
     // compromised / low: already cut. Don't double-discount.
+  }
+
+  // Alcohol hedge — acute or weekly-spike both cap PR attempts. Doesn't
+  // fire on a normal-baseline week (that's already priced into the
+  // weekly volume target via mrvScaleFactor upstream). Two triggers:
+  //   1. Drinks in last ≤36h → acute force/CNS suppression
+  //   2. weeklySpike = "heavy" tier this week → above-baseline drinking
+  if (alcohol) {
+    const hrs = alcohol.hoursSinceLastDrink;
+    const acute = hrs != null && hrs < 36;
+    if (acute || alcohol.weeklySpike) {
+      if (acute && hrs != null) {
+        notes.push(`Last drink ${hrs}h ago — capping intensity (alcohol tanks force ~24-48h)`);
+      } else if (alcohol.weeklySpike) {
+        notes.push(`Drinking spiked above baseline this week — holding off PR attempts`);
+      }
+      if (band === "exceptional" || band === "primed" || band === "adequate") {
+        // Cap to RPE 8 — no PR push, but still a productive session.
+        adjusted.rpeCap = Math.min(adjusted.rpeCap ?? 8, 8);
+        if (acute && hrs != null && hrs < 24) {
+          // Within 24h: also pull a set off to keep volume realistic.
+          adjusted.targetSets = Math.max(adjusted.targetSets - 1, 2);
+        }
+      }
+    }
   }
 
   const applied =

@@ -343,7 +343,11 @@ export function useWorkout() {
     const d21 = day21.toISOString().slice(0, 10);
 
     const [alcoholRes, suppLogsRes, activeStackRes, weightRes, latestWeightRes, sets21Res, protein21Res, health7Res] = await Promise.all([
-      supabase.from("alcohol_logs").select("log_date, drink_count").eq("user_id", uid).gte("log_date", d7),
+      // 21-day window — establishes Sir's personal drinking baseline so
+      // the coach tiers this week's pace against his own norm instead of
+      // a sober-default warn-at-3-days threshold. logged_at lets us
+      // compute hours-since-last-drink for the acute-hedge gate.
+      supabase.from("alcohol_logs").select("log_date, drink_count, logged_at").eq("user_id", uid).gte("log_date", d21),
       supabase.from("supplement_logs").select("supplement_id").eq("user_id", uid).gte("log_date", d7),
       supabase.from("supplement_stack").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("is_active", true),
       supabase.from("weight_logs").select("weight_kg, logged_at").eq("user_id", uid).gte("logged_at", `${d21}T00:00:00`).order("logged_at", { ascending: true }),
@@ -355,7 +359,7 @@ export function useWorkout() {
 
     const ctx = buildLifestyleContext({
       health7d:        (health7Res.data ?? []) as Array<{ sleep_hours: number | null; sleep_score: number | null }>,
-      alcohol7d:       (alcoholRes.data ?? []) as Array<{ log_date: string; drink_count: number | null }>,
+      alcohol21d:      (alcoholRes.data ?? []) as Array<{ log_date: string; drink_count: number | null; logged_at?: string | null }>,
       suppLogs7d:      (suppLogsRes.data ?? []) as Array<{ supplement_id: string }>,
       activeStackCount: activeStackRes.count ?? 0,
       weight21d:       (weightRes.data ?? []) as Array<{ weight_kg: number; logged_at: string }>,
@@ -536,7 +540,17 @@ export function useWorkout() {
       targetSets:   baseVerdict.targetSets,
       rpeCap:       baseVerdict.rpeCap,
     };
-    const adjustment = adjustForRecovery(base, recovery, muscleStatus, proteinDeficit);
+    // Alcohol hedge — gates PR attempts when drinks are recent or
+    // when this week is above Sir's baseline (per lifestyle-drivers
+    // tiering). Chronic-baseline weeks are already priced in via
+    // mrvScaleFactor upstream; this is just the per-session overlay.
+    const alcohol = lifestyleCtx
+      ? {
+          hoursSinceLastDrink: lifestyleCtx.hoursSinceLastDrink,
+          weeklySpike:         lifestyleCtx.alcoholDragTier === "heavy",
+        }
+      : null;
+    const adjustment = adjustForRecovery(base, recovery, muscleStatus, proteinDeficit, alcohol);
     verdict = {
       ...baseVerdict,
       targetWeight: adjustment.adjusted.targetWeight,

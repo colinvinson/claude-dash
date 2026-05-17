@@ -12,11 +12,20 @@ import { collapseToDaily, computeStrengthDeltaPct, computeProteinAdherence, deri
 export type DriverSeverity = "good" | "warn" | "info";
 export type Driver = { text: string; severity: DriverSeverity };
 
+// Alcohol drag tier. Drives BOTH the driver text framing AND the
+// downstream training adjustments (MRV scale, RPE caps on drink-
+// adjacent days). "Normal" means this matches Sir's personal
+// baseline — no extra hedge applied beyond what the system already
+// scales for. The chronic baseline still bakes in some MRV penalty.
+export type AlcoholDragTier = "none" | "low" | "normal" | "heavy";
+
 export type LifestyleInputs = {
   // Last 7 health_logs rows (avg sleep is computed from these).
   health7d: Array<{ sleep_hours: number | null; sleep_score: number | null }>;
-  // Last 7 days of alcohol_logs rows (one row per drink event).
-  alcohol7d: Array<{ log_date: string; drink_count: number | null }>;
+  // Last 21 days of alcohol_logs rows. 21d window establishes Sir's
+  // personal baseline; the most-recent 7d slice is the "this week"
+  // comparison against that baseline.
+  alcohol21d: Array<{ log_date: string; drink_count: number | null; logged_at?: string | null }>;
   // Last 7 days of supplement_logs rows (one row per supp×day).
   suppLogs7d: Array<{ supplement_id: string }>;
   // Number of CURRENTLY ACTIVE supplement stack items. Drives adherence ratio.
@@ -37,18 +46,37 @@ export type LifestyleContext = {
   // deload Sir on a clean cut (where strength regression is expected).
   compositionTag: RecompTag | null;
   // Composite "training drag" flag — at least one major lifestyle factor is
-  // suppressing recovery (heavy alcohol week OR multi-night sleep debt).
+  // suppressing recovery. NOTE: alcohol on its own no longer flips this
+  // unless it's at the "heavy" tier (a real spike above baseline), so the
+  // flag doesn't fire every week for someone with a regular-drinker baseline.
   hasMajorDrag: boolean;
   // Useful raw signals exposed for the coach's tip text.
   sleepHrs7dAvg:    number | null;
   sleepScore7dAvg:  number | null;
   alcoholDays7d:    number;
   drinks7dTotal:    number;
+  drinksPerWeekBaseline: number;  // 21d average → drinks/week
+  alcoholDragTier:  AlcoholDragTier;
+  // MRV (Maximum Recoverable Volume) scale to apply to weekly volume
+  // targets. 1.0 = no scaling; 0.92 = trim 8%; 0.85 = trim 15%. Chronic
+  // drinkers carry a real, sustained recovery cost — the coach should
+  // pull volume targets down so the program is achievable, not so Sir
+  // accumulates fatigue debt.
+  mrvScaleFactor:   number;
+  // Hours since the most recent logged drink. Null if no drinks in window.
+  // Drives the per-session recovery hedge (cap RPE if last drink was
+  // recent — alcohol acutely tanks force output 24-48h).
+  hoursSinceLastDrink: number | null;
   suppAdherence7d:  number;
 };
 
 function avg(arr: number[]): number | null {
   return arr.length === 0 ? null : arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function avgPerWeek(drinks21dTotal: number): number {
+  // 21 days = 3 weeks
+  return drinks21dTotal / 3;
 }
 
 export function buildLifestyleContext(inputs: LifestyleInputs): LifestyleContext {
@@ -73,19 +101,84 @@ export function buildLifestyleContext(inputs: LifestyleInputs): LifestyleContext
     }
   }
 
-  // ── Alcohol ──────────────────────────────────────────────
-  const drinks7dTotal = inputs.alcohol7d.reduce((s, r) => s + Number(r.drink_count ?? 1), 0);
-  const alcoholDays7d = new Set(inputs.alcohol7d.map((r) => r.log_date)).size;
-  let alcoholDrag = false;
-  if (drinks7dTotal >= 6 || alcoholDays7d >= 3) {
+  // ── Alcohol — baseline-aware tiering ──────────────────────
+  // Sir's directive: he drinks often. The previous absolute thresholds
+  // ("warn if ≥6 drinks / 3 days") fired every week — pure noise, zero
+  // signal. Tier against his own 21-day baseline instead so the system
+  // calls out DEVIATIONS (a real spike), and bakes the chronic baseline
+  // into a permanent MRV scale-down rather than nagging about it.
+  const now = Date.now();
+  const day7Ago = now - 7 * 86400000;
+  const day7Iso = new Date(day7Ago).toISOString().slice(0, 10);
+  const drinks7d   = inputs.alcohol21d.filter((r) => r.log_date >= day7Iso);
+  const drinks21d  = inputs.alcohol21d;
+  const drinks7dTotal  = drinks7d .reduce((s, r) => s + Number(r.drink_count ?? 1), 0);
+  const drinks21dTotal = drinks21d.reduce((s, r) => s + Number(r.drink_count ?? 1), 0);
+  const alcoholDays7d  = new Set(drinks7d.map((r) => r.log_date)).size;
+  const drinksPerWeekBaseline = avgPerWeek(drinks21dTotal);
+
+  // Hours since most recent drink — used by adjustForRecovery to hedge
+  // single-session prescriptions if drinks happened in the last ~36h.
+  const mostRecentTs = drinks21d
+    .map((r) => {
+      if (r.logged_at) return new Date(r.logged_at).getTime();
+      // Fall back to end-of-log-date if no timestamp
+      return new Date(r.log_date + "T20:00:00Z").getTime();
+    })
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => b - a)[0];
+  const hoursSinceLastDrink = mostRecentTs != null ? Math.round((now - mostRecentTs) / 3600000) : null;
+
+  // Tier: compare this week's pace to personal baseline.
+  // "Heavy" = real spike above baseline OR an absolute high.
+  // "Normal" = matches baseline (regular drinker — already factored in).
+  // "Low"   = below baseline (positive deviation).
+  // "None"  = effectively zero across 21d (rare for Sir per his framing).
+  let alcoholDragTier: AlcoholDragTier;
+  if (drinks21dTotal === 0) {
+    alcoholDragTier = "none";
+  } else if (drinks7dTotal >= Math.max(14, drinksPerWeekBaseline * 1.5)) {
+    alcoholDragTier = "heavy";
+  } else if (drinks7dTotal < drinksPerWeekBaseline * 0.5) {
+    alcoholDragTier = "low";
+  } else {
+    alcoholDragTier = "normal";
+  }
+
+  // MRV scale factor — sustained baseline costs recovery capacity.
+  // Chronic ≥8/wk: 0.92x volume target. Chronic ≥14/wk OR this week's
+  // pace is "heavy": 0.85x. Pulled into the coach's weekly volume math
+  // by callers via lifestyleCtx.mrvScaleFactor.
+  let mrvScaleFactor = 1.0;
+  if (alcoholDragTier === "heavy" || drinksPerWeekBaseline >= 14) {
+    mrvScaleFactor = 0.85;
+  } else if (drinksPerWeekBaseline >= 8) {
+    mrvScaleFactor = 0.92;
+  }
+
+  // Driver text — speak to Sir's reality, not a sober-default template.
+  if (alcoholDragTier === "heavy") {
     drivers.push({
-      text: `${drinks7dTotal} drinks across ${alcoholDays7d} days last 7. Each session blunts MPS ~24-48h and tanks deep sleep — expect proportional drag on PRs.`,
+      text: `${drinks7dTotal} drinks last 7d (vs ${drinksPerWeekBaseline.toFixed(0)}/wk baseline) — that's a spike. Coach trims this week's volume target ~15% and caps PR attempts for 48h after any session.`,
       severity: "warn",
     });
-    alcoholDrag = true;
-  } else if (drinks7dTotal === 0) {
-    drivers.push({ text: `Zero drinks last 7d — clean recovery window.`, severity: "good" });
+  } else if (alcoholDragTier === "normal" && drinksPerWeekBaseline >= 6) {
+    drivers.push({
+      text: `Drinking at baseline (~${Math.round(drinksPerWeekBaseline)}/wk). Volume target already shaded down ${Math.round((1 - mrvScaleFactor) * 100)}% to fit. Protein 2.2g/kg and pre-bed casein matter more than the supplement stack for getting around this.`,
+      severity: "info",
+    });
+  } else if (alcoholDragTier === "low") {
+    drivers.push({
+      text: `Below baseline this week (${drinks7dTotal} vs ~${Math.round(drinksPerWeekBaseline)}/wk) — recovery window is better than usual, push the top of the volume range.`,
+      severity: "good",
+    });
   }
+  // "none" tier intentionally produces no driver — silent good.
+
+  // alcoholDrag only flips hasMajorDrag at the "heavy" tier. Chronic
+  // baseline doesn't trip the major-drag flag because the MRV scale
+  // already accounts for it; tripping it would just nag.
+  const alcoholDrag = alcoholDragTier === "heavy";
 
   // ── Supplement adherence (generic — no substance hardcoded) ────
   const possible = inputs.activeStackCount * 7;
@@ -143,6 +236,10 @@ export function buildLifestyleContext(inputs: LifestyleInputs): LifestyleContext
     sleepScore7dAvg,
     alcoholDays7d,
     drinks7dTotal,
+    drinksPerWeekBaseline,
+    alcoholDragTier,
+    mrvScaleFactor,
+    hoursSinceLastDrink,
     suppAdherence7d,
   };
 }
