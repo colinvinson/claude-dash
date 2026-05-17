@@ -15,6 +15,7 @@ import BusinessActivity from "./BusinessActivity";
 import MRRSparkline from "./MRRSparkline";
 import MarketingExperiments from "./MarketingExperiments";
 import LinkedChats from "./LinkedChats";
+import GoalsList from "@/components/goals/GoalsList";
 import AddToWantsButton from "@/components/finances/AddToWantsButton";
 
 // Per-business control panel. Layout flows top-down by what Sir needs to
@@ -203,6 +204,15 @@ export default function BusinessDetail({
 
           {/* ── TASKS — the main work surface ── */}
           <BusinessTasks businessId={business.id} />
+
+          {/* ── GOALS — long-term objectives tied to this specific business.
+              Each goal lives UNDER its business, not in a generic
+              business-bucket pool. Adding from here auto-links to
+              business.id via the AddGoalFlow pass-through. ── */}
+          <div>
+            <FormLabel>Goals</FormLabel>
+            <GoalsList bucket="business" businessId={business.id} />
+          </div>
 
           {/* ── AGENTS — workforce + artifact feedback ── */}
           <BusinessAgents business={business} />

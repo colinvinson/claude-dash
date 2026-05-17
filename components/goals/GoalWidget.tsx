@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Sparkles, Archive, Plus, RotateCcw, ArrowRightLeft, Star, Target, Trash2, Check } from "lucide-react";
 import Card from "@/components/ui/Card";
-import { FormInput, FormTextarea } from "@/components/ui/FormInput";
+import { FormInput, FormSelect, FormTextarea } from "@/components/ui/FormInput";
 import FormLabel from "@/components/ui/FormLabel";
+import { useBusinesses } from "@/hooks/useBusinesses";
 import CompletionToggle from "@/components/ui/CompletionToggle";
 import { useStack } from "@/hooks/useStack";
 import { useStackInsights } from "@/hooks/useStackInsights";
@@ -547,6 +548,16 @@ export default function GoalWidget({
             />
           </div>
 
+          {/* Re-home picker for business-bucket goals. Sir tags which
+              specific business this goal serves; the goal then nests
+              under that business in BusinessDetail. "—" means unassigned. */}
+          {goal.bucket === "business" && (
+            <BusinessReHomePicker
+              currentBusinessId={goal.business_id}
+              onChange={(bid) => onUpdate(goal.id, { business_id: bid })}
+            />
+          )}
+
           {/* Footer actions */}
           <div className="flex items-center justify-between pt-2 border-t border-zinc-900">
             <button
@@ -653,6 +664,36 @@ function MetricsEditor({
           <Plus size={ICON.xs} /> Add metric
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── BusinessReHomePicker ──────────────────────────────────────────
+// Small dropdown shown inside an expanded business-bucket goal widget.
+// Lets Sir assign / reassign the goal to a specific business, or leave
+// it unassigned. Source data: useBusinesses() — keeps in sync with the
+// portfolio in real time.
+function BusinessReHomePicker({
+  currentBusinessId,
+  onChange,
+}: {
+  currentBusinessId: string | null;
+  onChange: (businessId: string | null) => void;
+}) {
+  const { businesses } = useBusinesses();
+  if (businesses.length === 0) return null;
+  return (
+    <div className="pt-3 border-t border-zinc-900">
+      <FormLabel>Belongs to</FormLabel>
+      <FormSelect
+        value={currentBusinessId ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">— Unassigned</option>
+        {businesses.map((b) => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </FormSelect>
     </div>
   );
 }

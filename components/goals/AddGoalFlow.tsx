@@ -27,6 +27,10 @@ type Phase = "fork" | "manual" | "research-loading" | "research-review";
 
 type Props = {
   bucket: GoalBucket;
+  // Optional — set when adding from a per-business surface (BusinessDetail).
+  // null means "no business assignment" for business-bucket goals OR
+  // ignored entirely for personal-bucket.
+  businessId?: string | null;
   onCreate: (args: {
     title:           string;
     bucket:          GoalBucket;
@@ -36,6 +40,7 @@ type Props = {
     target_value?:   number | null;
     starting_value?: number | null;
     metric_unit?:    string | null;
+    business_id?:    string | null;
   }) => Promise<LongTermGoal | null>;
   onUpdate: (id: string, patch: Partial<LongTermGoal>) => Promise<void>;
 };
@@ -54,7 +59,7 @@ const GOAL_TYPES: Array<{ id: GoalType; label: string; desc: string }> = [
 //                          (which create supplement_stack rows linked to
 //                          the new goal), and the plan saves to
 //                          ai_action_plan.
-export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
+export default function AddGoalFlow({ bucket, businessId, onCreate, onUpdate }: Props) {
   const { createItem } = useStack();
 
   const [phase, setPhase]       = useState<Phase>("fork");
@@ -89,6 +94,7 @@ export default function AddGoalFlow({ bucket, onCreate, onUpdate }: Props) {
       target_value:   goalType === "quantitative" && targetValue   ? parseFloat(targetValue)   : null,
       starting_value: goalType === "quantitative" && startingValue ? parseFloat(startingValue) : null,
       metric_unit:    goalType === "quantitative" ? metricUnit.trim() || null : null,
+      business_id:    bucket === "business" ? (businessId ?? null) : null,
     };
   }
 

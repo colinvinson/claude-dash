@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useBusinesses, type Business } from "@/hooks/useBusinesses";
+import { useLongTermGoals } from "@/hooks/useLongTermGoals";
 import SectionLabel from "@/components/layout/SectionLabel";
 import BusinessHero from "@/components/businesses/BusinessHero";
 import BusinessCard from "@/components/businesses/BusinessCard";
@@ -15,6 +16,10 @@ const STATUS_ORDER: Business["status"][] = ["growing", "live", "building", "idea
 
 export default function BusinessesView() {
   const { businesses, loading, staleIds, topTasks } = useBusinesses();
+  // Business-bucket goals with no business_id — legacy / unassigned.
+  // Surface them at the bottom with a "needs a home" framing so Sir
+  // can re-home them into a specific business via the goal widget.
+  const { goals: unassignedGoals } = useLongTermGoals("business", null);
   const [openId, setOpenId] = useState<string | null>(null);
   const openBusiness = openId ? businesses.find((b) => b.id === openId) ?? null : null;
 
@@ -57,15 +62,22 @@ export default function BusinessesView() {
         <AddBusinessFlow />
       </div>
 
-      {/* Business GOALS still live as their own section. The portfolio is
-          for "what businesses exist + how are they doing"; goals are for
-          "what am I trying to hit." */}
-      <div className="anim-fade-up stagger-3 pt-6">
-        <SectionLabel>Business goals</SectionLabel>
-      </div>
-      <div className="anim-fade-up stagger-3">
-        <GoalsList bucket="business" />
-      </div>
+      {/* Unassigned business goals — only renders if there are legacy
+          goals tagged bucket=business with no business_id link. Lets
+          Sir re-home them into a specific business via the goal widget
+          inside this section. Goes away entirely once everything is
+          assigned. */}
+      {unassignedGoals.length > 0 && (
+        <>
+          <div className="anim-fade-up stagger-3 pt-6">
+            <SectionLabel>Unassigned business goals</SectionLabel>
+            <p className="text-[11px] text-zinc-500 mt-1">Tag each to a business to nest it under that business.</p>
+          </div>
+          <div className="anim-fade-up stagger-3">
+            <GoalsList bucket="business" businessId={null} />
+          </div>
+        </>
+      )}
 
       {openBusiness && (
         <BusinessDetail business={openBusiness} onClose={() => setOpenId(null)} />

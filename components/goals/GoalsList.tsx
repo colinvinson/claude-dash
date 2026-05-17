@@ -10,25 +10,32 @@ import AddGoalFlow from "./AddGoalFlow";
 
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
-  const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan, toggleFocus } = useLongTermGoals(bucket);
+// Renders goals filtered by bucket and (optionally) by businessId.
+//   businessId="<uuid>"  → only goals tied to that specific business.
+//                          New goals added from here auto-link to it.
+//   businessId={null}    → only UNASSIGNED business-bucket goals.
+//   businessId omitted   → all goals in bucket (existing behavior).
+export default function GoalsList({
+  bucket,
+  businessId,
+}: {
+  bucket:      GoalBucket;
+  businessId?: string | null;
+}) {
+  const { goals, loading, addGoal, updateGoal, archiveGoal, linkItem, refreshAiSummary, suggestPlan, toggleFocus } = useLongTermGoals(bucket, businessId);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Lazy weekly auto-refresh: when the page mounts (or bucket changes),
-  // fire a background goal-summary call for any goal whose ai_summary is
-  // null OR older than 7 days. Fire-and-forget; updates flow back via load().
   useEffect(() => {
     if (loading || goals.length === 0) return;
     const now = Date.now();
     for (const g of goals) {
       const updatedAt = g.ai_summary_updated_at ? new Date(g.ai_summary_updated_at).getTime() : 0;
       if (now - updatedAt > STALE_AFTER_MS) {
-        // Don't await — these are independent background tasks.
         void refreshAiSummary(g.id, false).catch(() => {});
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, bucket, goals.length]);
+  }, [loading, bucket, businessId, goals.length]);
 
   if (loading) {
     return (
@@ -38,9 +45,14 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
     );
   }
 
+  // Empty state when scoped to a specific business is more compact than
+  // the top-level no-bucket empty state — adding a goal from inside a
+  // business is a follow-on action, not the primary one.
+  const isBusinessScoped = typeof businessId === "string";
+
   return (
     <div className="space-y-3">
-      {goals.length === 0 && (
+      {goals.length === 0 && !isBusinessScoped && (
         <Card>
           <EmptyState
             icon={bucket === "business" ? Briefcase : Target}
@@ -48,6 +60,9 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
             description="Add one below to start tracking."
           />
         </Card>
+      )}
+      {goals.length === 0 && isBusinessScoped && (
+        <p className="text-[11px] text-zinc-500 italic">No goals tied to this business yet.</p>
       )}
 
       {goals.map((g) => (
@@ -65,8 +80,12 @@ export default function GoalsList({ bucket }: { bucket: GoalBucket }) {
         />
       ))}
 
-      {/* Add — onboarding fork between manual and Jarvis-drafted protocol */}
-      <AddGoalFlow bucket={bucket} onCreate={addGoal} onUpdate={updateGoal} />
+      <AddGoalFlow
+        bucket={bucket}
+        businessId={isBusinessScoped ? (businessId as string) : null}
+        onCreate={addGoal}
+        onUpdate={updateGoal}
+      />
     </div>
   );
 }
