@@ -6,29 +6,47 @@ import { useEffect, useState } from "react";
 import { NAV_TABS } from "@/lib/nav";
 import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 
-// Desktop-only left rail nav. Mirrors BottomNav's tabs in a vertical
-// stack with the Jarvis orb at the top. Hidden on screens < lg
-// (1024px); phones get BottomNav instead.
+// Edge-anchored, full-height left sidebar. Pixel-perfect spec:
 //
-// FLOATING SQUIRCLE — not edge-to-edge. Sits inside the viewport with
-// equal margins on the left, top, and bottom (matches the premium
-// game-launcher reference where the sidebar reads as its own object,
-// not part of the chrome). Width 68px + 12px gap on each side = the
-// content's left padding is 92px on lg.
+//   width                  72px
+//   bg                     #0D0B14 (deep matte dark violet-black)
+//   border-right           1px solid rgba(255,255,255,0.04)
+//   top padding            64px before first item
+//   item bounding box      48×48px
+//   item radius            12px (rounded-xl)
+//   icon size              22×22
+//   inter-item gap         16px (space-y-4)
+//   active bg              #171324
+//   active border tint     1px solid rgba(255,255,255,0.06)
+//   active+hover border    rgba(255,255,255,0.10)
+//   active icon            #FFFFFF (100% opacity)
+//   inactive icon          rgba(255,255,255,0.40)
+//   hover bg               rgba(255,255,255,0.04)
+//   hover icon             rgba(255,255,255,0.85)
+//   transition             all 200ms ease-in-out
+//
+// Left-edge indicator pill:
+//   4×24px, rounded-r-full, anchored to viewport-left (sidebar x=0).
+//   Slides via `top` transition on active-index change.
+//   will-change-transform for fluid GPU-accelerated motion.
+//
+// Hidden < lg (1024px) — mobile uses BottomNav instead.
 
-export const SIDE_NAV_W   = 88;
-export const SIDE_NAV_GAP = 12;
-export const SIDE_NAV_OFFSET = SIDE_NAV_W + SIDE_NAV_GAP * 2;  // 112px
+export const SIDE_NAV_W = 72;
+
+// Geometry constants — kept named so the pill-position math reads.
+const TOP_PAD       = 64;   // matches spec: 64px from top to first nav item
+const ITEM_BOX      = 48;   // item bounding box
+const ITEM_GAP      = 16;   // inter-item gap
+const ITEM_STRIDE   = ITEM_BOX + ITEM_GAP;  // 64px from item-top to next item-top
+const PILL_HEIGHT   = 24;
+const PILL_OFFSET_Y = TOP_PAD + (ITEM_BOX - PILL_HEIGHT) / 2;  // y of pill for index 0 = 76
 
 export default function SideNav() {
   const pathname = usePathname();
   const [jarvisOpen, setJarvisOpen]       = useState(false);
   const [jarvisPrefill, setJarvisPrefill] = useState<string | undefined>(undefined);
 
-  // Same global open-Jarvis event channel that BottomNav listens on.
-  // BOTH navs listen so the event works on either form factor; only
-  // one HUD will be visible at a time since the responsive visibility
-  // hides one of them.
   useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<{ prompt?: string }>).detail;
@@ -38,6 +56,10 @@ export default function SideNav() {
     window.addEventListener("jarvis:open", onOpen as EventListener);
     return () => window.removeEventListener("jarvis:open", onOpen as EventListener);
   }, []);
+
+  const activeIndex = NAV_TABS.findIndex(
+    (t) => pathname === t.href || pathname.startsWith(t.href + "/"),
+  );
 
   return (
     <>
@@ -49,65 +71,75 @@ export default function SideNav() {
       )}
 
       <aside
-        className="hidden lg:flex fixed z-50 flex-col items-center py-5"
+        className="hidden lg:flex fixed left-0 top-0 bottom-0 z-50 flex-col items-center antialiased subpixel-antialiased"
         style={{
-          left:   SIDE_NAV_GAP,
-          top:    SIDE_NAV_GAP,
-          bottom: SIDE_NAV_GAP,
-          width:  SIDE_NAV_W,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%), rgba(18,18,28,0.62)",
-          backdropFilter: "blur(40px) saturate(180%)",
-          WebkitBackdropFilter: "blur(40px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.09)",
-          borderRadius: 28,
-          boxShadow: "0 18px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.10)",
+          width: SIDE_NAV_W,
+          background:  "#0D0B14",
+          borderRight: "1px solid rgba(255, 255, 255, 0.04)",
         }}
       >
-        {/* Jarvis orb — top of the rail, the brand-defining centerpiece. */}
+        {/* Jarvis orb — sits inside the 64px top zone, centered horizontally
+            in the rail. Same 48×48 + 12px radius as nav items so it slots
+            into the visual rhythm. */}
         <button
           onClick={() => setJarvisOpen(true)}
           aria-label="Open Jarvis"
-          className="relative w-14 h-14 rounded-full transition-transform active:scale-95 mb-7 flex-shrink-0"
+          className="w-12 h-12 rounded-xl mt-2 transition-transform active:scale-95"
           style={{
             background: "radial-gradient(circle at 35% 30%, rgba(220,235,255,0.95) 0%, rgba(96,165,250,0.55) 50%, rgba(59,130,246,0.20) 100%)",
-            boxShadow:  "0 0 24px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
+            boxShadow:  "0 0 22px rgba(59,130,246,0.55), 0 4px 14px rgba(0,0,0,0.40), inset 0 0 18px rgba(255,255,255,0.40)",
             animation:  "jarvisOrbPulse 4s ease-in-out infinite",
           }}
         />
 
-        {/* Tabs — vertical stack. Active item gets a SOLID white squircle
-            fill with a DARK icon inside, matching the premium-launcher
-            screenshot. Inactive icons are translucent zinc on
-            transparent background. Bigger items (w-16 h-16, 28px icons)
-            to give the rail visual weight matching the reference. */}
-        <nav className="flex flex-col gap-2.5 flex-1 w-full items-center">
-          {NAV_TABS.map((tab) => {
-            const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
+        {/* Left-edge active-indicator pill. Anchored to the viewport's left
+            margin (sidebar's left=0). Slides via top transition. */}
+        {activeIndex >= 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute left-0 rounded-r-full bg-white pointer-events-none"
+            style={{
+              width:  4,
+              height: PILL_HEIGHT,
+              top:    PILL_OFFSET_Y + activeIndex * ITEM_STRIDE,
+              transition: "top 200ms ease-in-out",
+              transform:  "translateZ(0)",
+              willChange: "transform, top",
+            }}
+          />
+        )}
+
+        {/* Nav items — vertical stack starting at TOP_PAD with 16px gaps */}
+        <nav
+          className="flex flex-col items-center space-y-4"
+          style={{ marginTop: TOP_PAD - 48 - 8 /* orb height (48) + its mt-2 (8) consumed already; remaining gap before first item */ }}
+        >
+          {NAV_TABS.map((tab, i) => {
+            const active = activeIndex === i;
             const Icon   = tab.icon;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
                 aria-label={tab.label}
-                className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
+                className={
+                  "relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ease-in-out border " +
+                  (active
+                    ? "border-white/[0.06] hover:border-white/[0.10]"
+                    : "border-transparent hover:bg-white/[0.04]")
+                }
                 style={{
-                  // Active = floating dark squircle. Outer drop shadows
-                  // only (no insets) so the depth reads as the squircle
-                  // sitting above the surface, not as detailing painted
-                  // inside it. Thin 1px border at low opacity defines
-                  // the edge cleanly.
-                  background: active
-                    ? "linear-gradient(180deg, rgba(28,28,40,0.95) 0%, rgba(14,14,22,0.95) 100%)"
-                    : "transparent",
-                  color:      active ? "#fafafa" : "#a1a1aa",
-                  border:     active ? "1px solid rgba(255,255,255,0.06)" : "1px solid transparent",
-                  boxShadow:  active
-                    ? "0 8px 20px rgba(0,0,0,0.55), 0 2px 5px rgba(0,0,0,0.35)"
-                    : undefined,
-                  transition: "background 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
+                  background: active ? "#171324" : undefined,
+                  color:      active ? "#FFFFFF" : "rgba(255,255,255,0.40)",
                 }}
               >
-                <Icon size={26} weight={active ? "regular" : "light"} />
+                {/* Icon picks up color via currentColor. Active = fill weight
+                    (solid filled glyph in white); inactive = regular outline. */}
+                <Icon
+                  size={22}
+                  color="currentColor"
+                  weight={active ? "fill" : "regular"}
+                />
               </Link>
             );
           })}
@@ -118,6 +150,12 @@ export default function SideNav() {
         @keyframes jarvisOrbPulse {
           0%, 100% { transform: scale(1);    filter: brightness(1); }
           50%      { transform: scale(1.06); filter: brightness(1.12); }
+        }
+        /* Inactive-icon hover brightness lift. Tailwind hover:text-white/[0.85]
+           doesn't reliably override inline-style color, so we drive it via
+           a CSS rule scoped to the inactive (no #171324 bg) links. */
+        aside [href]:not([style*="background"]):hover {
+          color: rgba(255, 255, 255, 0.85) !important;
         }
       `}</style>
     </>
