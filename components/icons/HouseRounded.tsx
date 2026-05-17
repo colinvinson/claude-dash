@@ -39,7 +39,7 @@ export default function HouseRounded({
       viewBox="0 0 24 24"
       fill={filled ? color : "none"}
       stroke={filled ? "none" : color}
-      strokeWidth={2}
+      strokeWidth={1.6}
       strokeLinejoin="round"
       strokeLinecap="round"
       xmlns="http://www.w3.org/2000/svg"

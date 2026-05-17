@@ -91,13 +91,21 @@ export default function SideNav() {
                 aria-label={tab.label}
                 className="relative flex items-center justify-center w-16 h-16 rounded-2xl"
                 style={{
-                  background: active ? "#fafafa" : "transparent",
-                  color:      active ? "#0b0716" : "#a1a1aa",
-                  boxShadow:  active ? "0 6px 18px rgba(255,255,255,0.12)" : undefined,
-                  transition: "background-color 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
+                  // Active = DARK recessed squircle, like the screenshot
+                  // reference. A subtle translucent-black fill darker than
+                  // the rail bg + an INSET shadow at the top to read as
+                  // "pressed into the surface" instead of "raised above it."
+                  background: active
+                    ? "linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.20) 100%)"
+                    : "transparent",
+                  color:      active ? "#fafafa" : "#a1a1aa",
+                  boxShadow:  active
+                    ? "inset 0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.04)"
+                    : undefined,
+                  transition: "background 240ms cubic-bezier(0.22,1,0.36,1), color 200ms ease",
                 }}
               >
-                <Icon size={28} weight={active ? "fill" : "regular"} />
+                <Icon size={26} weight={active ? "regular" : "light"} />
               </Link>
             );
           })}
