@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/business-agents",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
