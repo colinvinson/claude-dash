@@ -49,7 +49,7 @@ export default function BusinessCard({
   const nextLine = topTask ?? business.next_action;
 
   return (
-    <Card>
+    <Card variant="item">
       <button onClick={onOpen} className="w-full text-left">
         <div className="flex items-start gap-3">
           {/* Status dot */}

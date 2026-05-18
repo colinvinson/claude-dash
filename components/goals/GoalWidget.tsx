@@ -186,7 +186,7 @@ export default function GoalWidget({
     : null;
 
   return (
-    <Card>
+    <Card variant="item">
       <button onClick={onToggleExpand} className="w-full text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
