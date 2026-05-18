@@ -44,11 +44,10 @@ html, body {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  /* Canvas: linear-gradient top-left → bottom-right per the launcher
-     spec. Deep muted violet/indigo top-left → matte velvet-black
-     bottom-right. background-attachment: fixed so it doesn't scroll
-     with content. */
-  background: linear-gradient(135deg, #1D172A 0%, #0C0A12 100%);
+  /* Pure dark canvas — no color cast. Matches the "dark and sleek"
+     net-worth screenshot direction. background-attachment: fixed so it
+     doesn't scroll with content. */
+  background: #050506;
   background-attachment: fixed;
   color: #FAFAFA;
   -webkit-font-smoothing: antialiased;
@@ -230,13 +229,12 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  /* Subtle emerald wash — single very-low-alpha glow at top-right. Keeps
+     the canvas from being perfectly flat without painting the screen
+     violet. Matches the "dark and sleek" net-worth screenshot. */
   background:
-    /* top-right: deep violet glow */
-    radial-gradient(ellipse 90% 55% at 82% 12%, rgba(139, 92, 246, 0.28) 0%, transparent 100%),
-    /* bottom-left: cool indigo/blue accent */
-    radial-gradient(ellipse 70% 55% at 18% 92%, rgba(96, 165, 250, 0.14) 0%, transparent 100%),
-    /* center: faint magenta lift */
-    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(217, 70, 239, 0.06) 0%, transparent 100%);
+    radial-gradient(ellipse 80% 50% at 80% 10%, rgba(16, 185, 129, 0.06) 0%, transparent 100%),
+    radial-gradient(ellipse 70% 55% at 20% 95%, rgba(16, 185, 129, 0.03) 0%, transparent 100%);
   filter: blur(40px);
   animation: wash-drift 36s ease-in-out infinite alternate;
 }

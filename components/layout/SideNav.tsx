@@ -12,7 +12,7 @@ import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 //   Width                 64px
 //   Position              fixed, 24px from left + top + bottom
 //   Height                calc(100vh - 48px) implicit via top+bottom
-//   Background            solid #161223
+//   Background            solid #0c0c0e (neutral near-black, no color cast)
 //   Border                1px solid rgba(255, 255, 255, 0.05)
 //   Radius                24px on all four corners
 //   Box shadow            0 12px 40px 0 rgba(0, 0, 0, 0.5)
@@ -26,7 +26,7 @@ import JarvisHUD from "@/app/(app)/jarvis/JarvisHUD";
 // Top slot 0 is the four-square multi-color brand mark — tapping
 // opens Jarvis. The remaining top slots are the standard NAV_TABS.
 //
-// Active state: 44×44 bounding, 14px radius, #221C33 fill,
+// Active state: 44×44 bounding, 14px radius, rgba(255,255,255,0.06) fill,
 // 1px rgba(255,255,255,0.08) inner stroke, pure white 20px icon.
 // No edge pill — selection communicated purely via box shift.
 
@@ -73,7 +73,7 @@ export default function SideNav() {
           top:             24,
           bottom:          24,
           width:           SIDE_NAV_W,
-          background:      "#161223",
+          background:      "#0c0c0e",
           border:          "1px solid rgba(255, 255, 255, 0.05)",
           borderRadius:    24,
           boxShadow:       "0 12px 40px 0 rgba(0, 0, 0, 0.5)",
@@ -121,7 +121,7 @@ export default function SideNav() {
                   width:        ITEM_BOX,
                   height:       ITEM_BOX,
                   borderRadius: ITEM_RAD,
-                  background:   active ? "#221C33" : "transparent",
+                  background:   active ? "rgba(255, 255, 255, 0.06)" : "transparent",
                   border:       active ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid transparent",
                   color:        active ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)",
                 }}
@@ -143,7 +143,7 @@ export default function SideNav() {
               width:        ITEM_BOX,
               height:       ITEM_BOX,
               borderRadius: ITEM_RAD,
-              background:   settingsActive ? "#221C33" : "transparent",
+              background:   settingsActive ? "rgba(255, 255, 255, 0.06)" : "transparent",
               border:       settingsActive ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid transparent",
               color:        settingsActive ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)",
             }}
