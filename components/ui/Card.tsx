@@ -1,16 +1,16 @@
 import { ReactNode, CSSProperties } from "react";
-import { RADIUS, SPACING, BORDER, SHADOW } from "@/lib/design-tokens";
+import { RADIUS, SPACING, BORDER } from "@/lib/design-tokens";
 
-// Glass card — the single container primitive. Every Home / tab card
-// composes from this. Three variants drive visual hierarchy:
+// Card — the single container primitive. Every Home / tab card composes
+// from this. The "dark and sleek" direction: content sits on the canvas,
+// defined by a hairline border + padding, NOT by elevated glass fills
+// or shadows. Variants:
 //
-//   hero    — THE moment-defining card on a surface. Stronger backdrop
-//             blur, denser bg, lit edge highlight at the top (the Apple
-//             "lit-from-above" look), deeper shadow. Use exactly once
-//             per surface (TodayWrap on Home, BusinessHero on Biz tab).
-//   primary — everyday glass card. Default.
-//   inline  — minimal border-only "card" for items nested inside another
-//             lifted surface (avoids stacking shadows / blurs).
+//   hero    — THE moment-defining surface. Same flat treatment as primary
+//             but with the larger lg radius + slightly brighter border so
+//             it still reads as the focal element on its surface.
+//   primary — everyday card. Flat. Hairline border on near-canvas fill.
+//   inline  — nested rows / sub-blocks. Smaller radius, no fill at all.
 //
 // Padding + radius pull from tokens so the visual rhythm stays consistent.
 
@@ -18,29 +18,19 @@ type Variant = "hero" | "primary" | "inline";
 
 const STYLES: Record<Variant, CSSProperties> = {
   hero: {
-    // Denser glass + warmer saturation (1.5) for the premium-launcher
-    // look. Border slightly brighter than the everyday hair so the lit
-    // edge reads at a glance.
-    background:           "rgba(255, 255, 255, 0.065)",
-    backdropFilter:       "blur(40px) saturate(1.5)",
-    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
-    boxShadow:            SHADOW.hero,
-    border:               "1px solid rgba(255, 255, 255, 0.10)",
-    borderRadius:         `${RADIUS.lg}px`,
-    padding:              `${SPACING.lg}px`,
+    background:    "rgba(255, 255, 255, 0.015)",
+    border:        "1px solid rgba(255, 255, 255, 0.08)",
+    borderRadius:  `${RADIUS.lg}px`,
+    padding:       `${SPACING.lg}px`,
   },
   primary: {
-    background:           "rgba(255, 255, 255, 0.04)",
-    backdropFilter:       "blur(24px) saturate(1.2)",
-    WebkitBackdropFilter: "blur(24px) saturate(1.2)",
-    boxShadow:            SHADOW.primary,
-    border:               `1px solid ${BORDER.hair}`,
-    borderRadius:         `${RADIUS.lg}px`,
-    padding:              `${SPACING.lg}px`,
+    background:    "rgba(255, 255, 255, 0.015)",
+    border:        `1px solid ${BORDER.hair}`,
+    borderRadius:  `${RADIUS.lg}px`,
+    padding:       `${SPACING.lg}px`,
   },
   inline: {
     background:    "transparent",
-    boxShadow:     SHADOW.inline,
     border:        `1px solid ${BORDER.hair}`,
     borderRadius:  `${RADIUS.md}px`,
     padding:       `${SPACING.md}px`,
