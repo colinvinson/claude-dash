@@ -1,40 +1,21 @@
 import { ReactNode, CSSProperties } from "react";
-import { RADIUS, SPACING, BORDER } from "@/lib/design-tokens";
+import { SPACING } from "@/lib/design-tokens";
 
-// Card — the single container primitive. Every Home / tab card composes
-// from this. The "dark and sleek" direction: content sits on the canvas,
-// defined by a hairline border + padding, NOT by elevated glass fills
-// or shadows. Variants:
+// Card — semantic section wrapper. No background, no border, no shadow,
+// no radius. Just padding so internal content has breathing room.
+// Sections on the page are defined by headers + spacing, not chrome.
 //
-//   hero    — THE moment-defining surface. Same flat treatment as primary
-//             but with the larger lg radius + slightly brighter border so
-//             it still reads as the focal element on its surface.
-//   primary — everyday card. Flat. Hairline border on near-canvas fill.
-//   inline  — nested rows / sub-blocks. Smaller radius, no fill at all.
-//
-// Padding + radius pull from tokens so the visual rhythm stays consistent.
+// Variants kept only to honor existing import sites; they all render
+// the same flat block. Variant prop is a no-op visually but tuning a
+// single variant later (if a real "lifted" treatment comes back) won't
+// require touching every consumer.
 
 type Variant = "hero" | "primary" | "inline";
 
 const STYLES: Record<Variant, CSSProperties> = {
-  hero: {
-    background:    "rgba(255, 255, 255, 0.015)",
-    border:        "1px solid rgba(255, 255, 255, 0.08)",
-    borderRadius:  `${RADIUS.lg}px`,
-    padding:       `${SPACING.lg}px`,
-  },
-  primary: {
-    background:    "rgba(255, 255, 255, 0.015)",
-    border:        `1px solid ${BORDER.hair}`,
-    borderRadius:  `${RADIUS.lg}px`,
-    padding:       `${SPACING.lg}px`,
-  },
-  inline: {
-    background:    "transparent",
-    border:        `1px solid ${BORDER.hair}`,
-    borderRadius:  `${RADIUS.md}px`,
-    padding:       `${SPACING.md}px`,
-  },
+  hero:    { padding: `${SPACING.lg}px 0` },
+  primary: { padding: `${SPACING.lg}px 0` },
+  inline:  { padding: `${SPACING.md}px 0` },
 };
 
 export default function Card({
