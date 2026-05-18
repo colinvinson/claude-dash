@@ -116,6 +116,14 @@ export const TYPE = {
   // Micro — tiny uppercase tag, used for stage chips, badges. Tracked
   // wider than label so it reads at small size without crushing.
   micro:    "text-[9px] uppercase tracking-[0.22em] font-bold",
+  // Section header — the "01 // OPERATOR" pattern from the Miles dashboard.
+  // Numbered section anchor + uppercase + heavy tracking. Use as the top
+  // line of every card / surface section.
+  section:  "text-[10px] uppercase tracking-[0.20em] text-zinc-500 font-medium",
+  // Display italic — the "Good afternoon, [name]." hero pattern. Serif-ish
+  // weight via italic + display sizing. Use for the single biggest copy
+  // moment on a surface where a number isn't appropriate.
+  displayItalic: "text-4xl font-semibold italic text-zinc-100 leading-tight tracking-[-0.02em]",
 } as const;
 
 // ── SHADOW — three depth tiers for the Card variants ───────────────────
