@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #050506;
+  --color-background: #000000;
   --color-foreground: #FAFAFA;
   --font-sans: var(--font-sans);
 
@@ -44,10 +44,8 @@ html, body {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  /* Pure dark canvas — no color cast. Matches the "dark and sleek"
-     net-worth screenshot direction. background-attachment: fixed so it
-     doesn't scroll with content. */
-  background: #050506;
+  /* Plain black canvas. No gradient, no color cast. */
+  background: #000000;
   background-attachment: fixed;
   color: #FAFAFA;
   -webkit-font-smoothing: antialiased;
@@ -218,26 +216,8 @@ button:not(.no-tap):not(:disabled):active {
   * { transition-duration: 0.01ms !important; }
 }
 
-/* ── Radial washes — atmospheric ambient. Three layered radials at low
-   opacity give the dark bg subtle depth so the surface doesn't read as
-   flat. The default palette is violet-leaning (premium game-launcher
-   look); score-driven accents below override the top wash via
-   [data-score]. Drifts on a 36s loop. ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* Subtle emerald wash — single very-low-alpha glow at top-right. Keeps
-     the canvas from being perfectly flat without painting the screen
-     violet. Matches the "dark and sleek" net-worth screenshot. */
-  background:
-    radial-gradient(ellipse 80% 50% at 80% 10%, rgba(16, 185, 129, 0.06) 0%, transparent 100%),
-    radial-gradient(ellipse 70% 55% at 20% 95%, rgba(16, 185, 129, 0.03) 0%, transparent 100%);
-  filter: blur(40px);
-  animation: wash-drift 36s ease-in-out infinite alternate;
-}
+/* Ambient wash REMOVED — per Sir's direction, background stays plain
+   black. No gradients, no radial glow. */
 
 /* ── Film grain — kills the perfect-digital-flat look. Almost subliminal
    at 0.018 opacity but it's the difference between a Notion-flat
