@@ -16,29 +16,34 @@
 // Each token has ONE meaning. Reusing a token for a different concept is
 // exactly the drift that made amber mean both "warning" AND "primary."
 
+// Tuned for pure-black canvas. The Tailwind -500 shades are designed
+// for white backgrounds; they read as harsh or muddy against pure
+// black. -400 / -300 shades carry the right vibrancy + readability on
+// dark mode (this is also how Apple, Stripe, Linear, Notion handle
+// their dark themes).
 export const PALETTE = {
-  success:     "#10b981",  // emerald-500 — done / positive outcomes
-  warning:     "#f59e0b",  // amber-500   — at-risk / drift signals
-  info:        "#0ea5e9",  // sky-500     — neutral information / time
-  danger:      "#ef4444",  // red-500     — regression / acute drops
-  celebration: "#fbbf24",  // amber-300   — PRs / milestones / wins
-  dim:         "#71717a",  // zinc-500    — muted / inactive
+  success:     "#34d399",  // emerald-400 — done / positive outcomes
+  warning:     "#fbbf24",  // amber-400   — at-risk / drift signals
+  info:        "#60a5fa",  // blue-400    — neutral information / time
+  danger:      "#f87171",  // red-400     — regression / acute drops
+  celebration: "#fcd34d",  // amber-300   — PRs / milestones / wins
+  dim:         "#a1a1aa",  // zinc-400    — muted / inactive (zinc-500 disappears on pure black)
 } as const;
 
 export const TINT = {
-  success:     "rgba(16, 185, 129, 0.08)",
-  warning:     "rgba(245, 158, 11, 0.08)",
-  info:        "rgba(14, 165, 233, 0.08)",
-  danger:      "rgba(239, 68, 68, 0.08)",
-  celebration: "rgba(251, 191, 36, 0.10)",
+  success:     "rgba(52, 211, 153, 0.10)",
+  warning:     "rgba(251, 191, 36, 0.10)",
+  info:        "rgba(96, 165, 250, 0.10)",
+  danger:      "rgba(248, 113, 113, 0.10)",
+  celebration: "rgba(252, 211, 77, 0.12)",
 } as const;
 
 export const BORDER = {
-  success:     "rgba(16, 185, 129, 0.25)",
-  warning:     "rgba(245, 158, 11, 0.30)",
-  info:        "rgba(14, 165, 233, 0.30)",
-  danger:      "rgba(239, 68, 68, 0.30)",
-  celebration: "rgba(251, 191, 36, 0.35)",
+  success:     "rgba(52, 211, 153, 0.30)",
+  warning:     "rgba(251, 191, 36, 0.32)",
+  info:        "rgba(96, 165, 250, 0.32)",
+  danger:      "rgba(248, 113, 113, 0.32)",
+  celebration: "rgba(252, 211, 77, 0.35)",
   // Neutral card outline — one value across the whole app.
   hair:        "rgba(255, 255, 255, 0.06)",
 } as const;
